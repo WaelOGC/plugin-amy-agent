@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from app.routes import chat, config_sync, health
+from app.routes import chat, config_sync, health, submit_idea
 
 app = FastAPI(
     title="Amy Agent Service",
@@ -13,3 +13,4 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(config_sync.router)
 app.include_router(chat.router)
+app.include_router(submit_idea.router)

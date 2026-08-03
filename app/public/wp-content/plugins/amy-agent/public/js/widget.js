@@ -110,16 +110,23 @@
 			function formatInline(line) {
 				var out = '';
 				var rest = line;
+				var mdLinkRe = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/;
 				var boldRe = /\*\*(.+?)\*\*/;
 				var urlRe = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]?)/;
 
 				while (rest.length) {
+					var mdLinkMatch = rest.match(mdLinkRe);
 					var boldMatch = rest.match(boldRe);
 					var urlMatch = rest.match(urlRe);
 					var nextIndex = rest.length;
 					var kind = null;
 					var match = null;
 
+					if (mdLinkMatch && mdLinkMatch.index < nextIndex) {
+						nextIndex = mdLinkMatch.index;
+						kind = 'mdlink';
+						match = mdLinkMatch;
+					}
 					if (boldMatch && boldMatch.index < nextIndex) {
 						nextIndex = boldMatch.index;
 						kind = 'bold';
@@ -137,7 +144,14 @@
 					}
 
 					out += rest.slice(0, nextIndex);
-					if (kind === 'bold') {
+					if (kind === 'mdlink') {
+						out +=
+							'<a href="' +
+							match[2] +
+							'" target="_blank" rel="noopener noreferrer">' +
+							match[1] +
+							'</a>';
+					} else if (kind === 'bold') {
 						out += '<strong>' + match[1] + '</strong>';
 					} else {
 						var href = match[1];

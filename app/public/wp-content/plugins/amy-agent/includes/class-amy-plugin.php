@@ -50,6 +50,16 @@ class Amy_Plugin {
 	public $assets;
 
 	/**
+	 * @var Amy_Submit_Idea
+	 */
+	public $submit_idea;
+
+	/**
+	 * @var Amy_Submit_Idea_Mail
+	 */
+	public $submit_idea_mail;
+
+	/**
 	 * Returns the singleton instance.
 	 *
 	 * @return Amy_Plugin
@@ -65,18 +75,22 @@ class Amy_Plugin {
 	 * Constructor.
 	 */
 	private function __construct() {
-		$this->settings     = new Amy_Settings();
-		$this->admin_menu   = new Amy_Admin_Menu( $this->settings );
-		$this->api_client   = new Amy_Api_Client( $this->settings );
-		$this->rest         = new Amy_Rest( $this->api_client, $this->settings );
-		$this->theme_bridge = new Amy_Theme_Bridge( $this->settings );
-		$this->assets       = new Amy_Assets( $this->settings );
+		$this->settings         = new Amy_Settings();
+		$this->admin_menu       = new Amy_Admin_Menu( $this->settings );
+		$this->api_client       = new Amy_Api_Client( $this->settings );
+		$this->rest             = new Amy_Rest( $this->api_client, $this->settings );
+		$this->theme_bridge     = new Amy_Theme_Bridge( $this->settings );
+		$this->assets           = new Amy_Assets( $this->settings );
+		$this->submit_idea      = new Amy_Submit_Idea( $this->settings );
+		$this->submit_idea_mail = new Amy_Submit_Idea_Mail();
 
 		$this->settings->register();
 		$this->admin_menu->register();
 		$this->rest->register();
 		$this->theme_bridge->register();
 		$this->assets->register();
+		$this->submit_idea->register();
+		$this->submit_idea_mail->register();
 	}
 
 	/**

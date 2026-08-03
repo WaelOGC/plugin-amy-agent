@@ -98,6 +98,75 @@ class Amy_Rest {
 				),
 			)
 		);
+
+		$this->register_submit_idea_routes();
+	}
+
+	/**
+	 * Browser-facing Submit Idea proxies → Python /v1/submit-idea/*.
+	 */
+	private function register_submit_idea_routes() {
+		$nonce_perm = array( $this, 'can_chat' );
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/submit-idea/start',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_submit_idea_start' ),
+				'permission_callback' => $nonce_perm,
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/submit-idea/answers',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_submit_idea_answers' ),
+				'permission_callback' => $nonce_perm,
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/submit-idea/confirm',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_submit_idea_confirm' ),
+				'permission_callback' => $nonce_perm,
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/submit-idea/deep-dive-message',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_submit_idea_deep_dive' ),
+				'permission_callback' => $nonce_perm,
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/submit-idea/contact',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_submit_idea_contact' ),
+				'permission_callback' => $nonce_perm,
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/submit-idea/upload',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_submit_idea_upload' ),
+				'permission_callback' => $nonce_perm,
+			)
+		);
 	}
 
 	/**
@@ -234,6 +303,218 @@ class Amy_Rest {
 		}
 
 		return new WP_REST_Response( $body, $status );
+	}
+
+	/**
+	 * POST /submit-idea/start
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_submit_idea_start( $request ) {
+		return $this->proxy_submit_idea(
+			'/v1/submit-idea/start',
+			array(
+				'session_id'   => sanitize_text_field( (string) $request->get_param( 'session_id' ) ),
+				'service_slug' => sanitize_key( (string) $request->get_param( 'service_slug' ) ),
+			),
+			false
+		);
+	}
+
+	/**
+	 * POST /submit-idea/answers
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_submit_idea_answers( $request ) {
+		$answers = $request->get_param( 'answers' );
+		return $this->proxy_submit_idea(
+			'/v1/submit-idea/answers',
+			array(
+				'session_id' => sanitize_text_field( (string) $request->get_param( 'session_id' ) ),
+				'answers'    => is_array( $answers ) ? $this->sanitize_answers( $answers ) : array(),
+			),
+			true
+		);
+	}
+
+	/**
+	 * POST /submit-idea/confirm
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_submit_idea_confirm( $request ) {
+		return $this->proxy_submit_idea(
+			'/v1/submit-idea/confirm',
+			array(
+				'session_id' => sanitize_text_field( (string) $request->get_param( 'session_id' ) ),
+				'confirmed'  => (bool) $request->get_param( 'confirmed' ),
+			),
+			true
+		);
+	}
+
+	/**
+	 * POST /submit-idea/deep-dive-message
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_submit_idea_deep_dive( $request ) {
+		return $this->proxy_submit_idea(
+			'/v1/submit-idea/deep-dive-message',
+			array(
+				'session_id' => sanitize_text_field( (string) $request->get_param( 'session_id' ) ),
+				'message'    => sanitize_textarea_field( (string) $request->get_param( 'message' ) ),
+			),
+			true
+		);
+	}
+
+	/**
+	 * POST /submit-idea/contact
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_submit_idea_contact( $request ) {
+		$whatsapp = $request->get_param( 'whatsapp' );
+		return $this->proxy_submit_idea(
+			'/v1/submit-idea/contact',
+			array(
+				'session_id' => sanitize_text_field( (string) $request->get_param( 'session_id' ) ),
+				'email'      => sanitize_email( (string) $request->get_param( 'email' ) ),
+				'whatsapp'   => null !== $whatsapp && '' !== $whatsapp
+					? sanitize_text_field( (string) $whatsapp )
+					: null,
+			),
+			true
+		);
+	}
+
+	/**
+	 * POST /submit-idea/upload (multipart).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_submit_idea_upload( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+		$files      = $request->get_file_params();
+		$file       = isset( $files['file'] ) && is_array( $files['file'] ) ? $files['file'] : null;
+
+		if ( ! $session_id || ! $file ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'session_id and file are required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$result = $this->api_client->submit_idea_upload( $session_id, $file );
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * Proxy a Submit Idea JSON call to Python.
+	 *
+	 * @param string $path    Python path.
+	 * @param array  $payload Body.
+	 * @param bool   $with_ai Merge AI config.
+	 * @return WP_REST_Response
+	 */
+	private function proxy_submit_idea( $path, array $payload, $with_ai ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		if ( $this->is_rate_limited() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'rate_limited',
+					'message' => __( 'Too many messages. Please wait a moment and try again.', 'amy-agent' ),
+				),
+				429
+			);
+		}
+
+		$result = $this->api_client->submit_idea( $path, $payload, $with_ai );
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * @param array{ok: bool, status_code: int, body: array|null, error: string|null} $result Upstream result.
+	 * @return WP_REST_Response
+	 */
+	private function upstream_response( array $result ) {
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+
+		$body = is_array( $result['body'] ) ? $result['body'] : array(
+			'error'   => 'upstream_error',
+			'message' => __( 'Amy is unavailable right now.', 'amy-agent' ),
+		);
+
+		if ( ! empty( $result['error'] ) && empty( $body['message'] ) ) {
+			$body['message'] = __( 'Amy is unavailable right now.', 'amy-agent' );
+		}
+
+		return new WP_REST_Response( $body, $status );
+	}
+
+	/**
+	 * @param array $answers Raw answers map.
+	 * @return array<string, mixed>
+	 */
+	private function sanitize_answers( array $answers ) {
+		$clean = array();
+		foreach ( $answers as $key => $value ) {
+			$qid = sanitize_key( (string) $key );
+			if ( '' === $qid ) {
+				continue;
+			}
+			if ( is_array( $value ) ) {
+				$clean[ $qid ] = array_values(
+					array_filter(
+						array_map(
+							static function ( $item ) {
+								return sanitize_text_field( (string) $item );
+							},
+							$value
+						),
+						static function ( $item ) {
+							return '' !== $item;
+						}
+					)
+				);
+			} else {
+				$clean[ $qid ] = sanitize_textarea_field( (string) $value );
+			}
+		}
+		return $clean;
 	}
 
 	/**

@@ -60,6 +60,123 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST a Submit Idea JSON endpoint, injecting AI config when needed.
+	 *
+	 * @param string $path    Path under /v1/submit-idea/….
+	 * @param array  $payload Request body (without ai).
+	 * @param bool   $with_ai Whether to merge AI config from settings.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function submit_idea( $path, array $payload, $with_ai = false ) {
+		if ( $with_ai ) {
+			$payload['ai'] = $this->settings->get_ai_config();
+		}
+		return $this->request( 'POST', $path, $payload, 60 );
+	}
+
+	/**
+	 * POST /v1/submit-idea/upload — multipart file proxy.
+	 *
+	 * @param string $session_id Session UUID.
+	 * @param array  $file       WordPress-style file array (name, type, tmp_name, size).
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function submit_idea_upload( $session_id, array $file ) {
+		$base = $this->settings->get_service_url();
+		if ( '' === $base ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Service URL is not configured.',
+			);
+		}
+
+		$secret = $this->settings->get_shared_secret();
+		if ( '' === $secret ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Shared secret is not configured.',
+			);
+		}
+
+		$tmp  = isset( $file['tmp_name'] ) ? (string) $file['tmp_name'] : '';
+		$name = isset( $file['name'] ) ? (string) $file['name'] : 'upload';
+		$type = isset( $file['type'] ) ? (string) $file['type'] : 'application/octet-stream';
+
+		if ( '' === $tmp || ! is_readable( $tmp ) ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Uploaded file is not readable.',
+			);
+		}
+
+		if ( ! class_exists( 'CURLFile' ) ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'CURLFile is required for uploads.',
+			);
+		}
+
+		$url  = $base . '/v1/submit-idea/upload';
+		$body = array(
+			'session_id' => (string) $session_id,
+			'file'       => new \CURLFile( $tmp, $type, $name ),
+		);
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- multipart proxy to local Python service.
+		$ch = curl_init( $url );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_POST           => true,
+				CURLOPT_POSTFIELDS     => $body,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_TIMEOUT        => 60,
+				CURLOPT_HTTPHEADER     => array(
+					'Accept: application/json',
+					'X-Amy-Secret: ' . $secret,
+				),
+			)
+		);
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_exec
+		$raw    = curl_exec( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_errno
+		$errno  = curl_errno( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error
+		$errstr = curl_error( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo
+		$status = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_close
+		curl_close( $ch );
+
+		if ( $errno ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => $errstr ? $errstr : 'Upload request failed.',
+			);
+		}
+
+		$decoded = json_decode( (string) $raw, true );
+
+		return array(
+			'ok'          => $status >= 200 && $status < 300,
+			'status_code' => $status,
+			'body'        => is_array( $decoded ) ? $decoded : null,
+			'error'       => ( $status >= 200 && $status < 300 ) ? null : ( is_array( $decoded ) && isset( $decoded['message'] ) ? (string) $decoded['message'] : 'Request failed.' ),
+		);
+	}
+
+	/**
 	 * Perform an authenticated request to the Python service.
 	 *
 	 * @param string     $method  HTTP method.

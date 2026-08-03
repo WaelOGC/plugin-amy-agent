@@ -28,6 +28,8 @@ require_once AMY_AGENT_PATH . 'includes/class-amy-api-client.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-rest.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-theme-bridge.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-assets.php';
+require_once AMY_AGENT_PATH . 'includes/class-amy-submit-idea.php';
+require_once AMY_AGENT_PATH . 'includes/class-amy-submit-idea-mail.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-plugin.php';
 
 /**

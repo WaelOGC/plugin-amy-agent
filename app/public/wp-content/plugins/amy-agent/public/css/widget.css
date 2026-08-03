@@ -186,7 +186,7 @@
 
 .amy-agent-bubble--assistant strong {
 	font-weight: 700;
-	color: var(--amy-accent-soft);
+	color: var(--amy-accent);
 }
 
 .amy-agent-bubble--assistant ol,

@@ -1,0 +1,410 @@
+/**
+ * Amy Agent — Submit Your Idea conversational UI.
+ * Reuses the floating widget CSS custom properties for visual identity.
+ */
+
+.amy-submit-idea {
+	--amy-bg: #0a0a0a;
+	--amy-panel: rgba(20, 20, 20, 0.92);
+	--amy-border: rgba(255, 210, 122, 0.35);
+	--amy-accent: #ffd27a;
+	--amy-accent-soft: #ffeac2;
+	--amy-text: #f5f5f5;
+	--amy-muted: #c9c9c9;
+	--amy-brand-rgb: 255, 210, 122;
+	color: var(--amy-text);
+	font-family: "Space Grotesk", Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+	max-width: 52rem;
+	margin: 0 auto;
+}
+
+.amy-si-section {
+	display: none;
+}
+
+.amy-si-section.is-active {
+	display: block;
+}
+
+.amy-si-heading {
+	margin: 0 0 0.5rem;
+	font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+	font-weight: 700;
+	color: var(--amy-accent-soft);
+	letter-spacing: 0.01em;
+}
+
+.amy-si-sub {
+	margin: 0 0 1.5rem;
+	color: var(--amy-muted);
+	font-size: 0.95rem;
+	line-height: 1.5;
+}
+
+/* —— Service cards —— */
+.amy-si-services {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+	gap: 0.85rem;
+}
+
+.amy-si-service {
+	appearance: none;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.65rem;
+	text-align: left;
+	padding: 1.1rem 1rem;
+	border-radius: 0.9rem;
+	border: 1px solid var(--amy-border);
+	background: linear-gradient(160deg, rgba(26, 26, 26, 0.95), rgba(10, 10, 10, 0.9));
+	color: var(--amy-text);
+	cursor: pointer;
+	font: inherit;
+	transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.amy-si-service:hover,
+.amy-si-service:focus-visible {
+	transform: translateY(-3px);
+	border-color: var(--amy-accent);
+	box-shadow:
+		0 10px 28px rgba(0, 0, 0, 0.4),
+		0 0 22px rgba(var(--amy-brand-rgb), 0.22);
+	outline: none;
+}
+
+.amy-si-service__icon {
+	width: 2.25rem;
+	height: 2.25rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 0.55rem;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.3);
+	background: rgba(var(--amy-brand-rgb), 0.08);
+	color: var(--amy-accent);
+	font-size: 1.05rem;
+	line-height: 1;
+}
+
+.amy-si-service__label {
+	font-size: 0.9rem;
+	font-weight: 600;
+	line-height: 1.35;
+}
+
+/* —— Question form —— */
+.amy-si-form {
+	display: flex;
+	flex-direction: column;
+	gap: 1.25rem;
+}
+
+.amy-si-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.amy-si-field__label {
+	font-size: 0.92rem;
+	font-weight: 600;
+	color: var(--amy-text);
+}
+
+.amy-si-field__label .amy-si-optional {
+	font-weight: 400;
+	color: var(--amy-muted);
+	font-size: 0.8rem;
+}
+
+.amy-si-input,
+.amy-si-textarea {
+	width: 100%;
+	box-sizing: border-box;
+	border-radius: 0.7rem;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.25);
+	background: rgba(0, 0, 0, 0.35);
+	color: var(--amy-text);
+	padding: 0.75rem 0.85rem;
+	font: inherit;
+	font-size: 0.92rem;
+}
+
+.amy-si-textarea {
+	min-height: 6rem;
+	resize: vertical;
+}
+
+.amy-si-input:focus,
+.amy-si-textarea:focus {
+	outline: none;
+	border-color: var(--amy-accent);
+	box-shadow: 0 0 0 2px rgba(var(--amy-brand-rgb), 0.15);
+}
+
+.amy-si-pills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
+.amy-si-pill {
+	appearance: none;
+	border-radius: 999px;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.3);
+	background: rgba(0, 0, 0, 0.3);
+	color: var(--amy-text);
+	font: inherit;
+	font-size: 0.85rem;
+	padding: 0.45rem 0.9rem;
+	cursor: pointer;
+	transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.amy-si-pill:hover,
+.amy-si-pill:focus-visible {
+	border-color: var(--amy-accent);
+	outline: none;
+}
+
+.amy-si-pill.is-active {
+	background: rgba(var(--amy-brand-rgb), 0.18);
+	border-color: var(--amy-accent);
+	color: var(--amy-accent-soft);
+}
+
+.amy-si-dropzone {
+	border: 1px dashed rgba(var(--amy-brand-rgb), 0.4);
+	border-radius: 0.85rem;
+	padding: 1.25rem 1rem;
+	text-align: center;
+	color: var(--amy-muted);
+	font-size: 0.88rem;
+	background: rgba(0, 0, 0, 0.25);
+	cursor: pointer;
+	transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.amy-si-dropzone.is-dragover {
+	border-color: var(--amy-accent);
+	background: rgba(var(--amy-brand-rgb), 0.08);
+	color: var(--amy-accent-soft);
+}
+
+.amy-si-dropzone input[type="file"] {
+	display: none;
+}
+
+.amy-si-files {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+	margin-top: 0.65rem;
+}
+
+.amy-si-file-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	padding: 0.35rem 0.55rem 0.35rem 0.75rem;
+	border-radius: 999px;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.3);
+	background: rgba(var(--amy-brand-rgb), 0.1);
+	font-size: 0.8rem;
+	color: var(--amy-accent-soft);
+}
+
+.amy-si-file-chip button {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--amy-muted);
+	cursor: pointer;
+	font-size: 1rem;
+	line-height: 1;
+	padding: 0 0.15rem;
+}
+
+.amy-si-file-chip button:hover {
+	color: var(--amy-accent);
+}
+
+.amy-si-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+	margin-top: 0.5rem;
+}
+
+.amy-si-btn {
+	appearance: none;
+	border-radius: 0.7rem;
+	border: 1px solid var(--amy-border);
+	background: linear-gradient(145deg, #1a1a1a, #101010);
+	color: #fff;
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 600;
+	padding: 0.7rem 1.15rem;
+	cursor: pointer;
+	transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.amy-si-btn:hover:not(:disabled),
+.amy-si-btn:focus-visible:not(:disabled) {
+	border-color: var(--amy-accent);
+	background: rgba(var(--amy-brand-rgb), 0.16);
+	outline: none;
+}
+
+.amy-si-btn:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.amy-si-btn--primary {
+	border-color: var(--amy-accent);
+	color: #0a0a0a;
+	background: linear-gradient(145deg, #ffeac2, #ffd27a);
+}
+
+.amy-si-btn--primary:hover:not(:disabled),
+.amy-si-btn--primary:focus-visible:not(:disabled) {
+	background: linear-gradient(145deg, #fff3d6, #ffd27a);
+	border-color: var(--amy-accent-soft);
+}
+
+.amy-si-error {
+	color: #ff8f8f;
+	font-size: 0.85rem;
+	margin: 0;
+}
+
+/* —— Chat / summary —— */
+.amy-si-chat {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1rem;
+	border-radius: 1rem;
+	border: 1px solid var(--amy-border);
+	background: var(--amy-panel);
+	min-height: 12rem;
+	max-height: 28rem;
+	overflow-y: auto;
+}
+
+.amy-si-bubble {
+	max-width: 92%;
+	padding: 0.7rem 0.85rem;
+	border-radius: 0.85rem;
+	font-size: 0.9rem;
+	line-height: 1.45;
+	word-break: break-word;
+}
+
+.amy-si-bubble--assistant {
+	align-self: flex-start;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.18);
+	color: var(--amy-text);
+}
+
+.amy-si-bubble--assistant p {
+	margin: 0 0 0.65rem;
+}
+
+.amy-si-bubble--assistant p:last-child {
+	margin-bottom: 0;
+}
+
+.amy-si-bubble--assistant strong {
+	font-weight: 700;
+	color: var(--amy-accent);
+}
+
+.amy-si-bubble--assistant ol,
+.amy-si-bubble--assistant ul {
+	margin: 0.35rem 0 0.65rem;
+	padding-left: 1.25rem;
+}
+
+.amy-si-bubble--assistant a {
+	color: #ffd27a;
+	text-decoration: underline;
+}
+
+.amy-si-bubble--user {
+	align-self: flex-end;
+	background: rgba(var(--amy-brand-rgb), 0.14);
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.35);
+	white-space: pre-wrap;
+}
+
+.amy-si-bubble--status {
+	align-self: center;
+	background: transparent;
+	border: 0;
+	color: var(--amy-muted);
+	font-size: 0.8rem;
+	padding: 0.25rem 0.5rem;
+}
+
+.amy-si-choices {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-top: 0.65rem;
+}
+
+.amy-si-composer {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.85rem;
+}
+
+.amy-si-composer .amy-si-input {
+	flex: 1;
+	min-width: 0;
+}
+
+/* —— Thank you —— */
+.amy-si-thanks {
+	text-align: center;
+	padding: 2.5rem 1.5rem;
+	border-radius: 1rem;
+	border: 1px solid var(--amy-border);
+	background:
+		radial-gradient(ellipse at 50% 0%, rgba(var(--amy-brand-rgb), 0.14), transparent 60%),
+		var(--amy-panel);
+}
+
+.amy-si-thanks__title {
+	margin: 0 0 0.75rem;
+	font-size: 1.4rem;
+	color: var(--amy-accent);
+}
+
+.amy-si-thanks__body {
+	margin: 0;
+	color: var(--amy-text);
+	line-height: 1.55;
+	font-size: 1rem;
+}
+
+@media (max-width: 560px) {
+	.amy-si-services {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.amy-si-service,
+	.amy-si-pill,
+	.amy-si-btn {
+		transition: none;
+	}
+}
