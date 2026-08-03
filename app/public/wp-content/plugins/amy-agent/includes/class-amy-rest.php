@@ -207,7 +207,7 @@ class Amy_Rest {
 			'session_id' => $session_id,
 			'mode'       => $mode,
 			'messages'   => $messages,
-			'context'    => is_array( $context ) ? $context : array(),
+			'context'    => is_array( $context ) && ! empty( $context ) ? $context : (object) array(),
 		);
 
 		if ( is_array( $page ) ) {
