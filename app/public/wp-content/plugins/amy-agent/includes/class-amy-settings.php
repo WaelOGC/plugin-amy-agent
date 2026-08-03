@@ -39,8 +39,38 @@ class Amy_Settings {
 	public function register() {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_init', array( $this, 'normalize_enabled_checkbox_post' ), 0 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( AMY_AGENT_FILE ), array( $this, 'add_settings_link' ) );
+	}
+
+	/**
+	 * Ensure Enable Amy posts as plain "0" or "1" (Settings API + checkbox).
+	 *
+	 * Duplicate hidden+checkbox fields can arrive as an array and get sanitized to "0".
+	 */
+	public function normalize_enabled_checkbox_post() {
+		if ( ! isset( $_POST['option_page'] ) || 'amy_agent_settings' !== $_POST['option_page'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$raw = isset( $_POST[ self::OPTION_ENABLED ] ) ? wp_unslash( $_POST[ self::OPTION_ENABLED ] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		if ( is_array( $raw ) ) {
+			$_POST[ self::OPTION_ENABLED ] = in_array( '1', array_map( 'strval', $raw ), true ) ? '1' : '0';
+			return;
+		}
+
+		// Checkbox-only: missing from POST means unchecked.
+		if ( null === $raw ) {
+			$_POST[ self::OPTION_ENABLED ] = '0';
+			return;
+		}
+
+		$_POST[ self::OPTION_ENABLED ] = ( '1' === (string) $raw ) ? '1' : '0';
 	}
 
 	/**
@@ -233,6 +263,9 @@ class Amy_Settings {
 	 * @return string '1' or '0'
 	 */
 	public function sanitize_checkbox( $value ) {
+		if ( is_array( $value ) ) {
+			return in_array( '1', array_map( 'strval', $value ), true ) ? '1' : '0';
+		}
 		return ( '1' === (string) $value || true === $value || 1 === $value ) ? '1' : '0';
 	}
 
@@ -382,17 +415,13 @@ class Amy_Settings {
 	 */
 	public function render_field_enabled() {
 		$checked = $this->is_enabled();
-		// Hidden 0 so unchecking still persists via Settings API.
-		printf(
-			'<input type="hidden" name="%1$s" value="0" />',
-			esc_attr( self::OPTION_ENABLED )
-		);
 		printf(
 			'<label><input type="checkbox" name="%1$s" value="1" %2$s /> %3$s</label>',
 			esc_attr( self::OPTION_ENABLED ),
 			checked( $checked, true, false ),
-			esc_html__( 'Replace Submit Your Idea manual form when ready (requires service URL + secret).', 'amy-agent' )
+			esc_html__( 'Show the Amy chat button on the site (requires service URL + secret).', 'amy-agent' )
 		);
+		echo '<p class="description">' . esc_html__( 'Uncheck and save to hide Amy again.', 'amy-agent' ) . '</p>';
 	}
 
 	/**
