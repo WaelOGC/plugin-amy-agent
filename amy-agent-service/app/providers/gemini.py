@@ -24,7 +24,11 @@ class GeminiProvider(BaseProvider):
         if not (api_key or "").strip():
             raise ProviderError("Missing API key.", code="auth_error")
 
+        # Remap retired model IDs WordPress may still send from older settings.
+        if (model or "").strip() == "gemini-2.0-flash":
+            model = None
         resolved = self.resolve_model(model)
+        print(f"[amy-gemini] using model={resolved}", flush=True)
         url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
             f"{resolved}:generateContent"

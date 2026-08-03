@@ -380,6 +380,10 @@ class Amy_Settings {
 	 */
 	public function get_ai_model() {
 		$model = trim( (string) get_option( self::OPTION_AI_MODEL, '' ) );
+		// Retired Gemini model IDs — fall back to Python provider default.
+		if ( 'gemini-2.0-flash' === $model ) {
+			$model = '';
+		}
 		return '' === $model ? null : $model;
 	}
 

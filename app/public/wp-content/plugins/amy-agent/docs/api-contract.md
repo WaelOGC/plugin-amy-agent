@@ -45,7 +45,7 @@ Included on intelligence-related POSTs. WordPress is the source of truth.
 
 | Provider | Default |
 | --- | --- |
-| `gemini` | `gemini-2.0-flash` |
+| `gemini` | `gemini-3.6-flash` |
 | `openai` | `gpt-4o-mini` |
 | `anthropic` | `claude-sonnet-4-20250514` |
 | `deepseek` | `deepseek-chat` |
