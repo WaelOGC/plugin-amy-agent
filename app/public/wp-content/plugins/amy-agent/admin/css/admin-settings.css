@@ -1,0 +1,11 @@
+/**
+ * Amy Agent — admin settings (Phase 1 stub).
+ */
+
+.amy-agent-settings .form-table th {
+	width: 200px;
+}
+
+.amy-agent-settings .description {
+	max-width: 40rem;
+}
