@@ -13,7 +13,7 @@ _TIMEOUT = httpx.Timeout(45.0, connect=10.0)
 
 class GeminiProvider(BaseProvider):
     provider_id = "gemini"
-    default_model = "gemini-2.0-flash"
+    default_model = "gemini-3.6-flash"
 
     async def complete(
         self,
@@ -63,6 +63,11 @@ class GeminiProvider(BaseProvider):
         return self._parse_response(response)
 
     def _parse_response(self, response: httpx.Response) -> str:
+        if response.status_code >= 400:
+            print(
+                f"[amy-gemini] HTTP {response.status_code}: {response.text}",
+                flush=True,
+            )
         if response.status_code in (401, 403):
             raise ProviderError("Provider authentication failed.", code="auth_error")
         if response.status_code == 429:
