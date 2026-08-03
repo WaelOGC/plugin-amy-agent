@@ -9,3 +9,9 @@
 .amy-agent-settings .description {
 	max-width: 40rem;
 }
+
+.amy-agent-settings .amy-agent-saved-status {
+	max-width: 40rem;
+	margin: 0.5rem 0 0;
+	color: #1e7e34;
+}

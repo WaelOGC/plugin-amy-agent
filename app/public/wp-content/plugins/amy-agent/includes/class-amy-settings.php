@@ -40,6 +40,26 @@ class Amy_Settings {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( AMY_AGENT_FILE ), array( $this, 'add_settings_link' ) );
+	}
+
+	/**
+	 * Add a Settings link on the Plugins list row.
+	 *
+	 * @param array $links Existing action links.
+	 * @return array
+	 */
+	public function add_settings_link( $links ) {
+		$url = admin_url( 'options-general.php?page=amy-agent' );
+		array_unshift(
+			$links,
+			sprintf(
+				'<a href="%s">%s</a>',
+				esc_url( $url ),
+				esc_html__( 'Settings', 'amy-agent' )
+			)
+		);
+		return $links;
 	}
 
 	/**
@@ -391,13 +411,26 @@ class Amy_Settings {
 	 * Shared secret field.
 	 */
 	public function render_field_shared_secret() {
-		$has_secret = '' !== $this->get_shared_secret();
+		$secret     = $this->get_shared_secret();
+		$has_secret = '' !== $secret;
 		printf(
 			'<input type="password" class="regular-text" name="%1$s" value="" autocomplete="new-password" placeholder="%2$s" />',
 			esc_attr( self::OPTION_SHARED_SECRET ),
-			$has_secret ? esc_attr__( '•••••••• (leave blank to keep current secret)', 'amy-agent' ) : ''
+			$has_secret ? esc_attr__( 'Enter a new secret to replace the saved one', 'amy-agent' ) : esc_attr__( 'Enter a shared secret', 'amy-agent' )
 		);
-		echo '<p class="description">' . esc_html__( 'Must match AMY_SHARED_SECRET in the Python service .env. Leave blank when saving to keep the existing secret.', 'amy-agent' ) . '</p>';
+		if ( $has_secret ) {
+			echo '<p class="amy-agent-saved-status"><strong>' . esc_html__( 'Saved:', 'amy-agent' ) . '</strong> ';
+			echo esc_html(
+				sprintf(
+					/* translators: %s: masked secret ending */
+					__( 'Shared secret is stored in the database (%s). Leave the field blank when saving to keep it.', 'amy-agent' ),
+					$this->mask_secret( $secret )
+				)
+			);
+			echo '</p>';
+		} else {
+			echo '<p class="description">' . esc_html__( 'Must match AMY_SHARED_SECRET in the Python service .env.', 'amy-agent' ) . '</p>';
+		}
 	}
 
 	/**
@@ -418,16 +451,44 @@ class Amy_Settings {
 	}
 
 	/**
-	 * API key — password field; never echo a hint of the full key beyond placeholder when set.
+	 * API key — password field never re-prints the raw key into HTML.
 	 */
 	public function render_field_api_key() {
-		$has_key = '' !== $this->get_ai_api_key();
+		$key     = $this->get_ai_api_key();
+		$has_key = '' !== $key;
 		printf(
 			'<input type="password" class="regular-text" name="%1$s" value="" autocomplete="new-password" placeholder="%2$s" />',
 			esc_attr( self::OPTION_AI_API_KEY ),
-			$has_key ? esc_attr__( '•••••••• (leave blank to keep current key)', 'amy-agent' ) : ''
+			$has_key ? esc_attr__( 'Enter a new key to replace the saved one', 'amy-agent' ) : esc_attr__( 'Paste your API key', 'amy-agent' )
 		);
-		echo '<p class="description">' . esc_html__( 'Stored via the Options API. Leave blank when saving to keep the existing key.', 'amy-agent' ) . '</p>';
+		if ( $has_key ) {
+			echo '<p class="amy-agent-saved-status"><strong>' . esc_html__( 'Saved:', 'amy-agent' ) . '</strong> ';
+			echo esc_html(
+				sprintf(
+					/* translators: %s: masked API key ending */
+					__( 'API key is stored in the database (%s). Leave the field blank when saving to keep it.', 'amy-agent' ),
+					$this->mask_secret( $key )
+				)
+			);
+			echo '</p>';
+		} else {
+			echo '<p class="description">' . esc_html__( 'Stored via the Options API. The field stays empty after save on purpose so the key is never shown in the page HTML.', 'amy-agent' ) . '</p>';
+		}
+	}
+
+	/**
+	 * Mask a secret for admin display (keep last 4 chars).
+	 *
+	 * @param string $value Raw secret.
+	 * @return string
+	 */
+	private function mask_secret( $value ) {
+		$value  = (string) $value;
+		$length = strlen( $value );
+		if ( $length <= 4 ) {
+			return str_repeat( '•', max( 4, $length ) );
+		}
+		return str_repeat( '•', min( 12, $length - 4 ) ) . substr( $value, -4 );
 	}
 
 	/**
