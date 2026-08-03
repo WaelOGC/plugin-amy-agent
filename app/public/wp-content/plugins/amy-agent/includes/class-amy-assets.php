@@ -29,7 +29,7 @@ class Amy_Assets {
 	 */
 	public function register() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue' ) );
-		add_action( 'wp_footer', array( $this, 'render_mount' ), 20 );
+		add_action( 'wp_footer', array( $this, 'render_mount' ), 5 );
 	}
 
 	/**
