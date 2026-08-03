@@ -20,6 +20,7 @@ class Amy_Settings {
 	const OPTION_AI_PROVIDER   = 'amy_agent_ai_provider';
 	const OPTION_AI_API_KEY    = 'amy_agent_ai_api_key';
 	const OPTION_AI_MODEL      = 'amy_agent_ai_model';
+	const OPTION_AVATAR_URL    = 'amy_agent_avatar_url';
 
 	/**
 	 * Allowed AI provider slugs (must match Python registry).
@@ -153,6 +154,16 @@ class Amy_Settings {
 			array(
 				'type'              => 'string',
 				'sanitize_callback' => 'sanitize_text_field',
+				'default'           => '',
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_AVATAR_URL,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_avatar_url' ),
 				'default'           => '',
 			)
 		);
@@ -304,6 +315,46 @@ class Amy_Settings {
 			return is_string( $existing ) ? $existing : '';
 		}
 		return sanitize_text_field( $value );
+	}
+
+	/**
+	 * @param mixed $value Raw avatar URL.
+	 * @return string Empty string clears custom avatar (plugin default is used).
+	 */
+	public function sanitize_avatar_url( $value ) {
+		$url = esc_url_raw( trim( (string) $value ) );
+		return $url ? $url : '';
+	}
+
+	/**
+	 * Bundled default avatar (plugin file).
+	 *
+	 * @return string
+	 */
+	public function get_default_avatar_url() {
+		return AMY_AGENT_URL . 'public/images/amy-avatar-v1.jpg';
+	}
+
+	/**
+	 * Active avatar URL for the front-end widget (custom option or default).
+	 *
+	 * @return string
+	 */
+	public function get_avatar_url() {
+		$custom = trim( (string) get_option( self::OPTION_AVATAR_URL, '' ) );
+		if ( '' !== $custom ) {
+			return esc_url_raw( $custom );
+		}
+		return esc_url_raw( $this->get_default_avatar_url() );
+	}
+
+	/**
+	 * Stored custom avatar URL only (empty means “use default”).
+	 *
+	 * @return string
+	 */
+	public function get_custom_avatar_url() {
+		return trim( (string) get_option( self::OPTION_AVATAR_URL, '' ) );
 	}
 
 	/**

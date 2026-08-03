@@ -97,6 +97,121 @@
 				.replace(/"/g, '&quot;');
 		}
 
+		/**
+		 * Safe Markdown → HTML for assistant bubbles.
+		 * Escapes raw HTML first, then applies a small allowlist of transforms.
+		 */
+		function renderMarkdown(text) {
+			var escaped = escapeHtml(String(text || ''));
+			var lines = escaped.split(/\r?\n/);
+			var html = [];
+			var i = 0;
+
+			function formatInline(line) {
+				var out = '';
+				var rest = line;
+				var boldRe = /\*\*(.+?)\*\*/;
+				var urlRe = /(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]?)/;
+
+				while (rest.length) {
+					var boldMatch = rest.match(boldRe);
+					var urlMatch = rest.match(urlRe);
+					var nextIndex = rest.length;
+					var kind = null;
+					var match = null;
+
+					if (boldMatch && boldMatch.index < nextIndex) {
+						nextIndex = boldMatch.index;
+						kind = 'bold';
+						match = boldMatch;
+					}
+					if (urlMatch && urlMatch.index < nextIndex) {
+						nextIndex = urlMatch.index;
+						kind = 'url';
+						match = urlMatch;
+					}
+
+					if (!kind) {
+						out += rest;
+						break;
+					}
+
+					out += rest.slice(0, nextIndex);
+					if (kind === 'bold') {
+						out += '<strong>' + match[1] + '</strong>';
+					} else {
+						var href = match[1];
+						out +=
+							'<a href="' +
+							href +
+							'" target="_blank" rel="noopener noreferrer">' +
+							href +
+							'</a>';
+					}
+					rest = rest.slice(nextIndex + match[0].length);
+				}
+
+				return out;
+			}
+
+			while (i < lines.length) {
+				var line = lines[i];
+
+				if (/^\s*$/.test(line)) {
+					i += 1;
+					continue;
+				}
+
+				var ulMatch = line.match(/^[\-\*]\s+(.+)$/);
+				var olMatch = line.match(/^\d+\.\s+(.+)$/);
+
+				if (ulMatch) {
+					html.push('<ul>');
+					while (i < lines.length) {
+						var uItem = lines[i].match(/^[\-\*]\s+(.+)$/);
+						if (!uItem) {
+							break;
+						}
+						html.push('<li>' + formatInline(uItem[1]) + '</li>');
+						i += 1;
+					}
+					html.push('</ul>');
+					continue;
+				}
+
+				if (olMatch) {
+					html.push('<ol>');
+					while (i < lines.length) {
+						var oItem = lines[i].match(/^\d+\.\s+(.+)$/);
+						if (!oItem) {
+							break;
+						}
+						html.push('<li>' + formatInline(oItem[1]) + '</li>');
+						i += 1;
+					}
+					html.push('</ol>');
+					continue;
+				}
+
+				var para = [formatInline(line)];
+				i += 1;
+				while (i < lines.length) {
+					var next = lines[i];
+					if (/^\s*$/.test(next)) {
+						break;
+					}
+					if (/^[\-\*]\s+/.test(next) || /^\d+\.\s+/.test(next)) {
+						break;
+					}
+					para.push(formatInline(next));
+					i += 1;
+				}
+				html.push('<p>' + para.join('<br>') + '</p>');
+			}
+
+			return html.join('') || '<p></p>';
+		}
+
 		function setOpen(open) {
 			root.classList.toggle('is-open', open);
 			panel.hidden = !open;
@@ -110,7 +225,11 @@
 		function appendBubble(text, kind) {
 			var el = document.createElement('div');
 			el.className = 'amy-agent-bubble amy-agent-bubble--' + kind;
-			el.textContent = text;
+			if (kind === 'assistant') {
+				el.innerHTML = renderMarkdown(text);
+			} else {
+				el.textContent = text;
+			}
 			messagesEl.appendChild(el);
 			messagesEl.scrollTop = messagesEl.scrollHeight;
 			return el;

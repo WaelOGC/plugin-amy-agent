@@ -4,9 +4,11 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
 from app.auth import require_amy_secret
+from app.prompts import AMY_SYSTEM_PROMPT
 from app.providers import get_provider, is_known_provider
 from app.providers.errors import ProviderError
 from app.schemas.messages import (
+    ChatMessage,
     ChatMeta,
     ChatReply,
     ChatRequest,
@@ -15,6 +17,13 @@ from app.schemas.messages import (
 )
 
 router = APIRouter(tags=["chat"])
+
+
+def _messages_with_system(messages: list[ChatMessage]) -> list[ChatMessage]:
+    """Prepend Amy's persona prompt unless a system message is already first."""
+    if messages and messages[0].role == "system":
+        return messages
+    return [ChatMessage(role="system", content=AMY_SYSTEM_PROMPT), *messages]
 
 
 @router.post("/v1/chat", dependencies=[Depends(require_amy_secret)])
@@ -42,10 +51,11 @@ async def chat(body: ChatRequest) -> JSONResponse:
 
     provider = get_provider(provider_slug)
     resolved_model = provider.resolve_model(body.ai.model)
+    messages = _messages_with_system(list(body.messages))
 
     try:
         text = await provider.complete(
-            body.messages,
+            messages,
             api_key=api_key,
             model=body.ai.model,
         )

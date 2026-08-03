@@ -14,6 +14,7 @@ $option_keys = array(
 	'amy_agent_ai_provider',
 	'amy_agent_ai_api_key',
 	'amy_agent_ai_model',
+	'amy_agent_avatar_url',
 );
 
 foreach ( $option_keys as $key ) {

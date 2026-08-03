@@ -1,0 +1,31 @@
+/**
+ * Amy Agent — Brand & Avatar admin page.
+ */
+
+.amy-agent-brand .amy-agent-brand__preview-wrap {
+	margin: 1rem 0 1.25rem;
+}
+
+.amy-agent-brand .amy-agent-brand__preview {
+	width: 96px;
+	height: 96px;
+	border-radius: 50%;
+	object-fit: cover;
+	display: block;
+	border: 2px solid #c9a227;
+	background: #1d2327;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.amy-agent-brand .amy-agent-brand__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	align-items: center;
+	margin-bottom: 1.25rem;
+}
+
+.amy-agent-brand .amy-agent-brand__hint {
+	max-width: 40rem;
+	color: #646970;
+}

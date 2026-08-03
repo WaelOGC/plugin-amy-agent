@@ -90,6 +90,7 @@ class Amy_Plugin {
 			'amy_agent_ai_provider'   => 'gemini',
 			'amy_agent_ai_api_key'    => '',
 			'amy_agent_ai_model'      => '',
+			'amy_agent_avatar_url'    => '',
 		);
 
 		foreach ( $defaults as $key => $value ) {

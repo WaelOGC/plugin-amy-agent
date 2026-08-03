@@ -166,7 +166,6 @@
 	border-radius: 0.85rem;
 	font-size: 0.9rem;
 	line-height: 1.45;
-	white-space: pre-wrap;
 	word-break: break-word;
 }
 
@@ -177,11 +176,56 @@
 	color: var(--amy-text);
 }
 
+.amy-agent-bubble--assistant p {
+	margin: 0 0 0.65rem;
+}
+
+.amy-agent-bubble--assistant p:last-child {
+	margin-bottom: 0;
+}
+
+.amy-agent-bubble--assistant strong {
+	font-weight: 700;
+	color: var(--amy-accent-soft);
+}
+
+.amy-agent-bubble--assistant ol,
+.amy-agent-bubble--assistant ul {
+	margin: 0.35rem 0 0.65rem;
+	padding-left: 1.25rem;
+}
+
+.amy-agent-bubble--assistant ol:last-child,
+.amy-agent-bubble--assistant ul:last-child {
+	margin-bottom: 0;
+}
+
+.amy-agent-bubble--assistant li {
+	margin: 0.25rem 0;
+}
+
+.amy-agent-bubble--assistant li + li {
+	margin-top: 0.35rem;
+}
+
+.amy-agent-bubble--assistant a {
+	color: #ffd27a;
+	text-decoration: underline;
+	transition: color 0.15s ease;
+}
+
+.amy-agent-bubble--assistant a:hover,
+.amy-agent-bubble--assistant a:focus-visible {
+	color: #ffeac2;
+	outline: none;
+}
+
 .amy-agent-bubble--user {
 	align-self: flex-end;
 	background: rgba(var(--amy-brand-rgb), 0.14);
 	border: 1px solid rgba(var(--amy-brand-rgb), 0.35);
 	color: var(--amy-text);
+	white-space: pre-wrap;
 }
 
 .amy-agent-bubble--status {

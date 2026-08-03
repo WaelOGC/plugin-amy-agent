@@ -75,7 +75,7 @@ class Amy_Assets {
 				'nonce'     => wp_create_nonce( 'wp_rest' ),
 				'pageUrl'   => esc_url_raw( home_url( add_query_arg( array() ) ) ),
 				'pageSlug'  => is_singular() ? (string) get_post_field( 'post_name', get_queried_object_id() ) : '',
-				'avatarUrl' => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-v1.jpg' ),
+				'avatarUrl' => esc_url_raw( $this->settings->get_avatar_url() ),
 				'i18n'      => array(
 					'title'         => __( 'Amy', 'amy-agent' ),
 					'subtitle'      => __( 'OGC NewFinity assistant', 'amy-agent' ),

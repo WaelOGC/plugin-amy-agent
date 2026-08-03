@@ -8,11 +8,12 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers Amy → Overview / Settings / placeholders in wp-admin.
+ * Registers Amy → Overview / Settings / Brand & Avatar / placeholders in wp-admin.
  */
 class Amy_Admin_Menu {
 
-	const PARENT_SLUG = 'amy-overview';
+	const PARENT_SLUG     = 'amy-overview';
+	const BRAND_PAGE_SLUG = 'amy-brand-avatar';
 
 	/**
 	 * @var Amy_Settings
@@ -66,8 +67,16 @@ class Amy_Admin_Menu {
 			array( $this->settings, 'render_page' )
 		);
 
+		add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Brand & Avatar', 'amy-agent' ),
+			__( 'Brand & Avatar', 'amy-agent' ),
+			'manage_options',
+			self::BRAND_PAGE_SLUG,
+			array( $this, 'render_brand_page' )
+		);
+
 		$placeholders = array(
-			'amy-brand-avatar'    => __( 'Brand & Avatar', 'amy-agent' ),
 			'amy-chat'            => __( 'Chat', 'amy-agent' ),
 			'amy-analytics'       => __( 'Analytics', 'amy-agent' ),
 			'amy-seo-tasks'       => __( 'SEO Tasks', 'amy-agent' ),
@@ -89,20 +98,53 @@ class Amy_Admin_Menu {
 	}
 
 	/**
-	 * Enqueue overview styles on the Amy overview screen.
+	 * Enqueue overview / brand assets on their screens only.
 	 *
 	 * @param string $hook_suffix Current admin page hook.
 	 */
 	public function enqueue_assets( $hook_suffix ) {
-		if ( 'toplevel_page_amy-overview' !== $hook_suffix ) {
+		if ( 'toplevel_page_amy-overview' === $hook_suffix ) {
+			wp_enqueue_style(
+				'amy-agent-admin-overview',
+				AMY_AGENT_URL . 'admin/css/admin-overview.css',
+				array(),
+				AMY_AGENT_VERSION
+			);
 			return;
 		}
 
+		if ( 'amy-overview_page_amy-brand-avatar' !== $hook_suffix ) {
+			return;
+		}
+
+		wp_enqueue_media();
+
 		wp_enqueue_style(
-			'amy-agent-admin-overview',
-			AMY_AGENT_URL . 'admin/css/admin-overview.css',
+			'amy-agent-admin-brand',
+			AMY_AGENT_URL . 'admin/css/admin-brand.css',
 			array(),
 			AMY_AGENT_VERSION
+		);
+
+		wp_enqueue_script(
+			'amy-agent-admin-brand',
+			AMY_AGENT_URL . 'admin/js/admin-brand.js',
+			array( 'jquery' ),
+			AMY_AGENT_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'amy-agent-admin-brand',
+			'amyAgentBrand',
+			array(
+				'defaultAvatarUrl' => esc_url_raw( $this->settings->get_default_avatar_url() ),
+				'i18n'             => array(
+					'title'       => __( 'Select Amy avatar', 'amy-agent' ),
+					'button'      => __( 'Use this image', 'amy-agent' ),
+					'invalidType' => __( 'Please choose a JPG, PNG, or WebP image.', 'amy-agent' ),
+				),
+			)
 		);
 	}
 
@@ -121,7 +163,7 @@ class Amy_Admin_Menu {
 				'description' => __( 'Connect the Python service, shared secret, and AI provider.', 'amy-agent' ),
 			),
 			array(
-				'slug'        => 'amy-brand-avatar',
+				'slug'        => self::BRAND_PAGE_SLUG,
 				'title'       => __( 'Brand & Avatar', 'amy-agent' ),
 				'description' => __( 'Manage Amy’s look, name, and avatar.', 'amy-agent' ),
 			),
@@ -160,6 +202,75 @@ class Amy_Admin_Menu {
 					</a>
 				<?php endforeach; ?>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Brand & Avatar settings (custom avatar via Media Library).
+	 */
+	public function render_brand_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$custom  = $this->settings->get_custom_avatar_url();
+		$preview = $this->settings->get_avatar_url();
+		$default = $this->settings->get_default_avatar_url();
+		?>
+		<div class="wrap amy-agent-brand">
+			<h1><?php echo esc_html__( 'Brand & Avatar', 'amy-agent' ); ?></h1>
+			<p class="amy-agent-brand__hint">
+				<?php echo esc_html__( 'Choose the avatar shown on Amy’s floating chat button and chat header. JPG, PNG, or WebP recommended.', 'amy-agent' ); ?>
+			</p>
+
+			<?php settings_errors(); ?>
+
+			<form method="post" action="options.php">
+				<?php settings_fields( 'amy_agent_settings' ); ?>
+
+				<div class="amy-agent-brand__preview-wrap">
+					<img
+						id="amy-agent-avatar-preview"
+						class="amy-agent-brand__preview"
+						src="<?php echo esc_url( $preview ); ?>"
+						alt="<?php echo esc_attr__( 'Amy avatar preview', 'amy-agent' ); ?>"
+						width="96"
+						height="96"
+						decoding="async"
+					/>
+				</div>
+
+				<input
+					type="hidden"
+					id="amy_agent_avatar_url"
+					name="<?php echo esc_attr( Amy_Settings::OPTION_AVATAR_URL ); ?>"
+					value="<?php echo esc_attr( $custom ); ?>"
+				/>
+
+				<div class="amy-agent-brand__actions">
+					<button type="button" class="button" id="amy-agent-select-avatar">
+						<?php echo esc_html__( 'Select image', 'amy-agent' ); ?>
+					</button>
+					<button type="button" class="button" id="amy-agent-reset-avatar">
+						<?php echo esc_html__( 'Reset to default', 'amy-agent' ); ?>
+					</button>
+					<?php submit_button( __( 'Save', 'amy-agent' ), 'primary', 'submit', false ); ?>
+				</div>
+
+				<p class="description">
+					<?php
+					if ( '' === $custom ) {
+						echo esc_html__( 'Currently using the bundled default avatar. Select a custom image and save to replace it.', 'amy-agent' );
+					} else {
+						echo esc_html__( 'A custom avatar is saved. Reset to default clears it after you save.', 'amy-agent' );
+					}
+					?>
+				</p>
+				<p class="description screen-reader-text">
+					<?php echo esc_html( $default ); ?>
+				</p>
+			</form>
 		</div>
 		<?php
 	}
