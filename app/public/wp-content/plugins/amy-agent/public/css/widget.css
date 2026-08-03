@@ -26,6 +26,7 @@
 .amy-agent-launcher {
 	width: 3.5rem;
 	height: 3.5rem;
+	padding: 0;
 	border-radius: 999px;
 	border: 1px solid var(--amy-border);
 	background: linear-gradient(145deg, #1a1a1a, #0d0d0d);
@@ -38,6 +39,7 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	overflow: hidden;
 	transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -51,10 +53,21 @@
 	outline: none;
 }
 
-.amy-agent-launcher svg {
-	width: 1.4rem;
-	height: 1.4rem;
+.amy-agent-avatar {
 	display: block;
+	border-radius: 50%;
+	object-fit: cover;
+	flex-shrink: 0;
+}
+
+.amy-agent-avatar--launcher {
+	width: 56px;
+	height: 56px;
+}
+
+.amy-agent-avatar--header {
+	width: 40px;
+	height: 40px;
 }
 
 .amy-agent-panel {
@@ -92,6 +105,13 @@
 	padding: 0.9rem 1rem;
 	border-bottom: 1px solid rgba(var(--amy-brand-rgb), 0.18);
 	background: linear-gradient(180deg, rgba(var(--amy-brand-rgb), 0.08), transparent);
+}
+
+.amy-agent-header__brand {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	min-width: 0;
 }
 
 .amy-agent-header__titles {

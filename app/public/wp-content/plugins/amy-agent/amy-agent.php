@@ -23,6 +23,7 @@ define( 'AMY_AGENT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'AMY_AGENT_URL', plugin_dir_url( __FILE__ ) );
 
 require_once AMY_AGENT_PATH . 'includes/class-amy-settings.php';
+require_once AMY_AGENT_PATH . 'includes/class-amy-admin-menu.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-api-client.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-rest.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-theme-bridge.php';

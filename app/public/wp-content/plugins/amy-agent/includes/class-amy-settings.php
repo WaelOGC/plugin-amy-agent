@@ -8,9 +8,11 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers and renders Settings → Amy Agent.
+ * Registers Settings API options and renders Amy → Settings.
  */
 class Amy_Settings {
+
+	const PAGE_SLUG = 'amy-settings';
 
 	const OPTION_ENABLED       = 'amy_agent_enabled';
 	const OPTION_SERVICE_URL   = 'amy_agent_service_url';
@@ -37,7 +39,6 @@ class Amy_Settings {
 	 * Wire admin hooks.
 	 */
 	public function register() {
-		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_init', array( $this, 'normalize_enabled_checkbox_post' ), 0 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
@@ -80,7 +81,7 @@ class Amy_Settings {
 	 * @return array
 	 */
 	public function add_settings_link( $links ) {
-		$url = admin_url( 'options-general.php?page=amy-agent' );
+		$url = admin_url( 'admin.php?page=' . self::PAGE_SLUG );
 		array_unshift(
 			$links,
 			sprintf(
@@ -90,19 +91,6 @@ class Amy_Settings {
 			)
 		);
 		return $links;
-	}
-
-	/**
-	 * Add Settings submenu.
-	 */
-	public function add_menu() {
-		add_options_page(
-			__( 'Amy Agent', 'amy-agent' ),
-			__( 'Amy Agent', 'amy-agent' ),
-			'manage_options',
-			'amy-agent',
-			array( $this, 'render_page' )
-		);
 	}
 
 	/**
@@ -173,14 +161,14 @@ class Amy_Settings {
 			'amy_agent_section_general',
 			__( 'General', 'amy-agent' ),
 			array( $this, 'render_section_general' ),
-			'amy-agent'
+			self::PAGE_SLUG
 		);
 
 		add_settings_field(
 			self::OPTION_ENABLED,
 			__( 'Enable Amy', 'amy-agent' ),
 			array( $this, 'render_field_enabled' ),
-			'amy-agent',
+			self::PAGE_SLUG,
 			'amy_agent_section_general'
 		);
 
@@ -188,7 +176,7 @@ class Amy_Settings {
 			self::OPTION_SERVICE_URL,
 			__( 'Python service URL', 'amy-agent' ),
 			array( $this, 'render_field_service_url' ),
-			'amy-agent',
+			self::PAGE_SLUG,
 			'amy_agent_section_general'
 		);
 
@@ -196,7 +184,7 @@ class Amy_Settings {
 			self::OPTION_SHARED_SECRET,
 			__( 'Shared secret', 'amy-agent' ),
 			array( $this, 'render_field_shared_secret' ),
-			'amy-agent',
+			self::PAGE_SLUG,
 			'amy_agent_section_general'
 		);
 
@@ -204,14 +192,14 @@ class Amy_Settings {
 			'amy_agent_section_ai',
 			__( 'AI provider', 'amy-agent' ),
 			array( $this, 'render_section_ai' ),
-			'amy-agent'
+			self::PAGE_SLUG
 		);
 
 		add_settings_field(
 			self::OPTION_AI_PROVIDER,
 			__( 'Provider', 'amy-agent' ),
 			array( $this, 'render_field_provider' ),
-			'amy-agent',
+			self::PAGE_SLUG,
 			'amy_agent_section_ai'
 		);
 
@@ -219,7 +207,7 @@ class Amy_Settings {
 			self::OPTION_AI_API_KEY,
 			__( 'API key', 'amy-agent' ),
 			array( $this, 'render_field_api_key' ),
-			'amy-agent',
+			self::PAGE_SLUG,
 			'amy_agent_section_ai'
 		);
 
@@ -227,7 +215,7 @@ class Amy_Settings {
 			self::OPTION_AI_MODEL,
 			__( 'Model (optional)', 'amy-agent' ),
 			array( $this, 'render_field_model' ),
-			'amy-agent',
+			self::PAGE_SLUG,
 			'amy_agent_section_ai'
 		);
 	}
@@ -238,7 +226,7 @@ class Amy_Settings {
 	 * @param string $hook_suffix Current admin page hook.
 	 */
 	public function enqueue_assets( $hook_suffix ) {
-		if ( 'settings_page_amy-agent' !== $hook_suffix ) {
+		if ( 'amy-overview_page_amy-settings' !== $hook_suffix ) {
 			return;
 		}
 
@@ -546,11 +534,11 @@ class Amy_Settings {
 		}
 		?>
 		<div class="wrap amy-agent-settings">
-			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+			<h1><?php echo esc_html__( 'Settings', 'amy-agent' ); ?></h1>
 			<form method="post" action="options.php">
 				<?php
 				settings_fields( 'amy_agent_settings' );
-				do_settings_sections( 'amy-agent' );
+				do_settings_sections( self::PAGE_SLUG );
 				submit_button( __( 'Save settings', 'amy-agent' ) );
 				?>
 			</form>

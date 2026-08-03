@@ -25,6 +25,11 @@ class Amy_Plugin {
 	public $settings;
 
 	/**
+	 * @var Amy_Admin_Menu
+	 */
+	public $admin_menu;
+
+	/**
 	 * @var Amy_Api_Client
 	 */
 	public $api_client;
@@ -61,12 +66,14 @@ class Amy_Plugin {
 	 */
 	private function __construct() {
 		$this->settings     = new Amy_Settings();
+		$this->admin_menu   = new Amy_Admin_Menu( $this->settings );
 		$this->api_client   = new Amy_Api_Client( $this->settings );
 		$this->rest         = new Amy_Rest( $this->api_client, $this->settings );
 		$this->theme_bridge = new Amy_Theme_Bridge( $this->settings );
 		$this->assets       = new Amy_Assets( $this->settings );
 
 		$this->settings->register();
+		$this->admin_menu->register();
 		$this->rest->register();
 		$this->theme_bridge->register();
 		$this->assets->register();

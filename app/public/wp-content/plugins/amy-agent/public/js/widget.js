@@ -31,21 +31,30 @@
 		}
 
 		root.hidden = false;
+		var avatarUrl = cfg.avatarUrl || '';
+		var avatarImg = avatarUrl
+			? '<img class="amy-agent-avatar amy-agent-avatar--launcher" src="' +
+			  escapeHtml(avatarUrl) +
+			  '" alt="" width="56" height="56" decoding="async" />'
+			: '';
+		var headerAvatar = avatarUrl
+			? '<img class="amy-agent-avatar amy-agent-avatar--header" src="' +
+			  escapeHtml(avatarUrl) +
+			  '" alt="" width="40" height="40" decoding="async" />'
+			: '';
+
 		root.innerHTML =
 			'<button type="button" class="amy-agent-launcher" aria-expanded="false" aria-controls="amy-agent-panel" title="' +
 			escapeHtml(cfg.i18n.open) +
 			'">' +
-			'<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75">' +
-			'<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v6A2.5 2.5 0 0 1 16.5 15H13l-3.5 3.5V15H7.5A2.5 2.5 0 0 1 5 12.5v-6Z"/>' +
-			'<circle cx="9" cy="9.5" r="0.9" fill="currentColor" stroke="none"/>' +
-			'<circle cx="12" cy="9.5" r="0.9" fill="currentColor" stroke="none"/>' +
-			'<circle cx="15" cy="9.5" r="0.9" fill="currentColor" stroke="none"/>' +
-			'</svg>' +
+			avatarImg +
 			'</button>' +
 			'<div id="amy-agent-panel" class="amy-agent-panel" role="dialog" aria-label="' +
 			escapeHtml(cfg.i18n.title) +
 			'" hidden>' +
 			'<div class="amy-agent-header">' +
+			'<div class="amy-agent-header__brand">' +
+			headerAvatar +
 			'<div class="amy-agent-header__titles">' +
 			'<p class="amy-agent-header__title">' +
 			escapeHtml(cfg.i18n.title) +
@@ -53,6 +62,7 @@
 			'<p class="amy-agent-header__subtitle">' +
 			escapeHtml(cfg.i18n.subtitle) +
 			'</p>' +
+			'</div>' +
 			'</div>' +
 			'<button type="button" class="amy-agent-header__close" aria-label="' +
 			escapeHtml(cfg.i18n.close) +

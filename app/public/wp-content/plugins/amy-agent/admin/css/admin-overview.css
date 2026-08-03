@@ -1,0 +1,54 @@
+/**
+ * Amy Agent — admin overview dashboard.
+ */
+
+.amy-agent-overview__intro {
+	max-width: 40rem;
+	margin: 0 0 1.5rem;
+	color: #50575e;
+}
+
+.amy-agent-overview__grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+	gap: 1rem;
+	max-width: 56rem;
+}
+
+.amy-agent-overview__card {
+	display: block;
+	padding: 1.15rem 1.25rem;
+	border: 1px solid #c3c4c7;
+	border-radius: 8px;
+	background: #fff;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	text-decoration: none;
+	color: inherit;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.amy-agent-overview__card:hover,
+.amy-agent-overview__card:focus {
+	border-color: #c9a227;
+	box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.35), 0 4px 12px rgba(0, 0, 0, 0.06);
+	outline: none;
+}
+
+.amy-agent-overview__card-title {
+	margin: 0 0 0.4rem;
+	font-size: 1.05rem;
+	font-weight: 600;
+	color: #1d2327;
+}
+
+.amy-agent-overview__card:hover .amy-agent-overview__card-title,
+.amy-agent-overview__card:focus .amy-agent-overview__card-title {
+	color: #8a6d12;
+}
+
+.amy-agent-overview__card-desc {
+	margin: 0;
+	font-size: 0.875rem;
+	line-height: 1.45;
+	color: #646970;
+}
