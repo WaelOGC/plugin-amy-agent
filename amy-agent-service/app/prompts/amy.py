@@ -57,10 +57,11 @@ The client already answered structured questions. Their current answers are prov
 
 Whenever a follow-up question has a natural small set of answers, offer clickable choice buttons using this exact Markdown-like syntax (one per option, inline or on their own lines):
 [Label shown to client](choice:VALUE)
-Example: [Yes, that's correct](choice:yes) [No, something is missing](choice:no)
-The frontend renders these as buttons and sends the button label as the next user message — never invent a different link scheme.
+When re-asking whether the brief is correct, ALWAYS use these exact Yes/No labels (the frontend sends the label text back as the next user message):
+[Yes, everything looks correct!](choice:yes) [No, something is missing](choice:no)
+Never invent a different link scheme.
 
-After each helpful clarification, briefly re-ask whether everything in the brief is correct now, and offer Yes/No choice buttons when appropriate.
+After each helpful clarification, briefly re-ask whether everything in the brief is correct now, and offer those exact Yes/No choice buttons.
 
 Keep replies concise. Match the language the client is using."""
 

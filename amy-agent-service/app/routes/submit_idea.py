@@ -68,9 +68,46 @@ ALLOWED_UPLOAD_CONTENT_TYPES = {
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+# Exact labels Amy (or the frontend) may send when the client confirms the brief.
+_AFFIRMATIVE_EXACT = {
+    "yes, everything looks correct!",
+    "yes, everything looks correct",
+    "yes everything looks correct",
+    "yes, everything is correct!",
+    "yes, everything is correct",
+    "yes, that's correct!",
+    "yes, that's correct",
+    "yes, thats correct!",
+    "yes, thats correct",
+    "yes that's correct",
+    "yes, that looks correct!",
+    "yes, that looks correct",
+    "everything looks correct!",
+    "everything looks correct",
+    "everything is correct!",
+    "everything is correct",
+    "looks correct!",
+    "looks correct",
+    "that's correct!",
+    "that's correct",
+    "thats correct!",
+    "thats correct",
+    "all correct!",
+    "all correct",
+}
+
+# Short whole-message affirmatives (typed replies).
 _AFFIRMATIVE_RE = re.compile(
-    r"^\s*(yes|y|yeah|yep|yup|correct|confirmed|looks good|that's right|thats right|"
-    r"oui|ja|si|sí|ok|okay|perfect|all good|everything is correct)\s*[.!]?\s*$",
+    r"^\s*("
+    r"yes|y|yeah|yep|yup|correct|confirmed|looks\s+good|"
+    r"that'?s\s+right|oui|ja|si|sí|ok|okay|perfect|all\s+good|"
+    r"everything\s+(is|looks)\s+correct|"
+    r"yes[,\s]+(everything|that|it)\s+(is\s+|looks\s+)?(correct|good|right|fine)|"
+    r"yes[,\s]+(all\s+)?(good|correct|fine)|"
+    r"no\s+changes?\s+needed|"
+    r"ready\s+to\s+(continue|proceed|submit)"
+    r")\s*[.!]?\s*$",
     re.IGNORECASE,
 )
 
@@ -166,7 +203,18 @@ def _fallback_summary(template: SubmitIdeaTemplate, answers: dict[str, Any]) -> 
 
 
 def _is_affirmative(message: str) -> bool:
-    return bool(_AFFIRMATIVE_RE.match(message or ""))
+    """Deterministic confirmation detection — do not rely on Gemini for this transition."""
+    text = (message or "").strip()
+    if not text:
+        return False
+    normalized = re.sub(r"\s+", " ", text).strip().lower()
+    # Drop trailing punctuation for exact-label matching.
+    normalized_key = normalized.rstrip(".! ").strip()
+    if normalized in _AFFIRMATIVE_EXACT or normalized_key in _AFFIRMATIVE_EXACT:
+        return True
+    if _AFFIRMATIVE_RE.match(text):
+        return True
+    return False
 
 
 @router.post("/v1/submit-idea/start", dependencies=[Depends(require_amy_secret)])
