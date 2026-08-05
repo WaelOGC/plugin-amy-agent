@@ -509,13 +509,13 @@
 			uploadField.appendChild(drop);
 			var chips = document.createElement('div');
 			chips.className = 'amy-si-files';
-			chips.setAttribute('data-si-file-chips');
+			chips.setAttribute('data-si-file-chips', '');
 			uploadField.appendChild(chips);
 			formEl.appendChild(uploadField);
 
 			var err = document.createElement('p');
 			err.className = 'amy-si-error';
-			err.setAttribute('data-si-form-error');
+			err.setAttribute('data-si-form-error', '');
 			err.hidden = true;
 			formEl.appendChild(err);
 
