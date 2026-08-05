@@ -13,11 +13,32 @@ defined( 'ABSPATH' ) || exit;
 class Amy_Submit_Idea_Mail {
 
 	/**
+	 * Last wp_mail_failed WP_Error message (request-scoped).
+	 *
+	 * @var string
+	 */
+	private $last_mail_error = '';
+
+	/**
 	 * Register AJAX actions (logged-in and anonymous).
 	 */
 	public function register() {
 		add_action( 'wp_ajax_amy_submit_idea_notify', array( $this, 'handle_notify' ) );
 		add_action( 'wp_ajax_nopriv_amy_submit_idea_notify', array( $this, 'handle_notify' ) );
+		add_action( 'wp_mail_failed', array( $this, 'capture_mail_failure' ) );
+	}
+
+	/**
+	 * Capture PHPMailer failures for logging (wp_mail() return value alone is unreliable).
+	 *
+	 * @param WP_Error $error Mail error.
+	 */
+	public function capture_mail_failure( $error ) {
+		if ( is_wp_error( $error ) ) {
+			$this->last_mail_error = $error->get_error_message();
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log( '[amy-agent] wp_mail_failed: ' . $this->last_mail_error );
+		}
 	}
 
 	/**
@@ -58,19 +79,47 @@ class Amy_Submit_Idea_Mail {
 		}
 
 		$admin_email = (string) get_option( 'admin_email' );
-		$admin_ok    = $this->send_admin_email( $admin_email, $service_label, $brief );
-		$client_ok   = $this->send_client_email( $client_email, $service_label );
+		/**
+		 * Filter the inbox that receives Submit Idea admin briefs.
+		 *
+		 * @param string $admin_email Default: get_option( 'admin_email' ).
+		 * @param array  $brief       Finalized brief payload.
+		 */
+		$admin_email = (string) apply_filters( 'amy_submit_idea_admin_email', $admin_email, $brief );
+
+		if ( $this->looks_like_placeholder_email( $admin_email ) ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log(
+				'[amy-agent] Submit Idea admin brief target looks like a placeholder (' . $admin_email .
+				'). Set Settings → General → Administration Email Address to your real inbox (e.g. contact@ogcnewfinity.com).'
+			);
+		}
+
+		$this->last_mail_error = '';
+		$admin_ok              = $this->send_admin_email( $admin_email, $service_label, $brief, $client_email );
+		if ( ! $admin_ok ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log(
+				'[amy-agent] Submit Idea ADMIN mail failed to=' . $admin_email .
+				' err=' . ( $this->last_mail_error ? $this->last_mail_error : '(no wp_mail_failed detail)' )
+			);
+		}
+
+		$this->last_mail_error = '';
+		$client_ok             = $this->send_client_email( $client_email, $service_label );
+		if ( ! $client_ok ) {
+			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+			error_log(
+				'[amy-agent] Submit Idea CLIENT mail failed to=' . $client_email .
+				' err=' . ( $this->last_mail_error ? $this->last_mail_error : '(no wp_mail_failed detail)' )
+			);
+		}
 
 		if ( ! $admin_ok ) {
 			wp_send_json_error(
 				array( 'message' => __( 'Could not notify the team. Please try again.', 'amy-agent' ) ),
 				500
 			);
-		}
-
-		if ( ! $client_ok ) {
-			// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-			error_log( '[amy-agent] Submit Idea client confirmation email failed for ' . $client_email );
 		}
 
 		wp_send_json_success(
@@ -82,12 +131,27 @@ class Amy_Submit_Idea_Mail {
 	}
 
 	/**
+	 * Detect common Local / staging placeholder admin addresses.
+	 *
+	 * @param string $email Address.
+	 * @return bool
+	 */
+	private function looks_like_placeholder_email( $email ) {
+		$email = strtolower( trim( (string) $email ) );
+		if ( '' === $email || ! is_email( $email ) ) {
+			return true;
+		}
+		return (bool) preg_match( '/@(wpengine\.local|localhost|example\.com|example\.org|invalid)$|@[^.]+\.local$/', $email );
+	}
+
+	/**
 	 * @param string $to            Admin address.
 	 * @param string $service_label Service display name.
 	 * @param array  $brief         Finalized brief.
+	 * @param string $reply_to      Client email for Reply-To (optional).
 	 * @return bool
 	 */
-	private function send_admin_email( $to, $service_label, array $brief ) {
+	private function send_admin_email( $to, $service_label, array $brief, $reply_to = '' ) {
 		$subject = sprintf(
 			/* translators: %s: service label */
 			__( 'New Project Idea Submitted — %s', 'amy-agent' ),
@@ -96,8 +160,13 @@ class Amy_Submit_Idea_Mail {
 
 		$body = $this->build_admin_body( $brief, $service_label );
 
+		$headers = array();
+		if ( $reply_to && is_email( $reply_to ) ) {
+			$headers[] = 'Reply-To: ' . $reply_to;
+		}
+
 		add_filter( 'wp_mail_content_type', array( $this, 'html_content_type' ) );
-		$sent = wp_mail( $to, $subject, $body );
+		$sent = wp_mail( $to, $subject, $body, $headers );
 		remove_filter( 'wp_mail_content_type', array( $this, 'html_content_type' ) );
 
 		return (bool) $sent;
