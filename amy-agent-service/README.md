@@ -30,6 +30,7 @@ Edit `.env`:
 
 - `AMY_SHARED_SECRET` — must match WordPress **Settings → Amy Agent → Shared secret**
 - `PORT` — default `8765`
+- `PUBLIC_BASE_URL` — public origin of this service (no trailing slash), used for Submit Idea upload links in emails. Local: `http://127.0.0.1:8765`. On Dokploy, use the publicly reachable HTTPS URL of this service (not an internal Docker hostname).
 
 **Do not put AI provider API keys in `.env`.** Keys live in WordPress Options and are sent per request in the `ai` payload.
 
@@ -53,6 +54,7 @@ PHP may need a different host than the browser:
 | GET | `/v1/health` | Requires `X-Amy-Secret` |
 | POST | `/v1/config/validate` | Schema check only |
 | POST | `/v1/chat` | Calls selected provider; `200` / `502` |
+| GET | `/uploads/submit-idea/{session_id}/{file}` | Public static files (no auth); scoped to upload dir |
 
 ## Tests
 

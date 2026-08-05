@@ -225,13 +225,20 @@ class Amy_Submit_Idea_Mail {
 
 		$attach_html = '';
 		if ( ! empty( $attachments ) ) {
-			$attach_html .= '<ul style="margin:0;padding-left:1.2em;color:#f5f5f5;">';
+			$attach_html .= '<div style="margin:0;">';
 			foreach ( $attachments as $path ) {
-				$path = (string) $path;
-				$attach_html .= '<li><a href="' . esc_url( $path ) . '" style="color:#ffd27a;">'
-					. esc_html( $path ) . '</a></li>';
+				$path  = (string) $path;
+				$label = basename( (string) ( wp_parse_url( $path, PHP_URL_PATH ) ?: $path ) );
+				if ( '' === $label ) {
+					$label = $path;
+				}
+				$attach_html .= '<a href="' . esc_url( $path ) . '" target="_blank" rel="noopener noreferrer"'
+					. ' style="display:inline-block;margin:0 10px 10px 0;padding:10px 18px;'
+					. 'background:#ffd27a;color:#0a0a0a;text-decoration:none;border-radius:8px;'
+					. 'font-weight:600;font-size:14px;line-height:1.2;">'
+					. esc_html( $label ) . '</a>';
 			}
-			$attach_html .= '</ul>';
+			$attach_html .= '</div>';
 		} else {
 			$attach_html = '<p style="color:#c9c9c9;margin:0;">—</p>';
 		}

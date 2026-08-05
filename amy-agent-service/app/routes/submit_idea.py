@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from app.auth import require_amy_secret
+from app.config import get_settings
 from app.data.submit_idea_templates import SUBMIT_IDEA_TEMPLATES
 from app.prompts import (
     AMY_SYSTEM_PROMPT,
@@ -68,6 +69,15 @@ ALLOWED_UPLOAD_CONTENT_TYPES = {
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Stored filenames are "{safe_stem}-{8 hex}{ext}" — reject anything with path chars.
+_SAFE_STORED_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def public_upload_url(session_id: str, stored_name: str) -> str:
+    """Absolute HTTP(S) URL for a stored upload (no auth; served via StaticFiles)."""
+    settings = get_settings()
+    base = (settings.public_base_url or f"http://127.0.0.1:{settings.port}").rstrip("/")
+    return f"{base}/uploads/submit-idea/{session_id}/{stored_name}"
 
 # Exact labels Amy (or the frontend) may send when the client confirms the brief.
 _AFFIRMATIVE_EXACT = {
@@ -589,16 +599,25 @@ async def submit_idea_upload(
 
     safe_stem = re.sub(r"[^a-zA-Z0-9._-]+", "_", Path(original_name).stem)[:80] or "file"
     stored_name = f"{safe_stem}-{uuid.uuid4().hex[:8]}{ext or ''}"
+    if not _SAFE_STORED_NAME_RE.fullmatch(stored_name):
+        return _error(
+            status.HTTP_400_BAD_REQUEST,
+            "invalid_filename",
+            "Could not derive a safe filename for this upload.",
+        )
+
+    # session_id comes from Form; keep it as a single path segment (no traversal).
+    if not session_id or "/" in session_id or "\\" in session_id or ".." in session_id:
+        return _error(status.HTTP_400_BAD_REQUEST, "invalid_session", "Invalid session_id.")
+
     dest_dir = UPLOAD_ROOT / session_id
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_path = dest_dir / stored_name
     dest_path.write_bytes(data)
 
-    # TODO(production): serve uploads via a proper static route or move files into the
-    # WordPress media library. For now return a local filesystem path placeholder as `url`.
-    stored_path = str(dest_path)
-    sess.attachments.append(stored_path)
+    file_url = public_upload_url(session_id, stored_name)
+    sess.attachments.append(file_url)
     sess.touch()
 
-    payload = SubmitIdeaUploadResponse(filename=original_name, url=stored_path)
+    payload = SubmitIdeaUploadResponse(filename=original_name, url=file_url)
     return JSONResponse(status_code=status.HTTP_200_OK, content=payload.model_dump())

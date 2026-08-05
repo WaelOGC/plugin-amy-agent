@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     amy_shared_secret: str = "change-me-to-a-long-random-string"
     port: int = 8765
+    # Public origin used when building absolute upload URLs for emails / clients.
+    # Example (Dokploy): https://amy-api.example.com — no trailing slash.
+    # Falls back to http://127.0.0.1:{port} when unset (local only).
+    public_base_url: str = ""
 
 
 @lru_cache
