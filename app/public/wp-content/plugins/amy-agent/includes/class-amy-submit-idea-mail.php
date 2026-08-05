@@ -225,10 +225,14 @@ class Amy_Submit_Idea_Mail {
 
 		$attach_html = '';
 		if ( ! empty( $attachments ) ) {
+			$labels = $this->attachment_button_labels( $attachments );
 			$attach_html .= '<div style="margin:0;">';
-			foreach ( $attachments as $path ) {
+			foreach ( $attachments as $index => $path ) {
 				$path  = (string) $path;
-				$label = basename( (string) ( wp_parse_url( $path, PHP_URL_PATH ) ?: $path ) );
+				$label = isset( $labels[ $index ] ) ? (string) $labels[ $index ] : '';
+				if ( '' === $label ) {
+					$label = basename( (string) ( wp_parse_url( $path, PHP_URL_PATH ) ?: $path ) );
+				}
 				if ( '' === $label ) {
 					$label = $path;
 				}
@@ -268,6 +272,75 @@ class Amy_Submit_Idea_Mail {
 				? '<p style="margin:8px 0 0;color:#f5f5f5;">WhatsApp: ' . esc_html( $whatsapp ) . '</p>'
 				: '' )
 			. '</div></div>';
+	}
+
+	/**
+	 * Human-readable button labels for attachment URLs.
+	 *
+	 * Extension set mirrors ALLOWED_UPLOAD_EXTENSIONS in
+	 * amy-agent-service/app/routes/submit_idea.py (source of truth for uploads).
+	 *
+	 * @param array $attachments List of absolute attachment URLs.
+	 * @return array<int, string> Labels keyed by attachment index.
+	 */
+	private function attachment_button_labels( array $attachments ) {
+		// Keep in sync with ALLOWED_UPLOAD_EXTENSIONS (Python upload allow-list).
+		$type_by_ext = array(
+			'.jpg'  => 'Image',
+			'.jpeg' => 'Image',
+			'.png'  => 'Image',
+			'.gif'  => 'Image',
+			'.webp' => 'Image',
+			'.pdf'  => 'PDF',
+			'.doc'  => 'Word Document',
+			'.docx' => 'Word Document',
+		);
+
+		$parsed = array();
+		$counts = array();
+
+		foreach ( $attachments as $index => $path ) {
+			$path     = (string) $path;
+			$filename = basename( (string) ( wp_parse_url( $path, PHP_URL_PATH ) ?: $path ) );
+			$ext      = strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) );
+			$ext_key  = '' !== $ext ? '.' . $ext : '';
+			$type     = isset( $type_by_ext[ $ext_key ] ) ? $type_by_ext[ $ext_key ] : '';
+
+			$parsed[ $index ] = array(
+				'type'     => $type,
+				'filename' => '' !== $filename ? $filename : $path,
+			);
+
+			if ( '' !== $type ) {
+				if ( ! isset( $counts[ $type ] ) ) {
+					$counts[ $type ] = 0;
+				}
+				++$counts[ $type ];
+			}
+		}
+
+		$seen   = array();
+		$labels = array();
+
+		foreach ( $parsed as $index => $info ) {
+			$type = $info['type'];
+			if ( '' === $type ) {
+				$labels[ $index ] = $info['filename'];
+				continue;
+			}
+
+			if ( $counts[ $type ] > 1 ) {
+				if ( ! isset( $seen[ $type ] ) ) {
+					$seen[ $type ] = 0;
+				}
+				++$seen[ $type ];
+				$labels[ $index ] = $type . ' ' . $seen[ $type ];
+			} else {
+				$labels[ $index ] = $type;
+			}
+		}
+
+		return $labels;
 	}
 
 	/**
