@@ -1,0 +1,5 @@
+# Local WP runtime / secrets — do not commit
+app/sql/
+logs/
+app/public/wp-content/uploads/
+app/public/wp-content/themes/ogc-newfinity/
