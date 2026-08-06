@@ -33,7 +33,10 @@
 		var busy = false;
 
 		root.innerHTML =
-			'<section class="amy-si-section is-active" data-si-step="service-select">' +
+			'<section class="amy-si-section is-active" data-si-step="avatar-landing">' +
+			'<div id="amy-avatar-mount"></div>' +
+			'</section>' +
+			'<section class="amy-si-section" data-si-step="service-select">' +
 			'<h2 class="amy-si-heading">' +
 			escapeHtml(cfg.i18n.chooseService) +
 			'</h2>' +
@@ -324,6 +327,10 @@
 				el.classList.toggle('is-active', el.getAttribute('data-si-step') === name);
 			});
 		}
+
+		document.addEventListener('amySubmitIdea:avatarStarted', function () {
+			showStep('service-select');
+		});
 
 		function setBusy(next) {
 			busy = next;

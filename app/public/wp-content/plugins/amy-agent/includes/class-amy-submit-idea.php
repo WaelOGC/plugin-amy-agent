@@ -86,6 +86,21 @@ class Amy_Submit_Idea {
 			true
 		);
 
+		wp_enqueue_style(
+			'amy-avatar',
+			AMY_AGENT_URL . 'public/css/amy-avatar.css',
+			array( 'amy-submit-idea' ),
+			AMY_AGENT_VERSION
+		);
+
+		wp_enqueue_script(
+			'amy-avatar',
+			AMY_AGENT_URL . 'public/js/amy-avatar.js',
+			array(),
+			AMY_AGENT_VERSION,
+			true
+		);
+
 		wp_localize_script(
 			'amy-submit-idea',
 			'amySubmitIdea',
@@ -112,6 +127,7 @@ class Amy_Submit_Idea {
 					'thankYou'        => __( 'Thank you — our team will respond within 48 hours to the email you provided.', 'amy-agent' ),
 					'summaryPrompt'   => __( 'Does this summary look correct?', 'amy-agent' ),
 					'deepDivePlaceholder' => __( 'Tell Amy what to change…', 'amy-agent' ),
+					'startConversation' => __( 'Start', 'amy-agent' ),
 				),
 			)
 		);
