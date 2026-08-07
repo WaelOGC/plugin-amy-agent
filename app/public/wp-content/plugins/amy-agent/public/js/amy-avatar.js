@@ -1,9 +1,8 @@
 /**
  * Amy Agent — Avatar landing interaction (Submit Your Idea Phase 1).
  * Real 3D scene (Three.js r128, already loaded site-wide by the theme
- * as `ogc-three`): a base head plane, an independently-moving eyes
- * plane, and a mouth plane that crossfades between a sad and a happy
- * texture. The whole group turns to face the pointer; the eyes get
+ * as `ogc-three`): a base head plane and an independently-moving eyes
+ * plane. The whole group turns to face the pointer; the eyes get
  * extra travel on top of that. A CSS shadow beneath echoes the same
  * pointer offset.
  */
@@ -20,8 +19,7 @@
 		var startLabel = (cfg.i18n && cfg.i18n.startConversation) || 'Start';
 		var imgBase = cfg.avatarBaseImage || '';
 		var imgEyes = cfg.avatarEyesImage || '';
-		var imgMouthHappy = cfg.avatarMouthHappyImage || '';
-		var imgMouthSad = cfg.avatarMouthSadImage || '';
+		var imgMouth = cfg.avatarMouthHappyImage || '';
 
 		function escapeHtml(str) {
 			return String(str)
@@ -82,6 +80,8 @@
 		function makeBaseMesh() {
 			var geo = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE);
 			var mat = new THREE.MeshPhysicalMaterial({
+				transparent: true,
+				depthWrite: true,
 				roughness: 0.32,
 				metalness: 0.08,
 				clearcoat: 0.4,
@@ -90,12 +90,11 @@
 			return new THREE.Mesh(geo, mat);
 		}
 
-		function makeOverlayMesh(z, opacity) {
+		function makeOverlayMesh(z) {
 			var geo = new THREE.PlaneGeometry(PLANE_SIZE, PLANE_SIZE);
 			var mat = new THREE.MeshBasicMaterial({
 				transparent: true,
-				depthWrite: false,
-				opacity: opacity
+				depthWrite: false
 			});
 			var mesh = new THREE.Mesh(geo, mat);
 			mesh.position.z = z;
@@ -105,14 +104,11 @@
 		var baseMesh = makeBaseMesh();
 		avatarGroup.add(baseMesh);
 
-		var eyesMesh = makeOverlayMesh(0.12, 1);
+		var eyesMesh = makeOverlayMesh(0.12);
 		avatarGroup.add(eyesMesh);
 
-		var mouthHappyMesh = makeOverlayMesh(0.1, 0);
-		avatarGroup.add(mouthHappyMesh);
-
-		var mouthSadMesh = makeOverlayMesh(0.11, 1);
-		avatarGroup.add(mouthSadMesh);
+		var mouthMesh = makeOverlayMesh(0.1);
+		avatarGroup.add(mouthMesh);
 
 		var loader = new THREE.TextureLoader();
 		loader.crossOrigin = 'anonymous';
@@ -120,7 +116,7 @@
 
 		function onTextureLoaded() {
 			texturesReady++;
-			if (texturesReady === 4) {
+			if (texturesReady === 3) {
 				renderer.render(scene, camera);
 			}
 		}
@@ -135,14 +131,9 @@
 			eyesMesh.material.needsUpdate = true;
 			onTextureLoaded();
 		});
-		loader.load(imgMouthHappy, function (tex) {
-			mouthHappyMesh.material.map = tex;
-			mouthHappyMesh.material.needsUpdate = true;
-			onTextureLoaded();
-		});
-		loader.load(imgMouthSad, function (tex) {
-			mouthSadMesh.material.map = tex;
-			mouthSadMesh.material.needsUpdate = true;
+		loader.load(imgMouth, function (tex) {
+			mouthMesh.material.map = tex;
+			mouthMesh.material.needsUpdate = true;
 			onTextureLoaded();
 		});
 
@@ -153,7 +144,6 @@
 		var targetY = 0;
 		var currentX = 0;
 		var currentY = 0;
-		var mouthMix = 0; /* 0 = sad, 1 = happy */
 		var tracking = false;
 
 		function clamp(n, min, max) {
@@ -202,22 +192,6 @@
 			eyesMesh.position.x = currentX * 0.22;
 			eyesMesh.position.y = currentY * -0.18;
 
-			/* Mouth crossfade: happy near the Start button, sad otherwise. */
-			var desired = 0;
-			if (startBtn) {
-				var br = startBtn.getBoundingClientRect();
-				var pad = 90;
-				var near =
-					targetX >= br.left - pad &&
-					targetX <= br.right + pad &&
-					targetY >= br.top - pad &&
-					targetY <= br.bottom + pad;
-				desired = near ? 1 : 0;
-			}
-			mouthMix = lerp(mouthMix, desired, 0.08);
-			mouthHappyMesh.material.opacity = mouthMix;
-			mouthSadMesh.material.opacity = 1 - mouthMix;
-
 			/* Shadow follows the same offset, opposite direction. */
 			shadowEl.style.transform =
 				'translate(calc(-50% + ' +
@@ -253,11 +227,6 @@
 			startBtn.disabled = true;
 			stopTracking();
 
-			mouthMix = 1;
-			mouthHappyMesh.material.opacity = 1;
-			mouthSadMesh.material.opacity = 0;
-			renderer.render(scene, camera);
-
 			window.setTimeout(function () {
 				wrap.classList.add('is-leaving');
 
@@ -292,7 +261,7 @@
 			document.addEventListener('mousemove', onPointerMove);
 			rafId = window.requestAnimationFrame(tick);
 		} else {
-			/* Static single frame: no pointer-follow, no crossfade. */
+			/* Static single frame: no pointer-follow. */
 			renderer.render(scene, camera);
 		}
 	});
