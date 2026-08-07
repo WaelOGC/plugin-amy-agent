@@ -28,53 +28,25 @@
 	pointer-events: none;
 }
 
-.amy-avatar-figure {
-	width: min(62vw, 240px);
-	height: auto;
-	overflow: visible;
-}
-
 /* The tilt group's `transform` is set entirely from JS every animation
    frame (for smooth mouse-follow) — do NOT add a `transition` on it,
    that would fight the per-frame updates and cause lag. */
-#amy-avatar-tilt-group {
-	transform-origin: 50% 60%;
+.amy-avatar-tilt-group {
+	transform-origin: 50% 55%;
 }
 
-.amy-avatar-mouth-neutral,
-.amy-avatar-mouth-smile {
-	transition: opacity 0.2s ease;
+.amy-avatar-figure {
+	display: block;
+	width: min(62vw, 260px);
+	height: auto;
+	border-radius: 50%;
+	filter: drop-shadow(0 0 32px rgba(255, 210, 122, 0.35));
+	transition: transform 0.35s ease, filter 0.35s ease;
 }
 
-.amy-avatar-mouth-smile {
-	opacity: 0;
-}
-
-.amy-avatar-wrap.is-smiling .amy-avatar-mouth-neutral {
-	opacity: 0;
-}
-
-.amy-avatar-wrap.is-smiling .amy-avatar-mouth-smile {
-	opacity: 1;
-}
-
-.amy-avatar-shadow {
-	fill: rgba(255, 210, 122, 0.25);
-	transition: transform 0.4s ease;
-}
-
-.amy-orbit-ring {
-	fill: none;
-	stroke: var(--amy-accent);
-	stroke-width: 1;
-	opacity: 0.5;
-	animation: amy-orbit-spin 18s linear infinite;
-	transform-origin: 50% 50%;
-}
-
-.amy-orbit-ring--reverse {
-	animation-direction: reverse;
-	animation-duration: 24s;
+.amy-avatar-wrap.is-pulsing .amy-avatar-figure {
+	transform: scale(1.06);
+	filter: drop-shadow(0 0 48px rgba(255, 210, 122, 0.55));
 }
 
 .amy-avatar-start-btn {
@@ -104,15 +76,7 @@
 	cursor: not-allowed;
 }
 
-@keyframes amy-orbit-spin {
-	from { transform: rotate(0deg); }
-	to { transform: rotate(360deg); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-	.amy-orbit-ring {
-		animation: none;
-	}
 	.amy-avatar-wrap {
 		transition: opacity 0.3s ease;
 	}
