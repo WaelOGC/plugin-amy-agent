@@ -96,7 +96,7 @@ class Amy_Submit_Idea {
 		wp_enqueue_script(
 			'amy-avatar',
 			AMY_AGENT_URL . 'public/js/amy-avatar.js',
-			array( 'amy-submit-idea' ),
+			array( 'amy-submit-idea', 'ogc-three' ),
 			AMY_AGENT_VERSION,
 			true
 		);
@@ -109,7 +109,10 @@ class Amy_Submit_Idea {
 				'restNonce' => wp_create_nonce( 'wp_rest' ),
 				'ajaxUrl'   => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
 				'ajaxNonce' => wp_create_nonce( 'amy_submit_idea_notify' ),
-				'avatarImage' => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar.jpg' ),
+				'avatarBaseImage'       => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-base.jpg' ),
+				'avatarEyesImage'       => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-eyes.png' ),
+				'avatarMouthHappyImage' => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-mouth-happy.png' ),
+				'avatarMouthSadImage'   => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-mouth-sad.png' ),
 				'i18n'      => array(
 					'chooseService'   => __( 'Choose a service to get started', 'amy-agent' ),
 					'submitAnswers'   => __( 'Submit', 'amy-agent' ),
