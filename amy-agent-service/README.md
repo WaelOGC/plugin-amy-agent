@@ -47,6 +47,10 @@ PHP may need a different host than the browser:
 - Try `http://127.0.0.1:8765` first in plugin settings
 - If PHP cannot reach the host, try `http://host.docker.internal:8765`
 
+## Persistence
+
+Submit Your Idea sessions are stored in SQLite at `data/submit_idea_sessions.db` (created automatically). This survives **process restarts** on the same filesystem. A **Dokploy redeploy** that starts a fresh container will still wipe sessions unless `data/` (or the app directory) is mounted as a persistent volume in the Dokploy service config (Application → Volumes).
+
 ## Endpoints (see plugin `docs/api-contract.md`)
 
 | Method | Path | Notes |

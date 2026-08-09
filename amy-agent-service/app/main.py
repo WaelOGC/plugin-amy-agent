@@ -8,7 +8,7 @@ from app.routes.submit_idea import UPLOAD_ROOT
 
 app = FastAPI(
     title="Amy Agent Service",
-    version="0.1.0",
+    version="0.1.1",
     description="Intelligence layer for the Amy Agent WordPress plugin (Phase 1 scaffold).",
 )
 

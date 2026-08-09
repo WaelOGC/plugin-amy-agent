@@ -306,6 +306,7 @@ async def submit_idea_answers(body: SubmitIdeaAnswersRequest) -> JSONResponse:
         raw = await _complete(body.ai, messages)
         summary_text, numbered_items = _parse_summary_json(raw)
     except ValueError:
+        state.save_session(sess)
         return _error(
             status.HTTP_400_BAD_REQUEST,
             "invalid_config",
@@ -319,6 +320,7 @@ async def submit_idea_answers(body: SubmitIdeaAnswersRequest) -> JSONResponse:
     if not numbered_items:
         summary_text, numbered_items = _fallback_summary(template, body.answers)
 
+    state.save_session(sess)
     payload = SubmitIdeaAnswersResponse(
         session_id=sess.session_id,
         status=sess.status,
@@ -341,6 +343,7 @@ async def submit_idea_confirm(body: SubmitIdeaConfirmRequest) -> JSONResponse:
     if body.confirmed:
         sess.status = "awaiting_contact"
         sess.touch()
+        state.save_session(sess)
         message = (
             "Thank you — that looks good. Please share your email "
             "(and optionally WhatsApp) so our team can follow up within 48 hours."
@@ -392,6 +395,7 @@ async def submit_idea_confirm(body: SubmitIdeaConfirmRequest) -> JSONResponse:
             pass
 
     sess.free_conversation.append({"role": "assistant", "content": opening})
+    state.save_session(sess)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -431,6 +435,7 @@ async def submit_idea_deep_dive(body: SubmitIdeaDeepDiveRequest) -> JSONResponse
             "(and optionally WhatsApp) so our team can follow up within 48 hours."
         )
         sess.free_conversation.append({"role": "assistant", "content": reply})
+        state.save_session(sess)
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=SubmitIdeaDeepDiveResponse(
@@ -485,6 +490,7 @@ async def submit_idea_deep_dive(body: SubmitIdeaDeepDiveRequest) -> JSONResponse
     sess.free_conversation.append({"role": "user", "content": message})
     sess.free_conversation.append({"role": "assistant", "content": reply})
     sess.touch()
+    state.save_session(sess)
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -558,6 +564,7 @@ async def submit_idea_contact(body: SubmitIdeaContactRequest) -> JSONResponse:
         attachments=list(sess.attachments),
     )
 
+    state.save_session(sess)
     payload = SubmitIdeaContactResponse(
         session_id=sess.session_id,
         status=sess.status,
@@ -618,6 +625,7 @@ async def submit_idea_upload(
     file_url = public_upload_url(session_id, stored_name)
     sess.attachments.append(file_url)
     sess.touch()
+    state.save_session(sess)
 
     payload = SubmitIdeaUploadResponse(filename=original_name, url=file_url)
     return JSONResponse(status_code=status.HTTP_200_OK, content=payload.model_dump())
