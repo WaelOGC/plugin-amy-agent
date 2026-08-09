@@ -109,6 +109,7 @@ class Amy_Submit_Idea {
 				'restNonce' => wp_create_nonce( 'wp_rest' ),
 				'ajaxUrl'   => esc_url_raw( admin_url( 'admin-ajax.php' ) ),
 				'ajaxNonce' => wp_create_nonce( 'amy_submit_idea_notify' ),
+				'buildVersion' => AMY_AGENT_VERSION . '-' . substr( md5( AMY_AGENT_VERSION . filemtime( AMY_AGENT_FILE ) ), 0, 6 ),
 				'avatarBaseImage'       => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-base.png' ),
 				'avatarEyesImage'       => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-eyes.png' ),
 				'avatarMouthHappyImage' => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-mouth-happy.png' ),

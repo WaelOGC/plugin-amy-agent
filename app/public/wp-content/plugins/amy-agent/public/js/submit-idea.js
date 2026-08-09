@@ -16,6 +16,16 @@
 			return;
 		}
 
+		(function renderBuildWatermark() {
+			var tag = document.createElement('div');
+			tag.textContent = 'AMY BUILD ' + (cfg.buildVersion || 'unknown');
+			tag.style.cssText =
+				'position:fixed;bottom:6px;right:6px;z-index:999999;' +
+				'background:#000;color:#FFD27A;font:11px monospace;' +
+				'padding:3px 6px;border-radius:4px;opacity:0.85;pointer-events:none;';
+			document.body.appendChild(tag);
+		})();
+
 		var SERVICES = [
 			{ slug: 'software-app', label: 'Software & App Development', icon: '</>' },
 			{ slug: 'wordpress', label: 'Custom WordPress Development', icon: 'W' },
