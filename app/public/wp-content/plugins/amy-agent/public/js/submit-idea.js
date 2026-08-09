@@ -51,6 +51,7 @@
 			'<div class="amy-si-ticker__track" data-si-ticker-track></div>' +
 			'</div>' +
 			'<div class="amy-si-chat" data-si-chat></div>' +
+			'<div class="amy-si-files" data-si-file-chips></div>' +
 			'<form class="amy-si-composer" data-si-composer>' +
 			'<button type="button" class="amy-si-attach" data-si-attach aria-label="Attach file">📎</button>' +
 			'<input type="file" multiple hidden data-si-file-input' +
@@ -63,7 +64,6 @@
 			escapeHtml(cfg.i18n.send) +
 			'</button>' +
 			'</form>' +
-			'<div class="amy-si-files" data-si-file-chips></div>' +
 			'</div>' +
 			'</section>';
 
@@ -121,18 +121,32 @@
 
 		function handleComposerSubmit() {
 			var text = (composerInput.value || '').trim();
-			if (!text || busy) {
+			var staged = attachments.slice();
+			if (busy) {
 				return;
 			}
 			if (chatPhase === 'questions') {
+				if (!text) {
+					return;
+				}
 				composerInput.value = '';
 				resetComposerHeight();
-				answerTextQuestion(text);
+				answerTextQuestion(text, takeStagedAttachments());
 			} else if (chatPhase === 'deep-dive') {
+				if (!text && !staged.length) {
+					return;
+				}
 				composerInput.value = '';
 				resetComposerHeight();
-				sendDeepDive(text);
+				sendDeepDive(text, takeStagedAttachments());
 			}
+		}
+
+		function takeStagedAttachments() {
+			var staged = attachments.slice();
+			attachments = [];
+			renderFileChips();
+			return staged;
 		}
 
 		function resizeComposer() {
@@ -342,12 +356,23 @@
 			chatEl.scrollTop = chatEl.scrollHeight;
 		}
 
-		function appendBubble(text, kind) {
+		function appendBubble(text, kind, files) {
 			var el = document.createElement('div');
 			el.className = 'amy-si-bubble amy-si-bubble--' + kind;
+
+			if (kind === 'assistant' || kind === 'user') {
+				var sender = document.createElement('div');
+				sender.className = 'amy-si-bubble__sender';
+				sender.textContent = kind === 'assistant' ? 'Amy' : 'You';
+				el.appendChild(sender);
+			}
+
 			if (kind === 'assistant') {
+				var body = document.createElement('div');
+				body.className = 'amy-si-bubble__body';
 				var rendered = renderMarkdown(text);
-				el.innerHTML = rendered.html;
+				body.innerHTML = rendered.html;
+				el.appendChild(body);
 				chatEl.appendChild(el);
 				if (rendered.choices && rendered.choices.length) {
 					var wrap = document.createElement('div');
@@ -367,6 +392,17 @@
 					});
 					chatEl.appendChild(wrap);
 				}
+			} else if (kind === 'user') {
+				if (text) {
+					var userBody = document.createElement('div');
+					userBody.className = 'amy-si-bubble__body';
+					userBody.textContent = text;
+					el.appendChild(userBody);
+				}
+				if (files && files.length) {
+					el.appendChild(buildAttachmentRow(files, false));
+				}
+				chatEl.appendChild(el);
 			} else {
 				el.textContent = text;
 				chatEl.appendChild(el);
@@ -402,7 +438,7 @@
 			senders.forEach(function (el) {
 				el.disabled = next;
 			});
-			attachBtn.disabled = next;
+			attachBtn.disabled = next || chatPhase === 'done' || chatPhase === 'contact';
 			if (!composerInput) {
 				return;
 			}
@@ -465,15 +501,13 @@
 			if (trayEl) {
 				trayEl.hidden = false;
 			}
-			var existingThanks = chatSection.querySelector('.amy-si-thanks--chat');
-			if (existingThanks) {
-				existingThanks.remove();
-			}
 			chatEl.innerHTML = '';
 			servicesBlock = null;
 			activeChoiceWrap = null;
 			contactForm = null;
 			contactError = null;
+			attachments = [];
+			renderFileChips();
 			appendBubble(cfg.i18n.chooseService, 'assistant');
 			renderServiceCards();
 			setTrustCardsVisible(true);
@@ -650,13 +684,13 @@
 			});
 		}
 
-		function answerTextQuestion(text) {
+		function answerTextQuestion(text, files) {
 			var q = currentQuestion();
 			if (!q || q.type === 'single_choice' || q.type === 'multi_choice') {
 				return;
 			}
 			answers[q.id] = text;
-			appendBubble(text, 'user');
+			appendBubble(text, 'user', files);
 			advanceQuestion();
 		}
 
@@ -784,191 +818,337 @@
 
 		function buildWhatsappCountrySelect() {
 			var countries = [
-				{ code: '+93', name: 'Afghanistan', flag: '🇦🇫' },
-				{ code: '+355', name: 'Albania', flag: '🇦🇱' },
-				{ code: '+213', name: 'Algeria', flag: '🇩🇿' },
-				{ code: '+376', name: 'Andorra', flag: '🇦🇩' },
-				{ code: '+244', name: 'Angola', flag: '🇦🇴' },
-				{ code: '+54', name: 'Argentina', flag: '🇦🇷' },
-				{ code: '+374', name: 'Armenia', flag: '🇦🇲' },
-				{ code: '+61', name: 'Australia', flag: '🇦🇺' },
-				{ code: '+43', name: 'Austria', flag: '🇦🇹' },
-				{ code: '+994', name: 'Azerbaijan', flag: '🇦🇿' },
-				{ code: '+973', name: 'Bahrain', flag: '🇧🇭' },
-				{ code: '+880', name: 'Bangladesh', flag: '🇧🇩' },
-				{ code: '+32', name: 'Belgium', flag: '🇧🇪' },
-				{ code: '+501', name: 'Belize', flag: '🇧🇿' },
-				{ code: '+229', name: 'Benin', flag: '🇧🇯' },
-				{ code: '+975', name: 'Bhutan', flag: '🇧🇹' },
-				{ code: '+591', name: 'Bolivia', flag: '🇧🇴' },
-				{ code: '+387', name: 'Bosnia & Herzegovina', flag: '🇧🇦' },
-				{ code: '+267', name: 'Botswana', flag: '🇧🇼' },
-				{ code: '+55', name: 'Brazil', flag: '🇧🇷' },
-				{ code: '+673', name: 'Brunei', flag: '🇧🇳' },
-				{ code: '+359', name: 'Bulgaria', flag: '🇧🇬' },
-				{ code: '+226', name: 'Burkina Faso', flag: '🇧🇫' },
-				{ code: '+257', name: 'Burundi', flag: '🇧🇮' },
-				{ code: '+855', name: 'Cambodia', flag: '🇰🇭' },
-				{ code: '+237', name: 'Cameroon', flag: '🇨🇲' },
-				{ code: '+1', name: 'Canada', flag: '🇨🇦' },
-				{ code: '+238', name: 'Cape Verde', flag: '🇨🇻' },
-				{ code: '+236', name: 'Central African Republic', flag: '🇨🇫' },
-				{ code: '+235', name: 'Chad', flag: '🇹🇩' },
-				{ code: '+56', name: 'Chile', flag: '🇨🇱' },
-				{ code: '+86', name: 'China', flag: '🇨🇳' },
-				{ code: '+57', name: 'Colombia', flag: '🇨🇴' },
-				{ code: '+269', name: 'Comoros', flag: '🇰🇲' },
-				{ code: '+242', name: 'Congo', flag: '🇨🇬' },
-				{ code: '+243', name: 'Congo (DRC)', flag: '🇨🇩' },
-				{ code: '+506', name: 'Costa Rica', flag: '🇨🇷' },
-				{ code: '+385', name: 'Croatia', flag: '🇭🇷' },
-				{ code: '+53', name: 'Cuba', flag: '🇨🇺' },
-				{ code: '+357', name: 'Cyprus', flag: '🇨🇾' },
-				{ code: '+420', name: 'Czechia', flag: '🇨🇿' },
-				{ code: '+45', name: 'Denmark', flag: '🇩🇰' },
-				{ code: '+253', name: 'Djibouti', flag: '🇩🇯' },
-				{ code: '+1', name: 'Dominican Republic', flag: '🇩🇴' },
-				{ code: '+593', name: 'Ecuador', flag: '🇪🇨' },
-				{ code: '+20', name: 'Egypt', flag: '🇪🇬' },
-				{ code: '+503', name: 'El Salvador', flag: '🇸🇻' },
-				{ code: '+372', name: 'Estonia', flag: '🇪🇪' },
-				{ code: '+268', name: 'Eswatini', flag: '🇸🇿' },
-				{ code: '+251', name: 'Ethiopia', flag: '🇪🇹' },
-				{ code: '+679', name: 'Fiji', flag: '🇫🇯' },
-				{ code: '+358', name: 'Finland', flag: '🇫🇮' },
-				{ code: '+33', name: 'France', flag: '🇫🇷' },
-				{ code: '+241', name: 'Gabon', flag: '🇬🇦' },
-				{ code: '+220', name: 'Gambia', flag: '🇬🇲' },
-				{ code: '+995', name: 'Georgia', flag: '🇬🇪' },
-				{ code: '+49', name: 'Germany', flag: '🇩🇪' },
-				{ code: '+233', name: 'Ghana', flag: '🇬🇭' },
-				{ code: '+30', name: 'Greece', flag: '🇬🇷' },
-				{ code: '+502', name: 'Guatemala', flag: '🇬🇹' },
-				{ code: '+224', name: 'Guinea', flag: '🇬🇳' },
-				{ code: '+592', name: 'Guyana', flag: '🇬🇾' },
-				{ code: '+509', name: 'Haiti', flag: '🇭🇹' },
-				{ code: '+504', name: 'Honduras', flag: '🇭🇳' },
-				{ code: '+852', name: 'Hong Kong', flag: '🇭🇰' },
-				{ code: '+36', name: 'Hungary', flag: '🇭🇺' },
-				{ code: '+354', name: 'Iceland', flag: '🇮🇸' },
-				{ code: '+91', name: 'India', flag: '🇮🇳' },
-				{ code: '+62', name: 'Indonesia', flag: '🇮🇩' },
-				{ code: '+98', name: 'Iran', flag: '🇮🇷' },
-				{ code: '+964', name: 'Iraq', flag: '🇮🇶' },
-				{ code: '+353', name: 'Ireland', flag: '🇮🇪' },
-				{ code: '+972', name: 'Israel', flag: '🇮🇱' },
-				{ code: '+39', name: 'Italy', flag: '🇮🇹' },
-				{ code: '+225', name: 'Ivory Coast', flag: '🇨🇮' },
-				{ code: '+1', name: 'Jamaica', flag: '🇯🇲' },
-				{ code: '+81', name: 'Japan', flag: '🇯🇵' },
-				{ code: '+962', name: 'Jordan', flag: '🇯🇴' },
-				{ code: '+7', name: 'Kazakhstan', flag: '🇰🇿' },
-				{ code: '+254', name: 'Kenya', flag: '🇰🇪' },
-				{ code: '+965', name: 'Kuwait', flag: '🇰🇼' },
-				{ code: '+996', name: 'Kyrgyzstan', flag: '🇰🇬' },
-				{ code: '+856', name: 'Laos', flag: '🇱🇦' },
-				{ code: '+371', name: 'Latvia', flag: '🇱🇻' },
-				{ code: '+961', name: 'Lebanon', flag: '🇱🇧' },
-				{ code: '+231', name: 'Liberia', flag: '🇱🇷' },
-				{ code: '+218', name: 'Libya', flag: '🇱🇾' },
-				{ code: '+423', name: 'Liechtenstein', flag: '🇱🇮' },
-				{ code: '+370', name: 'Lithuania', flag: '🇱🇹' },
-				{ code: '+352', name: 'Luxembourg', flag: '🇱🇺' },
-				{ code: '+853', name: 'Macau', flag: '🇲🇴' },
-				{ code: '+261', name: 'Madagascar', flag: '🇲🇬' },
-				{ code: '+265', name: 'Malawi', flag: '🇲🇼' },
-				{ code: '+60', name: 'Malaysia', flag: '🇲🇾' },
-				{ code: '+960', name: 'Maldives', flag: '🇲🇻' },
-				{ code: '+223', name: 'Mali', flag: '🇲🇱' },
-				{ code: '+356', name: 'Malta', flag: '🇲🇹' },
-				{ code: '+222', name: 'Mauritania', flag: '🇲🇷' },
-				{ code: '+230', name: 'Mauritius', flag: '🇲🇺' },
-				{ code: '+52', name: 'Mexico', flag: '🇲🇽' },
-				{ code: '+373', name: 'Moldova', flag: '🇲🇩' },
-				{ code: '+377', name: 'Monaco', flag: '🇲🇨' },
-				{ code: '+976', name: 'Mongolia', flag: '🇲🇳' },
-				{ code: '+382', name: 'Montenegro', flag: '🇲🇪' },
-				{ code: '+212', name: 'Morocco', flag: '🇲🇦' },
-				{ code: '+258', name: 'Mozambique', flag: '🇲🇿' },
-				{ code: '+95', name: 'Myanmar', flag: '🇲🇲' },
-				{ code: '+264', name: 'Namibia', flag: '🇳🇦' },
-				{ code: '+977', name: 'Nepal', flag: '🇳🇵' },
-				{ code: '+31', name: 'Netherlands', flag: '🇳🇱' },
-				{ code: '+64', name: 'New Zealand', flag: '🇳🇿' },
-				{ code: '+505', name: 'Nicaragua', flag: '🇳🇮' },
-				{ code: '+227', name: 'Niger', flag: '🇳🇪' },
-				{ code: '+234', name: 'Nigeria', flag: '🇳🇬' },
-				{ code: '+389', name: 'North Macedonia', flag: '🇲🇰' },
-				{ code: '+47', name: 'Norway', flag: '🇳🇴' },
-				{ code: '+968', name: 'Oman', flag: '🇴🇲' },
-				{ code: '+92', name: 'Pakistan', flag: '🇵🇰' },
-				{ code: '+970', name: 'Palestine', flag: '🇵🇸' },
-				{ code: '+507', name: 'Panama', flag: '🇵🇦' },
-				{ code: '+675', name: 'Papua New Guinea', flag: '🇵🇬' },
-				{ code: '+595', name: 'Paraguay', flag: '🇵🇾' },
-				{ code: '+51', name: 'Peru', flag: '🇵🇪' },
-				{ code: '+63', name: 'Philippines', flag: '🇵🇭' },
-				{ code: '+48', name: 'Poland', flag: '🇵🇱' },
-				{ code: '+351', name: 'Portugal', flag: '🇵🇹' },
-				{ code: '+974', name: 'Qatar', flag: '🇶🇦' },
-				{ code: '+40', name: 'Romania', flag: '🇷🇴' },
-				{ code: '+7', name: 'Russia', flag: '🇷🇺' },
-				{ code: '+250', name: 'Rwanda', flag: '🇷🇼' },
-				{ code: '+966', name: 'Saudi Arabia', flag: '🇸🇦' },
-				{ code: '+221', name: 'Senegal', flag: '🇸🇳' },
-				{ code: '+381', name: 'Serbia', flag: '🇷🇸' },
-				{ code: '+248', name: 'Seychelles', flag: '🇸🇨' },
-				{ code: '+232', name: 'Sierra Leone', flag: '🇸🇱' },
-				{ code: '+65', name: 'Singapore', flag: '🇸🇬' },
-				{ code: '+421', name: 'Slovakia', flag: '🇸🇰' },
-				{ code: '+386', name: 'Slovenia', flag: '🇸🇮' },
-				{ code: '+27', name: 'South Africa', flag: '🇿🇦' },
-				{ code: '+82', name: 'South Korea', flag: '🇰🇷' },
-				{ code: '+34', name: 'Spain', flag: '🇪🇸' },
-				{ code: '+94', name: 'Sri Lanka', flag: '🇱🇰' },
-				{ code: '+249', name: 'Sudan', flag: '🇸🇩' },
-				{ code: '+597', name: 'Suriname', flag: '🇸🇷' },
-				{ code: '+46', name: 'Sweden', flag: '🇸🇪' },
-				{ code: '+41', name: 'Switzerland', flag: '🇨🇭' },
-				{ code: '+963', name: 'Syria', flag: '🇸🇾' },
-				{ code: '+886', name: 'Taiwan', flag: '🇹🇼' },
-				{ code: '+992', name: 'Tajikistan', flag: '🇹🇯' },
-				{ code: '+255', name: 'Tanzania', flag: '🇹🇿' },
-				{ code: '+66', name: 'Thailand', flag: '🇹🇭' },
-				{ code: '+228', name: 'Togo', flag: '🇹🇬' },
-				{ code: '+216', name: 'Tunisia', flag: '🇹🇳' },
-				{ code: '+90', name: 'Turkey', flag: '🇹🇷' },
-				{ code: '+993', name: 'Turkmenistan', flag: '🇹🇲' },
-				{ code: '+256', name: 'Uganda', flag: '🇺🇬' },
-				{ code: '+380', name: 'Ukraine', flag: '🇺🇦' },
-				{ code: '+971', name: 'United Arab Emirates', flag: '🇦🇪' },
-				{ code: '+44', name: 'United Kingdom', flag: '🇬🇧' },
-				{ code: '+1', name: 'United States', flag: '🇺🇸' },
-				{ code: '+598', name: 'Uruguay', flag: '🇺🇾' },
-				{ code: '+998', name: 'Uzbekistan', flag: '🇺🇿' },
-				{ code: '+58', name: 'Venezuela', flag: '🇻🇪' },
-				{ code: '+84', name: 'Vietnam', flag: '🇻🇳' },
-				{ code: '+967', name: 'Yemen', flag: '🇾🇪' },
-				{ code: '+260', name: 'Zambia', flag: '🇿🇲' },
-				{ code: '+263', name: 'Zimbabwe', flag: '🇿🇼' },
+				{ code: '+93', name: 'Afghanistan', iso: 'af' },
+				{ code: '+355', name: 'Albania', iso: 'al' },
+				{ code: '+213', name: 'Algeria', iso: 'dz' },
+				{ code: '+376', name: 'Andorra', iso: 'ad' },
+				{ code: '+244', name: 'Angola', iso: 'ao' },
+				{ code: '+54', name: 'Argentina', iso: 'ar' },
+				{ code: '+374', name: 'Armenia', iso: 'am' },
+				{ code: '+61', name: 'Australia', iso: 'au' },
+				{ code: '+43', name: 'Austria', iso: 'at' },
+				{ code: '+994', name: 'Azerbaijan', iso: 'az' },
+				{ code: '+973', name: 'Bahrain', iso: 'bh' },
+				{ code: '+880', name: 'Bangladesh', iso: 'bd' },
+				{ code: '+32', name: 'Belgium', iso: 'be' },
+				{ code: '+501', name: 'Belize', iso: 'bz' },
+				{ code: '+229', name: 'Benin', iso: 'bj' },
+				{ code: '+975', name: 'Bhutan', iso: 'bt' },
+				{ code: '+591', name: 'Bolivia', iso: 'bo' },
+				{ code: '+387', name: 'Bosnia & Herzegovina', iso: 'ba' },
+				{ code: '+267', name: 'Botswana', iso: 'bw' },
+				{ code: '+55', name: 'Brazil', iso: 'br' },
+				{ code: '+673', name: 'Brunei', iso: 'bn' },
+				{ code: '+359', name: 'Bulgaria', iso: 'bg' },
+				{ code: '+226', name: 'Burkina Faso', iso: 'bf' },
+				{ code: '+257', name: 'Burundi', iso: 'bi' },
+				{ code: '+855', name: 'Cambodia', iso: 'kh' },
+				{ code: '+237', name: 'Cameroon', iso: 'cm' },
+				{ code: '+1', name: 'Canada', iso: 'ca' },
+				{ code: '+238', name: 'Cape Verde', iso: 'cv' },
+				{ code: '+236', name: 'Central African Republic', iso: 'cf' },
+				{ code: '+235', name: 'Chad', iso: 'td' },
+				{ code: '+56', name: 'Chile', iso: 'cl' },
+				{ code: '+86', name: 'China', iso: 'cn' },
+				{ code: '+57', name: 'Colombia', iso: 'co' },
+				{ code: '+269', name: 'Comoros', iso: 'km' },
+				{ code: '+242', name: 'Congo', iso: 'cg' },
+				{ code: '+243', name: 'Congo (DRC)', iso: 'cd' },
+				{ code: '+506', name: 'Costa Rica', iso: 'cr' },
+				{ code: '+385', name: 'Croatia', iso: 'hr' },
+				{ code: '+53', name: 'Cuba', iso: 'cu' },
+				{ code: '+357', name: 'Cyprus', iso: 'cy' },
+				{ code: '+420', name: 'Czechia', iso: 'cz' },
+				{ code: '+45', name: 'Denmark', iso: 'dk' },
+				{ code: '+253', name: 'Djibouti', iso: 'dj' },
+				{ code: '+1', name: 'Dominican Republic', iso: 'do' },
+				{ code: '+593', name: 'Ecuador', iso: 'ec' },
+				{ code: '+20', name: 'Egypt', iso: 'eg' },
+				{ code: '+503', name: 'El Salvador', iso: 'sv' },
+				{ code: '+372', name: 'Estonia', iso: 'ee' },
+				{ code: '+268', name: 'Eswatini', iso: 'sz' },
+				{ code: '+251', name: 'Ethiopia', iso: 'et' },
+				{ code: '+679', name: 'Fiji', iso: 'fj' },
+				{ code: '+358', name: 'Finland', iso: 'fi' },
+				{ code: '+33', name: 'France', iso: 'fr' },
+				{ code: '+241', name: 'Gabon', iso: 'ga' },
+				{ code: '+220', name: 'Gambia', iso: 'gm' },
+				{ code: '+995', name: 'Georgia', iso: 'ge' },
+				{ code: '+49', name: 'Germany', iso: 'de' },
+				{ code: '+233', name: 'Ghana', iso: 'gh' },
+				{ code: '+30', name: 'Greece', iso: 'gr' },
+				{ code: '+502', name: 'Guatemala', iso: 'gt' },
+				{ code: '+224', name: 'Guinea', iso: 'gn' },
+				{ code: '+592', name: 'Guyana', iso: 'gy' },
+				{ code: '+509', name: 'Haiti', iso: 'ht' },
+				{ code: '+504', name: 'Honduras', iso: 'hn' },
+				{ code: '+852', name: 'Hong Kong', iso: 'hk' },
+				{ code: '+36', name: 'Hungary', iso: 'hu' },
+				{ code: '+354', name: 'Iceland', iso: 'is' },
+				{ code: '+91', name: 'India', iso: 'in' },
+				{ code: '+62', name: 'Indonesia', iso: 'id' },
+				{ code: '+98', name: 'Iran', iso: 'ir' },
+				{ code: '+964', name: 'Iraq', iso: 'iq' },
+				{ code: '+353', name: 'Ireland', iso: 'ie' },
+				{ code: '+972', name: 'Israel', iso: 'il' },
+				{ code: '+39', name: 'Italy', iso: 'it' },
+				{ code: '+225', name: 'Ivory Coast', iso: 'ci' },
+				{ code: '+1', name: 'Jamaica', iso: 'jm' },
+				{ code: '+81', name: 'Japan', iso: 'jp' },
+				{ code: '+962', name: 'Jordan', iso: 'jo' },
+				{ code: '+7', name: 'Kazakhstan', iso: 'kz' },
+				{ code: '+254', name: 'Kenya', iso: 'ke' },
+				{ code: '+965', name: 'Kuwait', iso: 'kw' },
+				{ code: '+996', name: 'Kyrgyzstan', iso: 'kg' },
+				{ code: '+856', name: 'Laos', iso: 'la' },
+				{ code: '+371', name: 'Latvia', iso: 'lv' },
+				{ code: '+961', name: 'Lebanon', iso: 'lb' },
+				{ code: '+231', name: 'Liberia', iso: 'lr' },
+				{ code: '+218', name: 'Libya', iso: 'ly' },
+				{ code: '+423', name: 'Liechtenstein', iso: 'li' },
+				{ code: '+370', name: 'Lithuania', iso: 'lt' },
+				{ code: '+352', name: 'Luxembourg', iso: 'lu' },
+				{ code: '+853', name: 'Macau', iso: 'mo' },
+				{ code: '+261', name: 'Madagascar', iso: 'mg' },
+				{ code: '+265', name: 'Malawi', iso: 'mw' },
+				{ code: '+60', name: 'Malaysia', iso: 'my' },
+				{ code: '+960', name: 'Maldives', iso: 'mv' },
+				{ code: '+223', name: 'Mali', iso: 'ml' },
+				{ code: '+356', name: 'Malta', iso: 'mt' },
+				{ code: '+222', name: 'Mauritania', iso: 'mr' },
+				{ code: '+230', name: 'Mauritius', iso: 'mu' },
+				{ code: '+52', name: 'Mexico', iso: 'mx' },
+				{ code: '+373', name: 'Moldova', iso: 'md' },
+				{ code: '+377', name: 'Monaco', iso: 'mc' },
+				{ code: '+976', name: 'Mongolia', iso: 'mn' },
+				{ code: '+382', name: 'Montenegro', iso: 'me' },
+				{ code: '+212', name: 'Morocco', iso: 'ma' },
+				{ code: '+258', name: 'Mozambique', iso: 'mz' },
+				{ code: '+95', name: 'Myanmar', iso: 'mm' },
+				{ code: '+264', name: 'Namibia', iso: 'na' },
+				{ code: '+977', name: 'Nepal', iso: 'np' },
+				{ code: '+31', name: 'Netherlands', iso: 'nl' },
+				{ code: '+64', name: 'New Zealand', iso: 'nz' },
+				{ code: '+505', name: 'Nicaragua', iso: 'ni' },
+				{ code: '+227', name: 'Niger', iso: 'ne' },
+				{ code: '+234', name: 'Nigeria', iso: 'ng' },
+				{ code: '+389', name: 'North Macedonia', iso: 'mk' },
+				{ code: '+47', name: 'Norway', iso: 'no' },
+				{ code: '+968', name: 'Oman', iso: 'om' },
+				{ code: '+92', name: 'Pakistan', iso: 'pk' },
+				{ code: '+970', name: 'Palestine', iso: 'ps' },
+				{ code: '+507', name: 'Panama', iso: 'pa' },
+				{ code: '+675', name: 'Papua New Guinea', iso: 'pg' },
+				{ code: '+595', name: 'Paraguay', iso: 'py' },
+				{ code: '+51', name: 'Peru', iso: 'pe' },
+				{ code: '+63', name: 'Philippines', iso: 'ph' },
+				{ code: '+48', name: 'Poland', iso: 'pl' },
+				{ code: '+351', name: 'Portugal', iso: 'pt' },
+				{ code: '+974', name: 'Qatar', iso: 'qa' },
+				{ code: '+40', name: 'Romania', iso: 'ro' },
+				{ code: '+7', name: 'Russia', iso: 'ru' },
+				{ code: '+250', name: 'Rwanda', iso: 'rw' },
+				{ code: '+966', name: 'Saudi Arabia', iso: 'sa' },
+				{ code: '+221', name: 'Senegal', iso: 'sn' },
+				{ code: '+381', name: 'Serbia', iso: 'rs' },
+				{ code: '+248', name: 'Seychelles', iso: 'sc' },
+				{ code: '+232', name: 'Sierra Leone', iso: 'sl' },
+				{ code: '+65', name: 'Singapore', iso: 'sg' },
+				{ code: '+421', name: 'Slovakia', iso: 'sk' },
+				{ code: '+386', name: 'Slovenia', iso: 'si' },
+				{ code: '+27', name: 'South Africa', iso: 'za' },
+				{ code: '+82', name: 'South Korea', iso: 'kr' },
+				{ code: '+34', name: 'Spain', iso: 'es' },
+				{ code: '+94', name: 'Sri Lanka', iso: 'lk' },
+				{ code: '+249', name: 'Sudan', iso: 'sd' },
+				{ code: '+597', name: 'Suriname', iso: 'sr' },
+				{ code: '+46', name: 'Sweden', iso: 'se' },
+				{ code: '+41', name: 'Switzerland', iso: 'ch' },
+				{ code: '+963', name: 'Syria', iso: 'sy' },
+				{ code: '+886', name: 'Taiwan', iso: 'tw' },
+				{ code: '+992', name: 'Tajikistan', iso: 'tj' },
+				{ code: '+255', name: 'Tanzania', iso: 'tz' },
+				{ code: '+66', name: 'Thailand', iso: 'th' },
+				{ code: '+228', name: 'Togo', iso: 'tg' },
+				{ code: '+216', name: 'Tunisia', iso: 'tn' },
+				{ code: '+90', name: 'Turkey', iso: 'tr' },
+				{ code: '+993', name: 'Turkmenistan', iso: 'tm' },
+				{ code: '+256', name: 'Uganda', iso: 'ug' },
+				{ code: '+380', name: 'Ukraine', iso: 'ua' },
+				{ code: '+971', name: 'United Arab Emirates', iso: 'ae' },
+				{ code: '+44', name: 'United Kingdom', iso: 'gb' },
+				{ code: '+1', name: 'United States', iso: 'us' },
+				{ code: '+598', name: 'Uruguay', iso: 'uy' },
+				{ code: '+998', name: 'Uzbekistan', iso: 'uz' },
+				{ code: '+58', name: 'Venezuela', iso: 've' },
+				{ code: '+84', name: 'Vietnam', iso: 'vn' },
+				{ code: '+967', name: 'Yemen', iso: 'ye' },
+				{ code: '+260', name: 'Zambia', iso: 'zm' },
+				{ code: '+263', name: 'Zimbabwe', iso: 'zw' },
 			];
 
-			var select = document.createElement('select');
-			select.className = 'amy-si-input amy-si-whatsapp-country';
-			select.setAttribute('data-si-whatsapp-country', '');
-			select.setAttribute('aria-label', 'Country code');
+			var wrap = document.createElement('div');
+			wrap.className = 'amy-si-country-dd';
+			wrap.setAttribute('data-si-whatsapp-country-wrap', '');
 
-			countries.forEach(function (c) {
-				var opt = document.createElement('option');
-				opt.value = c.code;
-				opt.textContent = c.flag + ' ' + c.name + ' ' + c.code;
+			var hidden = document.createElement('input');
+			hidden.type = 'hidden';
+			hidden.setAttribute('data-si-whatsapp-country', '');
+			hidden.value = '+31';
+
+			var btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'amy-si-country-dd__btn';
+			btn.setAttribute('aria-haspopup', 'listbox');
+			btn.setAttribute('aria-expanded', 'false');
+			btn.setAttribute('aria-label', 'Country code');
+
+			var list = document.createElement('ul');
+			list.className = 'amy-si-country-dd__list';
+			list.setAttribute('role', 'listbox');
+			list.hidden = true;
+
+			var activeIndex = -1;
+			countries.forEach(function (c, idx) {
 				if (c.code === '+31' && c.name === 'Netherlands') {
-					opt.selected = true;
+					activeIndex = idx;
 				}
-				select.appendChild(opt);
+			});
+			if (activeIndex < 0) {
+				activeIndex = 0;
+			}
+
+			function flagHtml(iso) {
+				return (
+					'<img class="amy-si-flag" src="https://flagcdn.com/' +
+					String(iso).toLowerCase() +
+					'.svg" width="20" height="15" alt="" loading="lazy" decoding="async" />'
+				);
+			}
+
+			function renderButton(c) {
+				btn.innerHTML =
+					flagHtml(c.iso) +
+					'<span class="amy-si-country-dd__code">' +
+					escapeHtml(c.code) +
+					'</span>' +
+					'<span class="amy-si-country-dd__chevron" aria-hidden="true"></span>';
+				hidden.value = c.code;
+			}
+
+			function setOpen(open) {
+				list.hidden = !open;
+				btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+				wrap.classList.toggle('is-open', open);
+				if (open) {
+					var selected = list.querySelector('[aria-selected="true"]');
+					if (selected) {
+						selected.scrollIntoView({ block: 'nearest' });
+					}
+				}
+			}
+
+			function selectIndex(idx) {
+				if (idx < 0 || idx >= countries.length) {
+					return;
+				}
+				activeIndex = idx;
+				var options = list.querySelectorAll('[role="option"]');
+				options.forEach(function (opt, i) {
+					opt.setAttribute('aria-selected', i === idx ? 'true' : 'false');
+					opt.classList.toggle('is-active', i === idx);
+				});
+				renderButton(countries[idx]);
+				setOpen(false);
+				btn.focus();
+			}
+
+			countries.forEach(function (c, idx) {
+				var li = document.createElement('li');
+				li.className = 'amy-si-country-dd__option';
+				li.setAttribute('role', 'option');
+				li.setAttribute('data-index', String(idx));
+				li.setAttribute('aria-selected', idx === activeIndex ? 'true' : 'false');
+				if (idx === activeIndex) {
+					li.classList.add('is-active');
+				}
+				li.innerHTML =
+					flagHtml(c.iso) +
+					'<span class="amy-si-country-dd__label">' +
+					escapeHtml(c.name) +
+					'</span>' +
+					'<span class="amy-si-country-dd__dial">' +
+					escapeHtml(c.code) +
+					'</span>';
+				li.addEventListener('click', function (event) {
+					event.preventDefault();
+					event.stopPropagation();
+					selectIndex(idx);
+				});
+				list.appendChild(li);
 			});
 
-			return select;
+			renderButton(countries[activeIndex]);
+
+			btn.addEventListener('click', function (event) {
+				event.preventDefault();
+				event.stopPropagation();
+				setOpen(list.hidden);
+			});
+
+			btn.addEventListener('keydown', function (event) {
+				if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+					event.preventDefault();
+					if (list.hidden) {
+						setOpen(true);
+						return;
+					}
+					var next =
+						event.key === 'ArrowDown'
+							? Math.min(activeIndex + 1, countries.length - 1)
+							: Math.max(activeIndex - 1, 0);
+					activeIndex = next;
+					var options = list.querySelectorAll('[role="option"]');
+					options.forEach(function (opt, i) {
+						opt.classList.toggle('is-active', i === next);
+						opt.setAttribute('aria-selected', i === next ? 'true' : 'false');
+					});
+					if (options[next]) {
+						options[next].scrollIntoView({ block: 'nearest' });
+					}
+				} else if (event.key === 'Enter' || event.key === ' ') {
+					event.preventDefault();
+					if (list.hidden) {
+						setOpen(true);
+					} else {
+						selectIndex(activeIndex);
+					}
+				} else if (event.key === 'Escape') {
+					if (!list.hidden) {
+						event.preventDefault();
+						setOpen(false);
+					}
+				} else if (event.key === 'Home' && !list.hidden) {
+					event.preventDefault();
+					selectIndex(0);
+					setOpen(true);
+				} else if (event.key === 'End' && !list.hidden) {
+					event.preventDefault();
+					selectIndex(countries.length - 1);
+					setOpen(true);
+				}
+			});
+
+			document.addEventListener('click', function (event) {
+				if (!wrap.contains(event.target)) {
+					setOpen(false);
+				}
+			});
+
+			wrap.appendChild(hidden);
+			wrap.appendChild(btn);
+			wrap.appendChild(list);
+			return wrap;
 		}
 
 		function assembleWhatsapp(form) {
@@ -1068,33 +1248,27 @@
 		function showConfirmation() {
 			chatPhase = 'done';
 			setComposerMode('disabled');
-			chatEl.innerHTML = '';
-			attachments = [];
-			renderFileChips();
-			if (trayEl) {
-				trayEl.hidden = true;
-			}
-			var existing = chatSection.querySelector('.amy-si-thanks--chat');
-			if (existing) {
-				existing.remove();
-			}
-			var thanks = document.createElement('div');
-			thanks.className = 'amy-si-thanks amy-si-thanks--chat';
-			thanks.innerHTML =
-				'<p class="amy-si-thanks__body">' +
-				escapeHtml(cfg.i18n.thankYouChat || cfg.i18n.thankYou) +
-				'</p>';
-			chatSection.appendChild(thanks);
+			attachBtn.disabled = true;
+			appendBubble(cfg.i18n.thankYouChat || cfg.i18n.thankYou, 'assistant');
 			contactForm = null;
 			contactError = null;
 		}
 
-		function sendDeepDive(text) {
-			appendBubble(text, 'user');
+		function sendDeepDive(text, files) {
+			files = files || [];
+			var apiText = (text || '').trim();
+			if (!apiText && files.length) {
+				apiText = files
+					.map(function (f) {
+						return f.filename;
+					})
+					.join(', ');
+			}
+			appendBubble(text || '', 'user', files);
 			var thinking = appendBubble(cfg.i18n.thinking, 'status');
 			setBusy(true);
 
-			apiPost('deep-dive-message', { session_id: sessionId, message: text })
+			apiPost('deep-dive-message', { session_id: sessionId, message: apiText })
 				.then(function (result) {
 					thinking.remove();
 					if (!result.ok || !result.data) {
@@ -1118,22 +1292,149 @@
 				});
 		}
 
+		function isImageAttachment(att) {
+			if (att.isImage) {
+				return true;
+			}
+			return /\.(jpe?g|png|gif|webp)$/i.test(att.filename || '');
+		}
+
+		function formatFileSize(bytes) {
+			var n = Number(bytes);
+			if (!isFinite(n) || n < 0) {
+				return '';
+			}
+			if (n < 1024) {
+				return Math.round(n) + ' B';
+			}
+			if (n < 1024 * 1024) {
+				return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + ' KB';
+			}
+			return (n / (1024 * 1024)).toFixed(1) + ' MB';
+		}
+
+		function fileTypeIconSvg() {
+			return (
+				'<svg class="amy-si-file-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
+				'<path fill="currentColor" d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm1 7V3.5L19.5 9H15z"/>' +
+				'</svg>'
+			);
+		}
+
+		function buildAttachmentRow(fileList, removable) {
+			var row = document.createElement('div');
+			row.className = 'amy-si-bubble-files' + (removable ? ' amy-si-bubble-files--staged' : '');
+			fileList.forEach(function (att, index) {
+				row.appendChild(buildFileChip(att, removable ? index : -1));
+			});
+			return row;
+		}
+
+		function buildFileChip(att, removeIndex) {
+			var chip = document.createElement('span');
+			var isImage = isImageAttachment(att);
+			chip.className =
+				'amy-si-file-chip' +
+				(isImage ? ' amy-si-file-chip--image' : '') +
+				(removeIndex < 0 ? ' amy-si-file-chip--sent' : '');
+
+			if (isImage) {
+				var thumb = document.createElement('img');
+				thumb.className = 'amy-si-file-thumb' + (removeIndex < 0 ? ' amy-si-file-thumb--sent' : '');
+				thumb.alt = att.filename || '';
+				thumb.src = att.previewUrl || att.url || '';
+				chip.appendChild(thumb);
+				if (removeIndex >= 0) {
+					var name = document.createElement('span');
+					name.className = 'amy-si-file-chip__name';
+					name.textContent = att.filename || 'image';
+					chip.appendChild(name);
+				}
+			} else {
+				var iconWrap = document.createElement('span');
+				iconWrap.className = 'amy-si-file-chip__icon';
+				iconWrap.innerHTML = fileTypeIconSvg();
+				chip.appendChild(iconWrap);
+				var meta = document.createElement('span');
+				meta.className = 'amy-si-file-chip__meta';
+				var nameEl = document.createElement('span');
+				nameEl.className = 'amy-si-file-chip__name';
+				nameEl.textContent = att.filename || 'file';
+				meta.appendChild(nameEl);
+				if (removeIndex >= 0 && att.size) {
+					var sizeEl = document.createElement('span');
+					sizeEl.className = 'amy-si-file-chip__size';
+					sizeEl.textContent = formatFileSize(att.size);
+					meta.appendChild(sizeEl);
+				}
+				chip.appendChild(meta);
+			}
+
+			if (removeIndex >= 0) {
+				var rm = document.createElement('button');
+				rm.type = 'button';
+				rm.className = 'amy-si-file-chip__remove';
+				rm.setAttribute('aria-label', 'Remove');
+				rm.textContent = '✕';
+				rm.addEventListener('click', function () {
+					var removed = attachments.splice(removeIndex, 1)[0];
+					if (removed && removed.previewUrl) {
+						try {
+							URL.revokeObjectURL(removed.previewUrl);
+						} catch (e) {
+							/* ignore */
+						}
+					}
+					renderFileChips();
+				});
+				chip.appendChild(rm);
+			}
+
+			return chip;
+		}
+
 		function uploadFiles(fileList) {
 			var files = Array.prototype.slice.call(fileList || []);
 			files.forEach(function (file) {
+				var previewUrl = '';
+				var isImage = /^image\//i.test(file.type) || /\.(jpe?g|png|gif|webp)$/i.test(file.name);
+				if (isImage) {
+					try {
+						previewUrl = URL.createObjectURL(file);
+					} catch (e) {
+						previewUrl = '';
+					}
+				}
 				apiUpload(file)
 					.then(function (result) {
 						if (!result.ok || !result.data) {
+							if (previewUrl) {
+								try {
+									URL.revokeObjectURL(previewUrl);
+								} catch (e2) {
+									/* ignore */
+								}
+							}
 							window.alert(cfg.i18n.uploadError);
 							return;
 						}
 						attachments.push({
 							filename: result.data.filename || file.name,
 							url: result.data.url || '',
+							size: file.size || 0,
+							isImage: isImage,
+							previewUrl: previewUrl,
 						});
 						renderFileChips();
 					})
 					.catch(function () {
+						if (previewUrl) {
+							try {
+								URL.revokeObjectURL(previewUrl);
+							} catch (e3) {
+								/* ignore */
+							}
+						}
 						window.alert(cfg.i18n.uploadError);
 					});
 			});
@@ -1145,19 +1446,7 @@
 			}
 			fileChipsEl.innerHTML = '';
 			attachments.forEach(function (att, index) {
-				var chip = document.createElement('span');
-				chip.className = 'amy-si-file-chip';
-				chip.appendChild(document.createTextNode(att.filename));
-				var rm = document.createElement('button');
-				rm.type = 'button';
-				rm.setAttribute('aria-label', 'Remove');
-				rm.textContent = '×';
-				rm.addEventListener('click', function () {
-					attachments.splice(index, 1);
-					renderFileChips();
-				});
-				chip.appendChild(rm);
-				fileChipsEl.appendChild(chip);
+				fileChipsEl.appendChild(buildFileChip(att, index));
 			});
 		}
 
