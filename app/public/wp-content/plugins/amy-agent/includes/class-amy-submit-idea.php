@@ -128,6 +128,7 @@ class Amy_Submit_Idea {
 					'uploadHint'      => __( 'Drag & drop files here, or click to browse (images, PDF, DOC — max 10 MB)', 'amy-agent' ),
 					'uploadError'     => __( 'Could not upload that file.', 'amy-agent' ),
 					'thankYou'        => __( 'Thank you — our team will respond within 48 hours to the email you provided.', 'amy-agent' ),
+					'thankYouChat'    => __( '🎉 Got it — your idea is officially in! Thanks for taking the time to walk through it with me. Our team will review the details and get back to you within 48 hours. Keep an eye on your inbox 📩 — talk soon!', 'amy-agent' ),
 					'summaryPrompt'   => __( 'Does this summary look correct?', 'amy-agent' ),
 					'deepDivePlaceholder' => __( 'Tell Amy what to change…', 'amy-agent' ),
 					'startConversation' => __( 'Start', 'amy-agent' ),

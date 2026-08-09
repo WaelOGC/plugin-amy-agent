@@ -1,6 +1,6 @@
 /**
  * Amy Agent — Submit Your Idea conversational UI (vanilla JS).
- * Unified scrolling chat tray after avatar Start; contact/thank-you stay separate steps.
+ * Unified scrolling chat tray after avatar Start; contact + confirmation stay in-chat.
  */
 (function () {
 	'use strict';
@@ -32,11 +32,14 @@
 		var answers = {};
 		var attachments = [];
 		var busy = false;
-		/** @type {'services'|'questions'|'summary'|'deep-dive'} */
+		/** @type {'services'|'questions'|'summary'|'deep-dive'|'contact'|'done'} */
 		var chatPhase = 'services';
 		var questionIndex = 0;
 		var servicesBlock = null;
 		var activeChoiceWrap = null;
+		var contactForm = null;
+		var contactError = null;
+		var COMPOSER_MAX_HEIGHT_PX = 7.5 * 16;
 
 		root.innerHTML =
 			'<section class="amy-si-section is-active" data-si-step="avatar-landing">' +
@@ -52,51 +55,20 @@
 			'<button type="button" class="amy-si-attach" data-si-attach aria-label="Attach file">📎</button>' +
 			'<input type="file" multiple hidden data-si-file-input' +
 			' accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,image/*,application/pdf" />' +
-			'<input class="amy-si-input" type="text" maxlength="4000" autocomplete="off"' +
+			'<textarea class="amy-si-input" rows="1" maxlength="4000" autocomplete="off"' +
 			' data-si-composer-input placeholder="' +
 			escapeHtml(cfg.i18n.deepDivePlaceholder) +
-			'" />' +
+			'"></textarea>' +
 			'<button class="amy-si-btn amy-si-btn--primary" type="submit" data-si-composer-send>' +
 			escapeHtml(cfg.i18n.send) +
 			'</button>' +
 			'</form>' +
 			'<div class="amy-si-files" data-si-file-chips></div>' +
 			'</div>' +
-			'</section>' +
-			'<section class="amy-si-section" data-si-step="contact-form">' +
-			'<h2 class="amy-si-heading">' +
-			escapeHtml(cfg.i18n.emailLabel) +
-			'</h2>' +
-			'<form class="amy-si-form" data-si-contact-form novalidate>' +
-			'<div class="amy-si-field">' +
-			'<label class="amy-si-field__label" for="amy-si-email">' +
-			escapeHtml(cfg.i18n.emailLabel) +
-			'</label>' +
-			'<input class="amy-si-input" id="amy-si-email" type="email" name="email" required autocomplete="email" data-si-email />' +
-			'</div>' +
-			'<div class="amy-si-field">' +
-			'<label class="amy-si-field__label" for="amy-si-whatsapp">' +
-			escapeHtml(cfg.i18n.whatsappLabel) +
-			'</label>' +
-			'<input class="amy-si-input" id="amy-si-whatsapp" type="text" name="whatsapp" autocomplete="tel" data-si-whatsapp />' +
-			'</div>' +
-			'<p class="amy-si-error" data-si-contact-error hidden></p>' +
-			'<div class="amy-si-actions">' +
-			'<button class="amy-si-btn amy-si-btn--primary" type="submit">' +
-			escapeHtml(cfg.i18n.contactSubmit) +
-			'</button>' +
-			'</div>' +
-			'</form>' +
-			'</section>' +
-			'<section class="amy-si-section" data-si-step="thank-you">' +
-			'<div class="amy-si-thanks">' +
-			'<p class="amy-si-thanks__title">✓</p>' +
-			'<p class="amy-si-thanks__body">' +
-			escapeHtml(cfg.i18n.thankYou) +
-			'</p>' +
-			'</div>' +
 			'</section>';
 
+		var chatSection = root.querySelector('[data-si-step="chat"]');
+		var trayEl = root.querySelector('.amy-si-tray');
 		var chatEl = root.querySelector('[data-si-chat]');
 		var tickerTrack = root.querySelector('[data-si-ticker-track]');
 		var composerForm = root.querySelector('[data-si-composer]');
@@ -105,8 +77,6 @@
 		var attachBtn = root.querySelector('[data-si-attach]');
 		var fileInput = root.querySelector('[data-si-file-input]');
 		var fileChipsEl = root.querySelector('[data-si-file-chips]');
-		var contactForm = root.querySelector('[data-si-contact-form]');
-		var contactError = root.querySelector('[data-si-contact-error]');
 
 		populateTicker();
 		setComposerMode('disabled');
@@ -125,40 +95,57 @@
 			}
 		});
 
+		composerInput.addEventListener('input', function () {
+			resizeComposer();
+		});
+
+		composerInput.addEventListener('keydown', function (event) {
+			if (event.key === 'Enter' && !event.shiftKey) {
+				event.preventDefault();
+				if (typeof composerForm.requestSubmit === 'function') {
+					composerForm.requestSubmit();
+				} else {
+					handleComposerSubmit();
+				}
+			}
+		});
+
 		composerForm.addEventListener('submit', function (event) {
 			event.preventDefault();
+			handleComposerSubmit();
+		});
+
+		document.addEventListener('amySubmitIdea:avatarStarted', function () {
+			beginChat();
+		});
+
+		function handleComposerSubmit() {
 			var text = (composerInput.value || '').trim();
 			if (!text || busy) {
 				return;
 			}
 			if (chatPhase === 'questions') {
 				composerInput.value = '';
+				resetComposerHeight();
 				answerTextQuestion(text);
 			} else if (chatPhase === 'deep-dive') {
 				composerInput.value = '';
+				resetComposerHeight();
 				sendDeepDive(text);
 			}
-		});
+		}
 
-		contactForm.addEventListener('submit', function (event) {
-			event.preventDefault();
-			if (busy) {
-				return;
-			}
-			var email = (root.querySelector('[data-si-email]').value || '').trim();
-			var whatsapp = (root.querySelector('[data-si-whatsapp]').value || '').trim();
-			contactError.hidden = true;
-			if (!isValidEmail(email)) {
-				contactError.textContent = cfg.i18n.emailRequired;
-				contactError.hidden = false;
-				return;
-			}
-			submitContact(email, whatsapp);
-		});
+		function resizeComposer() {
+			composerInput.style.height = 'auto';
+			var scroll = composerInput.scrollHeight;
+			composerInput.style.height = Math.min(scroll, COMPOSER_MAX_HEIGHT_PX) + 'px';
+			composerInput.style.overflowY = scroll > COMPOSER_MAX_HEIGHT_PX ? 'auto' : 'hidden';
+		}
 
-		document.addEventListener('amySubmitIdea:avatarStarted', function () {
-			beginChat();
-		});
+		function resetComposerHeight() {
+			composerInput.style.height = '';
+			composerInput.style.overflowY = 'hidden';
+		}
 
 		function uuid() {
 			if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -475,9 +462,18 @@
 		function beginChat() {
 			showStep('chat');
 			chatPhase = 'services';
+			if (trayEl) {
+				trayEl.hidden = false;
+			}
+			var existingThanks = chatSection.querySelector('.amy-si-thanks--chat');
+			if (existingThanks) {
+				existingThanks.remove();
+			}
 			chatEl.innerHTML = '';
 			servicesBlock = null;
 			activeChoiceWrap = null;
+			contactForm = null;
+			contactError = null;
 			appendBubble(cfg.i18n.chooseService, 'assistant');
 			renderServiceCards();
 			setTrustCardsVisible(true);
@@ -770,7 +766,7 @@
 						return;
 					}
 					if (confirmed) {
-						showStep('contact-form');
+						renderContactBubble();
 					} else {
 						chatPhase = 'deep-dive';
 						appendBubble(result.data.message || '', 'assistant');
@@ -784,6 +780,84 @@
 				.finally(function () {
 					setBusy(false);
 				});
+		}
+
+		function renderContactBubble() {
+			chatPhase = 'contact';
+			setComposerMode('disabled');
+
+			var form = document.createElement('form');
+			form.className = 'amy-si-form amy-si-contact-bubble';
+			form.setAttribute('data-si-contact-form', '');
+			form.setAttribute('novalidate', '');
+			form.innerHTML =
+				'<div class="amy-si-field">' +
+				'<label class="amy-si-field__label" for="amy-si-email">' +
+				escapeHtml(cfg.i18n.emailLabel) +
+				'</label>' +
+				'<input class="amy-si-input" id="amy-si-email" type="email" name="email" required autocomplete="email" data-si-email />' +
+				'</div>' +
+				'<div class="amy-si-field">' +
+				'<label class="amy-si-field__label" for="amy-si-whatsapp">' +
+				escapeHtml(cfg.i18n.whatsappLabel) +
+				'</label>' +
+				'<input class="amy-si-input" id="amy-si-whatsapp" type="text" name="whatsapp" autocomplete="tel" data-si-whatsapp />' +
+				'</div>' +
+				'<p class="amy-si-error" data-si-contact-error hidden></p>' +
+				'<div class="amy-si-actions">' +
+				'<button class="amy-si-btn amy-si-btn--primary" type="submit">' +
+				escapeHtml(cfg.i18n.contactSubmit) +
+				'</button>' +
+				'</div>';
+
+			contactForm = form;
+			contactError = form.querySelector('[data-si-contact-error]');
+
+			form.addEventListener('submit', function (event) {
+				event.preventDefault();
+				if (busy) {
+					return;
+				}
+				var email = (form.querySelector('[data-si-email]').value || '').trim();
+				var whatsapp = (form.querySelector('[data-si-whatsapp]').value || '').trim();
+				contactError.hidden = true;
+				if (!isValidEmail(email)) {
+					contactError.textContent = cfg.i18n.emailRequired;
+					contactError.hidden = false;
+					return;
+				}
+				submitContact(email, whatsapp);
+			});
+
+			appendCustomBubble(form, 'contact');
+			var emailInput = form.querySelector('[data-si-email]');
+			if (emailInput) {
+				emailInput.focus();
+			}
+		}
+
+		function showConfirmation() {
+			chatPhase = 'done';
+			setComposerMode('disabled');
+			chatEl.innerHTML = '';
+			attachments = [];
+			renderFileChips();
+			if (trayEl) {
+				trayEl.hidden = true;
+			}
+			var existing = chatSection.querySelector('.amy-si-thanks--chat');
+			if (existing) {
+				existing.remove();
+			}
+			var thanks = document.createElement('div');
+			thanks.className = 'amy-si-thanks amy-si-thanks--chat';
+			thanks.innerHTML =
+				'<p class="amy-si-thanks__body">' +
+				escapeHtml(cfg.i18n.thankYouChat || cfg.i18n.thankYou) +
+				'</p>';
+			chatSection.appendChild(thanks);
+			contactForm = null;
+			contactError = null;
 		}
 
 		function sendDeepDive(text) {
@@ -800,7 +874,7 @@
 					}
 					appendBubble(result.data.reply || '', 'assistant');
 					if (result.data.status === 'awaiting_contact') {
-						showStep('contact-form');
+						renderContactBubble();
 					}
 				})
 				.catch(function () {
@@ -871,17 +945,21 @@
 			})
 				.then(function (result) {
 					if (!result.ok || !result.data || !result.data.brief) {
-						contactError.textContent = cfg.i18n.unavailable;
-						contactError.hidden = false;
+						if (contactError) {
+							contactError.textContent = cfg.i18n.unavailable;
+							contactError.hidden = false;
+						}
 						return null;
 					}
 					return notifyWordPress(result.data.brief).then(function () {
-						showStep('thank-you');
+						showConfirmation();
 					});
 				})
 				.catch(function () {
-					contactError.textContent = cfg.i18n.unavailable;
-					contactError.hidden = false;
+					if (contactError) {
+						contactError.textContent = cfg.i18n.unavailable;
+						contactError.hidden = false;
+					}
 				})
 				.finally(function () {
 					setBusy(false);

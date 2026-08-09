@@ -495,7 +495,7 @@
 /* —— Composer —— */
 .amy-si-composer {
 	display: flex;
-	align-items: center;
+	align-items: flex-end;
 	gap: 0.45rem;
 	margin-top: 0.35rem;
 	padding: 0.35rem 0.15rem 0.45rem;
@@ -505,11 +505,28 @@
 .amy-si-composer .amy-si-input {
 	flex: 1;
 	min-width: 0;
+	min-height: 2.4rem;
+	max-height: 7.5rem;
+	resize: none;
+	line-height: 1.4;
+	overflow-y: hidden;
 }
 
 .amy-si-composer.is-choice-mode .amy-si-input,
 .amy-si-composer.is-choice-mode [data-si-composer-send] {
 	display: none;
+}
+
+.amy-si-custom--contact {
+	align-self: stretch;
+	max-width: 100%;
+}
+
+.amy-si-contact-bubble {
+	padding: 0.85rem 0.9rem;
+	border-radius: 0.85rem;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.22);
+	background: rgba(255, 255, 255, 0.04);
 }
 
 .amy-si-attach {
@@ -542,7 +559,7 @@
 	cursor: not-allowed;
 }
 
-/* —— Thank you —— */
+/* —— Thank you / confirmation —— */
 .amy-si-thanks {
 	text-align: center;
 	padding: 2.5rem 1.5rem;
@@ -551,6 +568,10 @@
 	background:
 		radial-gradient(ellipse at 50% 0%, rgba(var(--amy-brand-rgb), 0.14), transparent 60%),
 		var(--amy-panel);
+}
+
+.amy-si-thanks--chat {
+	margin-top: 0.5rem;
 }
 
 .amy-si-thanks__title {
@@ -564,6 +585,7 @@
 	color: var(--amy-text);
 	line-height: 1.55;
 	font-size: 1rem;
+	white-space: pre-wrap;
 }
 
 @media (max-width: 560px) {
