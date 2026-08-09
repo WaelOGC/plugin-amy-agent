@@ -363,7 +363,19 @@
 			if (kind === 'assistant' || kind === 'user') {
 				var sender = document.createElement('div');
 				sender.className = 'amy-si-bubble__sender';
-				sender.textContent = kind === 'assistant' ? 'Amy' : 'You';
+				var name = document.createElement('span');
+				name.className = 'amy-si-bubble__sender-name';
+				name.textContent = kind === 'assistant' ? 'Amy' : 'You';
+				var dot = document.createElement('span');
+				dot.className = 'amy-si-bubble__dot';
+				dot.setAttribute('aria-hidden', 'true');
+				if (kind === 'assistant') {
+					sender.appendChild(dot);
+					sender.appendChild(name);
+				} else {
+					sender.appendChild(name);
+					sender.appendChild(dot);
+				}
 				el.appendChild(sender);
 			}
 
@@ -500,6 +512,21 @@
 			chatPhase = 'services';
 			if (trayEl) {
 				trayEl.hidden = false;
+				trayEl.classList.remove('is-success');
+			}
+			var ticker = root.querySelector('.amy-si-ticker');
+			if (ticker) {
+				ticker.hidden = false;
+			}
+			if (fileChipsEl) {
+				fileChipsEl.hidden = false;
+			}
+			if (composerForm) {
+				composerForm.hidden = false;
+			}
+			var priorSuccess = trayEl && trayEl.querySelector('.amy-si-success');
+			if (priorSuccess) {
+				priorSuccess.remove();
 			}
 			chatEl.innerHTML = '';
 			servicesBlock = null;
@@ -1249,9 +1276,39 @@
 			chatPhase = 'done';
 			setComposerMode('disabled');
 			attachBtn.disabled = true;
-			appendBubble(cfg.i18n.thankYouChat || cfg.i18n.thankYou, 'assistant');
 			contactForm = null;
 			contactError = null;
+			attachments = [];
+			renderFileChips();
+
+			chatEl.innerHTML = '';
+
+			var ticker = root.querySelector('.amy-si-ticker');
+			if (ticker) {
+				ticker.hidden = true;
+			}
+			if (fileChipsEl) {
+				fileChipsEl.hidden = true;
+			}
+			if (composerForm) {
+				composerForm.hidden = true;
+			}
+
+			if (trayEl) {
+				trayEl.classList.add('is-success');
+				var existing = trayEl.querySelector('.amy-si-success');
+				if (existing) {
+					existing.remove();
+				}
+				var card = document.createElement('div');
+				card.className = 'amy-si-success';
+				card.innerHTML =
+					'<div class="amy-si-success__badge" aria-hidden="true">🎉</div>' +
+					'<p class="amy-si-success__text">' +
+					escapeHtml(cfg.i18n.thankYouChat || cfg.i18n.thankYou) +
+					'</p>';
+				trayEl.appendChild(card);
+			}
 		}
 
 		function sendDeepDive(text, files) {
