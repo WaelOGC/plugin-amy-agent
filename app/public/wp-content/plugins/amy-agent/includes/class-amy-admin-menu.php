@@ -8,12 +8,13 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers Amy → Overview / Settings / Brand & Avatar / placeholders in wp-admin.
+ * Registers Amy → Overview / My Profile / Settings / Brand & Avatar / placeholders in wp-admin.
  */
 class Amy_Admin_Menu {
 
-	const PARENT_SLUG     = 'amy-overview';
-	const BRAND_PAGE_SLUG = 'amy-brand-avatar';
+	const PARENT_SLUG          = 'amy-overview';
+	const MY_PROFILE_PAGE_SLUG = 'amy-my-profile';
+	const BRAND_PAGE_SLUG      = 'amy-brand-avatar';
 
 	/**
 	 * @var Amy_Settings
@@ -60,6 +61,15 @@ class Amy_Admin_Menu {
 
 		add_submenu_page(
 			self::PARENT_SLUG,
+			__( 'My Profile', 'amy-agent' ),
+			__( 'My Profile', 'amy-agent' ),
+			'manage_options',
+			self::MY_PROFILE_PAGE_SLUG,
+			array( $this, 'render_my_profile' )
+		);
+
+		add_submenu_page(
+			self::PARENT_SLUG,
 			__( 'Settings', 'amy-agent' ),
 			__( 'Settings', 'amy-agent' ),
 			'manage_options',
@@ -98,7 +108,7 @@ class Amy_Admin_Menu {
 	}
 
 	/**
-	 * Enqueue overview / brand assets on their screens only.
+	 * Enqueue overview / my profile / brand assets on their screens only.
 	 *
 	 * @param string $hook_suffix Current admin page hook.
 	 */
@@ -115,6 +125,23 @@ class Amy_Admin_Menu {
 				'amy-agent-admin-overview',
 				AMY_AGENT_URL . 'admin/css/admin-overview.css',
 				array( 'amy-agent-admin-overview-fonts', 'dashicons' ),
+				AMY_AGENT_VERSION
+			);
+			return;
+		}
+
+		if ( 'amy-overview_page_' . self::MY_PROFILE_PAGE_SLUG === $hook_suffix ) {
+			wp_enqueue_style(
+				'amy-agent-admin-my-profile-fonts',
+				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+				array(),
+				null
+			);
+
+			wp_enqueue_style(
+				'amy-agent-admin-my-profile',
+				AMY_AGENT_URL . 'admin/css/admin-my-profile.css',
+				array( 'amy-agent-admin-my-profile-fonts', 'dashicons' ),
 				AMY_AGENT_VERSION
 			);
 			return;
@@ -357,6 +384,73 @@ class Amy_Admin_Menu {
 						</a>
 					</article>
 				<?php endforeach; ?>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * My Profile — personal task activity for the logged-in user.
+	 */
+	public function render_my_profile() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?>
+		<div class="wrap amy-agent-my-profile">
+			<header class="amy-agent-my-profile__header">
+				<h1 class="amy-agent-my-profile__title"><?php echo esc_html__( 'My Profile', 'amy-agent' ); ?></h1>
+				<p class="amy-agent-my-profile__intro">
+					<?php echo esc_html__( 'Your personal task activity.', 'amy-agent' ); ?>
+				</p>
+				<span class="amy-agent-my-profile__underline" aria-hidden="true"></span>
+			</header>
+
+			<div class="amy-agent-my-profile__sections">
+				<section class="amy-agent-my-profile__section">
+					<h2 class="amy-agent-my-profile__section-title"><?php echo esc_html__( 'Open Tasks', 'amy-agent' ); ?></h2>
+					<?php
+					// TODO: replace empty state with real task query once Task Service exists.
+					?>
+					<div class="amy-agent-my-profile__empty">
+						<span class="amy-agent-my-profile__empty-icon" aria-hidden="true">
+							<span class="dashicons dashicons-clipboard"></span>
+						</span>
+						<p class="amy-agent-my-profile__empty-text">
+							<?php echo esc_html__( 'No tasks yet — Task Service is being built next.', 'amy-agent' ); ?>
+						</p>
+					</div>
+				</section>
+
+				<section class="amy-agent-my-profile__section">
+					<h2 class="amy-agent-my-profile__section-title"><?php echo esc_html__( 'Completed Tasks', 'amy-agent' ); ?></h2>
+					<?php
+					// TODO: replace empty state with real task query once Task Service exists.
+					?>
+					<div class="amy-agent-my-profile__empty">
+						<span class="amy-agent-my-profile__empty-icon" aria-hidden="true">
+							<span class="dashicons dashicons-yes-alt"></span>
+						</span>
+						<p class="amy-agent-my-profile__empty-text">
+							<?php echo esc_html__( 'Nothing completed yet.', 'amy-agent' ); ?>
+						</p>
+					</div>
+				</section>
+
+				<section class="amy-agent-my-profile__section">
+					<h2 class="amy-agent-my-profile__section-title"><?php echo esc_html__( 'Recent Activity', 'amy-agent' ); ?></h2>
+					<?php
+					// TODO: replace empty state with real activity query once Task Service exists.
+					?>
+					<div class="amy-agent-my-profile__empty">
+						<span class="amy-agent-my-profile__empty-icon" aria-hidden="true">
+							<span class="dashicons dashicons-backup"></span>
+						</span>
+						<p class="amy-agent-my-profile__empty-text">
+							<?php echo esc_html__( 'No activity yet.', 'amy-agent' ); ?>
+						</p>
+					</div>
+				</section>
 			</div>
 		</div>
 		<?php
