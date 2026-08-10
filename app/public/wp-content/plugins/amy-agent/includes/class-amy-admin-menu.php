@@ -15,6 +15,7 @@ class Amy_Admin_Menu {
 	const PARENT_SLUG          = 'amy-overview';
 	const MY_PROFILE_PAGE_SLUG = 'amy-my-profile';
 	const BRAND_PAGE_SLUG      = 'amy-brand-avatar';
+	const USER_AVATAR_META     = 'amy_agent_user_avatar_url';
 
 	/**
 	 * @var Amy_Settings
@@ -59,6 +60,7 @@ class Amy_Admin_Menu {
 	public function register() {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_action( 'wp_ajax_amy_agent_save_my_profile', array( $this, 'ajax_save_my_profile' ) );
 	}
 
 	/**
@@ -157,6 +159,8 @@ class Amy_Admin_Menu {
 		}
 
 		if ( $this->hook_my_profile === $hook_suffix ) {
+			wp_enqueue_media();
+
 			wp_enqueue_style(
 				'amy-agent-admin-my-profile-fonts',
 				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
@@ -169,6 +173,34 @@ class Amy_Admin_Menu {
 				AMY_AGENT_URL . 'admin/css/admin-my-profile.css',
 				array( 'amy-agent-admin-my-profile-fonts', 'dashicons' ),
 				AMY_AGENT_VERSION
+			);
+
+			wp_enqueue_script(
+				'amy-agent-admin-my-profile',
+				AMY_AGENT_URL . 'admin/js/admin-my-profile.js',
+				array( 'jquery' ),
+				AMY_AGENT_VERSION,
+				true
+			);
+
+			$user = wp_get_current_user();
+			wp_localize_script(
+				'amy-agent-admin-my-profile',
+				'amyAgentMyProfile',
+				array(
+					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+					'nonce'       => wp_create_nonce( 'amy_agent_save_my_profile' ),
+					'gravatarUrl' => esc_url_raw( get_avatar_url( $user->ID, array( 'size' => 144 ) ) ),
+					'i18n'        => array(
+						'mediaTitle'   => __( 'Select profile photo', 'amy-agent' ),
+						'mediaButton'  => __( 'Use this image', 'amy-agent' ),
+						'invalidType'  => __( 'Please choose a JPG, PNG, or WebP image.', 'amy-agent' ),
+						'invalidEmail' => __( 'Please enter a valid email address.', 'amy-agent' ),
+						'saving'       => __( 'Saving…', 'amy-agent' ),
+						'save'         => __( 'Save changes', 'amy-agent' ),
+						'error'        => __( 'Could not save profile. Please try again.', 'amy-agent' ),
+					),
+				)
 			);
 			return;
 		}
@@ -422,64 +454,463 @@ class Amy_Admin_Menu {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+
+		$user        = wp_get_current_user();
+		$coming_soon = __( '(coming soon)', 'amy-agent' );
+		$avatar_url  = $this->get_user_avatar_url( $user->ID );
+		$role_label  = $this->get_primary_role_label( $user );
+		$joined      = $this->format_joined_date( $user->user_registered );
+		$custom_avatar = trim( (string) get_user_meta( $user->ID, self::USER_AVATAR_META, true ) );
+
+		$top_stats = array(
+			// TODO: wire to Task Service once built.
+			array(
+				'label' => __( 'Open Tasks', 'amy-agent' ),
+				'icon'  => 'clipboard',
+			),
+			// TODO: wire to Task Service once built.
+			array(
+				'label' => __( 'Completed Tasks', 'amy-agent' ),
+				'icon'  => 'yes-alt',
+			),
+			// TODO: wire to Task Service / activity once built.
+			array(
+				'label' => __( 'This Week', 'amy-agent' ),
+				'icon'  => 'calendar-alt',
+			),
+		);
 		?>
 		<div class="wrap amy-agent-my-profile">
 			<header class="amy-agent-my-profile__header">
-				<h1 class="amy-agent-my-profile__title"><?php echo esc_html__( 'My Profile', 'amy-agent' ); ?></h1>
-				<p class="amy-agent-my-profile__intro">
-					<?php echo esc_html__( 'Your personal task activity.', 'amy-agent' ); ?>
-				</p>
-				<span class="amy-agent-my-profile__underline" aria-hidden="true"></span>
+				<div class="amy-agent-my-profile__header-main">
+					<h1 class="amy-agent-my-profile__title"><?php echo esc_html__( 'My Profile', 'amy-agent' ); ?></h1>
+					<p class="amy-agent-my-profile__intro">
+						<?php echo esc_html__( 'Your personal task activity.', 'amy-agent' ); ?>
+					</p>
+					<span class="amy-agent-my-profile__underline" aria-hidden="true"></span>
+				</div>
+				<div class="amy-agent-my-profile__header-actions">
+					<?php
+					// TODO: enable New Task once Task Service exists.
+					?>
+					<button
+						type="button"
+						class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent amy-agent-my-profile__btn--disabled"
+						disabled
+						aria-disabled="true"
+						title="<?php echo esc_attr__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>"
+					>
+						<?php echo esc_html__( '+ New Task', 'amy-agent' ); ?>
+					</button>
+					<span class="amy-agent-my-profile__coming-note">
+						<?php echo esc_html__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>
+					</span>
+				</div>
 			</header>
 
-			<div class="amy-agent-my-profile__sections">
-				<section class="amy-agent-my-profile__section">
-					<h2 class="amy-agent-my-profile__section-title"><?php echo esc_html__( 'Open Tasks', 'amy-agent' ); ?></h2>
+			<section class="amy-agent-my-profile__identity" id="amy-agent-my-profile-identity" aria-label="<?php echo esc_attr__( 'Employee identity', 'amy-agent' ); ?>">
+				<img
+					id="amy-agent-my-profile-avatar"
+					class="amy-agent-my-profile__identity-avatar"
+					src="<?php echo esc_url( $avatar_url ); ?>"
+					alt="<?php echo esc_attr( $user->display_name ); ?>"
+					width="72"
+					height="72"
+					decoding="async"
+				/>
+				<div class="amy-agent-my-profile__identity-body">
+					<div class="amy-agent-my-profile__identity-name-row">
+						<h2 id="amy-agent-my-profile-name" class="amy-agent-my-profile__identity-name">
+							<?php echo esc_html( $user->display_name ); ?>
+						</h2>
+						<?php // TODO: replace with Admin Roles & Social role once that system exists. ?>
+						<span id="amy-agent-my-profile-role" class="amy-agent-my-profile__role-pill">
+							<?php echo esc_html( $role_label ); ?>
+						</span>
+					</div>
+					<p class="amy-agent-my-profile__identity-meta">
+						<span id="amy-agent-my-profile-email"><?php echo esc_html( $user->user_email ); ?></span>
+						<span class="amy-agent-my-profile__identity-sep" aria-hidden="true">·</span>
+						<span id="amy-agent-my-profile-joined"><?php echo esc_html( $joined ); ?></span>
+					</p>
+				</div>
+				<button
+					type="button"
+					class="amy-agent-my-profile__btn amy-agent-my-profile__btn--outline"
+					id="amy-agent-edit-profile-open"
+				>
+					<?php echo esc_html__( 'Edit Profile', 'amy-agent' ); ?>
+				</button>
+			</section>
+
+			<div class="amy-agent-my-profile__stats">
+				<?php foreach ( $top_stats as $stat ) : ?>
+					<div class="amy-agent-my-profile__stat">
+						<span class="amy-agent-my-profile__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-<?php echo esc_attr( $stat['icon'] ); ?>"></span>
+						</span>
+						<div class="amy-agent-my-profile__stat-body">
+							<p class="amy-agent-my-profile__stat-label"><?php echo esc_html( $stat['label'] ); ?></p>
+							<p class="amy-agent-my-profile__stat-value">
+								—
+								<span class="amy-agent-my-profile__coming-soon"><?php echo esc_html( $coming_soon ); ?></span>
+							</p>
+						</div>
+					</div>
+				<?php endforeach; ?>
+			</div>
+
+			<div class="amy-agent-my-profile__layout">
+				<section class="amy-agent-my-profile__panel amy-agent-my-profile__panel--open">
+					<h2 class="amy-agent-my-profile__panel-title">
+						<span class="amy-agent-my-profile__panel-title-icon" aria-hidden="true">
+							<span class="dashicons dashicons-clipboard"></span>
+						</span>
+						<?php echo esc_html__( 'Open Tasks', 'amy-agent' ); ?>
+					</h2>
 					<?php
 					// TODO: replace empty state with real task query once Task Service exists.
 					?>
-					<div class="amy-agent-my-profile__empty">
-						<span class="amy-agent-my-profile__empty-icon" aria-hidden="true">
-							<span class="dashicons dashicons-clipboard"></span>
-						</span>
+					<div class="amy-agent-my-profile__empty amy-agent-my-profile__empty--hero">
+						<div class="amy-agent-my-profile__empty-orbit" aria-hidden="true">
+							<span class="amy-agent-my-profile__empty-orbit-ring"></span>
+							<span class="amy-agent-my-profile__empty-icon amy-agent-my-profile__empty-icon--lg">
+								<span class="dashicons dashicons-clipboard"></span>
+							</span>
+						</div>
 						<p class="amy-agent-my-profile__empty-text">
 							<?php echo esc_html__( 'No tasks yet — Task Service is being built next.', 'amy-agent' ); ?>
 						</p>
+						<?php
+						// TODO: point to Task Service once its menu page exists.
+						?>
+						<button
+							type="button"
+							class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent amy-agent-my-profile__btn--disabled"
+							disabled
+							aria-disabled="true"
+							title="<?php echo esc_attr__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>"
+						>
+							<?php echo esc_html__( 'Go to Task Service', 'amy-agent' ); ?>
+						</button>
+						<span class="amy-agent-my-profile__coming-note">
+							<?php echo esc_html__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>
+						</span>
 					</div>
 				</section>
 
-				<section class="amy-agent-my-profile__section">
-					<h2 class="amy-agent-my-profile__section-title"><?php echo esc_html__( 'Completed Tasks', 'amy-agent' ); ?></h2>
-					<?php
-					// TODO: replace empty state with real task query once Task Service exists.
-					?>
-					<div class="amy-agent-my-profile__empty">
-						<span class="amy-agent-my-profile__empty-icon" aria-hidden="true">
-							<span class="dashicons dashicons-yes-alt"></span>
-						</span>
-						<p class="amy-agent-my-profile__empty-text">
-							<?php echo esc_html__( 'Nothing completed yet.', 'amy-agent' ); ?>
-						</p>
-					</div>
-				</section>
+				<div class="amy-agent-my-profile__side">
+					<section class="amy-agent-my-profile__panel amy-agent-my-profile__panel--completed">
+						<h2 class="amy-agent-my-profile__panel-title">
+							<span class="amy-agent-my-profile__panel-title-icon" aria-hidden="true">
+								<span class="dashicons dashicons-star-filled"></span>
+							</span>
+							<?php echo esc_html__( 'Completed Tasks', 'amy-agent' ); ?>
+						</h2>
+						<?php
+						// TODO: replace empty state with real task query once Task Service exists.
+						?>
+						<div class="amy-agent-my-profile__empty">
+							<span class="amy-agent-my-profile__empty-icon amy-agent-my-profile__empty-icon--star" aria-hidden="true">
+								<span class="dashicons dashicons-star-filled"></span>
+							</span>
+							<p class="amy-agent-my-profile__empty-text">
+								<?php echo esc_html__( 'Nothing completed yet.', 'amy-agent' ); ?>
+							</p>
+						</div>
+					</section>
 
-				<section class="amy-agent-my-profile__section">
-					<h2 class="amy-agent-my-profile__section-title"><?php echo esc_html__( 'Recent Activity', 'amy-agent' ); ?></h2>
-					<?php
-					// TODO: replace empty state with real activity query once Task Service exists.
-					?>
-					<div class="amy-agent-my-profile__empty">
-						<span class="amy-agent-my-profile__empty-icon" aria-hidden="true">
-							<span class="dashicons dashicons-backup"></span>
-						</span>
-						<p class="amy-agent-my-profile__empty-text">
-							<?php echo esc_html__( 'No activity yet.', 'amy-agent' ); ?>
-						</p>
-					</div>
-				</section>
+					<section class="amy-agent-my-profile__panel amy-agent-my-profile__panel--activity">
+						<h2 class="amy-agent-my-profile__panel-title">
+							<span class="amy-agent-my-profile__panel-title-icon" aria-hidden="true">
+								<span class="dashicons dashicons-backup"></span>
+							</span>
+							<?php echo esc_html__( 'Recent Activity', 'amy-agent' ); ?>
+						</h2>
+						<?php
+						// TODO: replace with real activity feed once available.
+						?>
+						<ol class="amy-agent-my-profile__timeline">
+							<?php for ( $i = 0; $i < 3; $i++ ) : ?>
+								<li class="amy-agent-my-profile__timeline-item">
+									<span class="amy-agent-my-profile__timeline-dot" aria-hidden="true"></span>
+									<div class="amy-agent-my-profile__timeline-body">
+										<span class="amy-agent-my-profile__timeline-bar" aria-hidden="true"></span>
+										<span class="amy-agent-my-profile__timeline-label">
+											<?php echo esc_html__( 'No activity yet.', 'amy-agent' ); ?>
+										</span>
+									</div>
+								</li>
+							<?php endfor; ?>
+						</ol>
+					</section>
+				</div>
+			</div>
+
+			<div
+				class="amy-agent-my-profile__modal"
+				id="amy-agent-edit-profile-modal"
+				hidden
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="amy-agent-edit-profile-title"
+			>
+				<div class="amy-agent-my-profile__modal-backdrop" data-amy-modal-close></div>
+				<div class="amy-agent-my-profile__modal-dialog">
+					<header class="amy-agent-my-profile__modal-header">
+						<h2 id="amy-agent-edit-profile-title" class="amy-agent-my-profile__modal-title">
+							<?php echo esc_html__( 'Edit Profile', 'amy-agent' ); ?>
+						</h2>
+						<button
+							type="button"
+							class="amy-agent-my-profile__modal-close"
+							data-amy-modal-close
+							aria-label="<?php echo esc_attr__( 'Close', 'amy-agent' ); ?>"
+						>
+							<span class="dashicons dashicons-no-alt" aria-hidden="true"></span>
+						</button>
+					</header>
+					<form id="amy-agent-edit-profile-form" class="amy-agent-my-profile__modal-form" novalidate>
+						<p class="amy-agent-my-profile__field-error" id="amy-agent-edit-profile-error" hidden></p>
+
+						<label class="amy-agent-my-profile__field" for="amy-agent-edit-display-name">
+							<span class="amy-agent-my-profile__field-label"><?php echo esc_html__( 'Display name', 'amy-agent' ); ?></span>
+							<input
+								type="text"
+								id="amy-agent-edit-display-name"
+								name="display_name"
+								value="<?php echo esc_attr( $user->display_name ); ?>"
+								required
+								autocomplete="name"
+							/>
+						</label>
+
+						<label class="amy-agent-my-profile__field" for="amy-agent-edit-email">
+							<span class="amy-agent-my-profile__field-label"><?php echo esc_html__( 'Email', 'amy-agent' ); ?></span>
+							<input
+								type="email"
+								id="amy-agent-edit-email"
+								name="email"
+								value="<?php echo esc_attr( $user->user_email ); ?>"
+								required
+								autocomplete="email"
+							/>
+						</label>
+
+						<div class="amy-agent-my-profile__field amy-agent-my-profile__field--avatar">
+							<span class="amy-agent-my-profile__field-label"><?php echo esc_html__( 'Avatar', 'amy-agent' ); ?></span>
+							<div class="amy-agent-my-profile__avatar-editor">
+								<img
+									id="amy-agent-edit-avatar-preview"
+									class="amy-agent-my-profile__avatar-preview"
+									src="<?php echo esc_url( $avatar_url ); ?>"
+									alt=""
+									width="64"
+									height="64"
+									decoding="async"
+								/>
+								<input
+									type="hidden"
+									id="amy-agent-edit-avatar-url"
+									name="avatar_url"
+									value="<?php echo esc_attr( $custom_avatar ); ?>"
+								/>
+								<div class="amy-agent-my-profile__avatar-actions">
+									<button type="button" class="amy-agent-my-profile__btn amy-agent-my-profile__btn--outline" id="amy-agent-edit-avatar-select">
+										<?php echo esc_html__( 'Select image', 'amy-agent' ); ?>
+									</button>
+									<button type="button" class="amy-agent-my-profile__btn amy-agent-my-profile__btn--ghost" id="amy-agent-edit-avatar-reset">
+										<?php echo esc_html__( 'Use Gravatar', 'amy-agent' ); ?>
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<div class="amy-agent-my-profile__modal-actions">
+							<button type="button" class="amy-agent-my-profile__btn amy-agent-my-profile__btn--ghost" data-amy-modal-close>
+								<?php echo esc_html__( 'Cancel', 'amy-agent' ); ?>
+							</button>
+							<button type="submit" class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent" id="amy-agent-edit-profile-save">
+								<?php echo esc_html__( 'Save changes', 'amy-agent' ); ?>
+							</button>
+						</div>
+					</form>
+				</div>
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * AJAX: save the current user's My Profile fields.
+	 */
+	public function ajax_save_my_profile() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'You do not have permission to edit this profile.', 'amy-agent' ) ),
+				403
+			);
+		}
+
+		check_ajax_referer( 'amy_agent_save_my_profile', 'nonce' );
+
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Not logged in.', 'amy-agent' ) ),
+				401
+			);
+		}
+
+		$display_name = isset( $_POST['display_name'] ) ? sanitize_text_field( wp_unslash( $_POST['display_name'] ) ) : '';
+		$email        = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+		$avatar_url   = isset( $_POST['avatar_url'] ) ? esc_url_raw( wp_unslash( $_POST['avatar_url'] ) ) : '';
+
+		if ( '' === $display_name ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Display name is required.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		if ( '' === $email || ! is_email( $email ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Please enter a valid email address.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$email_owner = email_exists( $email );
+		if ( $email_owner && (int) $email_owner !== (int) $user_id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'That email address is already in use.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		if ( '' !== $avatar_url && ! $this->is_allowed_avatar_url( $avatar_url ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Please choose a JPG, PNG, or WebP image.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$result = wp_update_user(
+			array(
+				'ID'           => $user_id,
+				'display_name' => $display_name,
+				'user_email'   => $email,
+			)
+		);
+
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error(
+				array( 'message' => $result->get_error_message() ),
+				400
+			);
+		}
+
+		if ( '' === $avatar_url ) {
+			delete_user_meta( $user_id, self::USER_AVATAR_META );
+		} else {
+			update_user_meta( $user_id, self::USER_AVATAR_META, $avatar_url );
+		}
+
+		$user = get_userdata( $user_id );
+		wp_send_json_success(
+			array(
+				'displayName' => $user->display_name,
+				'email'       => $user->user_email,
+				'avatarUrl'   => $this->get_user_avatar_url( $user_id ),
+				'gravatarUrl' => esc_url_raw( get_avatar_url( $user_id, array( 'size' => 144 ) ) ),
+				'joined'      => $this->format_joined_date( $user->user_registered ),
+				'roleLabel'   => $this->get_primary_role_label( $user ),
+			)
+		);
+	}
+
+	/**
+	 * Avatar URL for a user: custom meta override, else WP Gravatar.
+	 *
+	 * @param int $user_id User ID.
+	 * @return string
+	 */
+	private function get_user_avatar_url( $user_id ) {
+		$custom = trim( (string) get_user_meta( $user_id, self::USER_AVATAR_META, true ) );
+		if ( '' !== $custom ) {
+			return esc_url_raw( $custom );
+		}
+
+		return get_avatar_url( $user_id, array( 'size' => 144 ) );
+	}
+
+	/**
+	 * Human-readable primary role label for the identity pill.
+	 *
+	 * @param WP_User $user User object.
+	 * @return string
+	 */
+	private function get_primary_role_label( $user ) {
+		// TODO: replace with Admin Roles & Social role once that system exists.
+		$roles = (array) $user->roles;
+		$role  = ! empty( $roles[0] ) ? $roles[0] : '';
+
+		$map = array(
+			'administrator' => __( 'Admin', 'amy-agent' ),
+			'editor'        => __( 'Editor', 'amy-agent' ),
+			'author'        => __( 'Author', 'amy-agent' ),
+			'contributor'   => __( 'Contributor', 'amy-agent' ),
+			'subscriber'    => __( 'Subscriber', 'amy-agent' ),
+		);
+
+		if ( isset( $map[ $role ] ) ) {
+			return $map[ $role ];
+		}
+
+		if ( '' === $role ) {
+			return __( 'Member', 'amy-agent' );
+		}
+
+		return ucwords( str_replace( array( '-', '_' ), ' ', $role ) );
+	}
+
+	/**
+	 * Format user_registered for identity meta.
+	 *
+	 * @param string $registered MySQL datetime.
+	 * @return string
+	 */
+	private function format_joined_date( $registered ) {
+		$timestamp = strtotime( $registered );
+		if ( ! $timestamp ) {
+			return '';
+		}
+
+		return sprintf(
+			/* translators: %s: month day, year */
+			__( 'Joined %s', 'amy-agent' ),
+			date_i18n( 'F j, Y', $timestamp )
+		);
+	}
+
+	/**
+	 * Allow only http(s) image URLs that look like JPG/PNG/WebP (mirrors Brand picker).
+	 *
+	 * @param string $url Avatar URL.
+	 * @return bool
+	 */
+	private function is_allowed_avatar_url( $url ) {
+		if ( '' === $url || ! wp_http_validate_url( $url ) ) {
+			return false;
+		}
+
+		$path = wp_parse_url( $url, PHP_URL_PATH );
+		if ( ! is_string( $path ) || '' === $path ) {
+			return false;
+		}
+
+		$ext = strtolower( pathinfo( $path, PATHINFO_EXTENSION ) );
+		return in_array( $ext, array( 'jpg', 'jpeg', 'png', 'webp' ), true );
 	}
 
 	/**

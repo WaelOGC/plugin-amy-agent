@@ -30,10 +30,105 @@
 	box-sizing: border-box;
 }
 
-/* —— Header band —— */
+/* —— Buttons —— */
+
+.amy-agent-my-profile__btn {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	margin: 0;
+	padding: 0.65rem 1.15rem;
+	border-radius: 10px;
+	border: 1px solid transparent;
+	font-family: var(--amy-font-body);
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.2;
+	cursor: pointer;
+	transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.amy-agent-my-profile__btn--accent {
+	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end));
+	color: var(--amy-text-on-accent);
+	border-color: transparent;
+}
+
+.amy-agent-my-profile__btn--outline {
+	background: transparent;
+	border-color: var(--amy-border);
+	color: var(--amy-text);
+}
+
+.amy-agent-my-profile__btn--outline:hover,
+.amy-agent-my-profile__btn--outline:focus-visible {
+	border-color: var(--amy-grad-end);
+	color: var(--amy-grad-end);
+	outline: none;
+}
+
+.amy-agent-my-profile__btn--ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--amy-text-muted);
+}
+
+.amy-agent-my-profile__btn--ghost:hover,
+.amy-agent-my-profile__btn--ghost:focus-visible {
+	color: var(--amy-text);
+	outline: none;
+}
+
+.amy-agent-my-profile__btn--disabled,
+.amy-agent-my-profile__btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+	background: transparent;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	color: var(--amy-text-muted);
+	box-shadow: none;
+}
+
+.amy-agent-my-profile__coming-note {
+	display: block;
+	margin-top: 0.4rem;
+	color: var(--amy-text-muted);
+	font-size: 0.75rem;
+	font-weight: 400;
+	line-height: 1.35;
+	opacity: 0.9;
+}
+
+.amy-agent-my-profile__coming-soon {
+	display: block;
+	margin-top: 0.2rem;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.6875rem;
+	font-weight: 400;
+	opacity: 0.85;
+}
+
+/* —— Header —— */
 
 .amy-agent-my-profile__header {
-	margin: 0 0 1.75rem;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1.25rem;
+	margin: 0 0 1.5rem;
+}
+
+.amy-agent-my-profile__header-main {
+	min-width: 0;
+	flex: 1;
+}
+
+.amy-agent-my-profile__header-actions {
+	flex-shrink: 0;
+	text-align: right;
 }
 
 .amy-agent-my-profile__title {
@@ -68,32 +163,203 @@
 	transform-origin: left center;
 }
 
-/* —— Stacked sections —— */
+/* —— Identity —— */
 
-.amy-agent-my-profile__sections {
+.amy-agent-my-profile__identity {
 	display: flex;
-	flex-direction: column;
-	gap: 1rem;
-}
-
-.amy-agent-my-profile__section {
-	display: flex;
-	flex-direction: column;
-	min-height: 14rem;
-	padding: 1.25rem 1.35rem 1.5rem;
+	align-items: center;
+	gap: 1.1rem;
+	margin: 0 0 1.25rem;
+	padding: 1.15rem 1.25rem;
 	border: 1px solid var(--amy-border);
 	border-radius: 14px;
 	background: var(--amy-panel);
 }
 
-.amy-agent-my-profile__section-title {
+.amy-agent-my-profile__identity-avatar {
+	flex-shrink: 0;
+	width: 72px;
+	height: 72px;
+	border-radius: 50%;
+	object-fit: cover;
+	border: 2px solid rgba(247, 148, 29, 0.65);
+	background: #1a1a1a;
+}
+
+.amy-agent-my-profile__identity-body {
+	min-width: 0;
+	flex: 1;
+}
+
+.amy-agent-my-profile__identity-name-row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.55rem 0.75rem;
+	margin: 0 0 0.35rem;
+}
+
+.amy-agent-my-profile__identity-name {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.35rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.2;
+}
+
+.amy-agent-my-profile__role-pill {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.2rem 0.65rem;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end));
+	color: var(--amy-text-on-accent);
+	font-family: var(--amy-font-body);
+	font-size: 0.6875rem;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	line-height: 1.3;
+	text-transform: uppercase;
+}
+
+.amy-agent-my-profile__identity-meta {
+	margin: 0;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.875rem;
+	line-height: 1.45;
+}
+
+.amy-agent-my-profile__identity-sep {
+	margin: 0 0.4rem;
+	opacity: 0.7;
+}
+
+.amy-agent-my-profile__identity > .amy-agent-my-profile__btn {
+	flex-shrink: 0;
+	margin-left: auto;
+}
+
+/* —— Stat strip —— */
+
+.amy-agent-my-profile__stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.85rem;
+	margin: 0 0 1.25rem;
+}
+
+.amy-agent-my-profile__stat {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+	padding: 1rem 1.1rem;
+	border: 1px solid rgba(247, 148, 29, 0.45);
+	border-radius: 12px;
+	background: var(--amy-panel);
+}
+
+.amy-agent-my-profile__stat-icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 50%;
+	background: linear-gradient(145deg, rgba(255, 122, 24, 0.22), rgba(255, 197, 66, 0.1));
+	border: 1px solid rgba(247, 148, 29, 0.45);
+	color: var(--amy-grad-start);
+}
+
+.amy-agent-my-profile__stat-icon .dashicons {
+	width: 1.2rem;
+	height: 1.2rem;
+	font-size: 1.2rem;
+	line-height: 1.2rem;
+}
+
+.amy-agent-my-profile__stat-label {
+	margin: 0 0 0.2rem;
+	color: var(--amy-text-muted);
+	font-size: 0.75rem;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
+.amy-agent-my-profile__stat-value {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.5rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+/* —— Main layout —— */
+
+.amy-agent-my-profile__layout {
+	display: grid;
+	grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+	gap: 1rem;
+	align-items: stretch;
+}
+
+.amy-agent-my-profile__side {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	min-width: 0;
+}
+
+.amy-agent-my-profile__panel {
+	display: flex;
+	flex-direction: column;
+	padding: 1.2rem 1.3rem 1.35rem;
+	border: 1px solid var(--amy-border);
+	border-radius: 14px;
+	background: var(--amy-panel);
+}
+
+.amy-agent-my-profile__panel--open {
+	min-height: 22rem;
+}
+
+.amy-agent-my-profile__panel--completed {
+	min-height: 10rem;
+}
+
+.amy-agent-my-profile__panel--activity {
+	flex: 1;
+	min-height: 14rem;
+}
+
+.amy-agent-my-profile__panel-title {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
 	margin: 0 0 1rem;
 	color: var(--amy-text);
 	font-family: var(--amy-font-heading);
-	font-size: 1.15rem;
+	font-size: 1.1rem;
 	font-style: normal;
 	font-weight: 700;
 	line-height: 1.25;
+}
+
+.amy-agent-my-profile__panel-title-icon {
+	display: inline-flex;
+	color: var(--amy-grad-start);
+}
+
+.amy-agent-my-profile__panel-title-icon .dashicons {
+	width: 1.15rem;
+	height: 1.15rem;
+	font-size: 1.15rem;
+	line-height: 1.15rem;
 }
 
 .amy-agent-my-profile__empty {
@@ -103,8 +369,29 @@
 	justify-content: center;
 	flex: 1;
 	gap: 0.75rem;
-	padding: 1.5rem 1rem;
+	padding: 1.25rem 1rem;
 	text-align: center;
+}
+
+.amy-agent-my-profile__empty--hero {
+	gap: 0.9rem;
+}
+
+.amy-agent-my-profile__empty-orbit {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 6.5rem;
+	height: 6.5rem;
+}
+
+.amy-agent-my-profile__empty-orbit-ring {
+	position: absolute;
+	inset: 0;
+	border-radius: 50%;
+	border: 2px dashed rgba(247, 148, 29, 0.45);
+	opacity: 0.9;
 }
 
 .amy-agent-my-profile__empty-icon {
@@ -113,27 +400,284 @@
 	justify-content: center;
 	width: 3rem;
 	height: 3rem;
-	border-radius: 12px;
-	background: linear-gradient(145deg, rgba(255, 122, 24, 0.18), rgba(255, 197, 66, 0.08));
-	border: 1px solid rgba(247, 148, 29, 0.4);
+	border-radius: 50%;
+	background: linear-gradient(145deg, rgba(255, 122, 24, 0.22), rgba(255, 197, 66, 0.1));
+	border: 1px solid rgba(247, 148, 29, 0.45);
 	color: var(--amy-grad-start);
 }
 
+.amy-agent-my-profile__empty-icon--lg {
+	width: 3.5rem;
+	height: 3.5rem;
+	position: relative;
+	z-index: 1;
+}
+
+.amy-agent-my-profile__empty-icon--star {
+	background: linear-gradient(145deg, rgba(255, 197, 66, 0.25), rgba(255, 122, 24, 0.12));
+}
+
 .amy-agent-my-profile__empty-icon .dashicons {
-	width: 1.5rem;
-	height: 1.5rem;
-	font-size: 1.5rem;
-	line-height: 1.5rem;
+	width: 1.4rem;
+	height: 1.4rem;
+	font-size: 1.4rem;
+	line-height: 1.4rem;
+}
+
+.amy-agent-my-profile__empty-icon--lg .dashicons {
+	width: 1.6rem;
+	height: 1.6rem;
+	font-size: 1.6rem;
+	line-height: 1.6rem;
 }
 
 .amy-agent-my-profile__empty-text {
 	margin: 0;
-	max-width: 28rem;
+	max-width: 22rem;
 	color: var(--amy-text-muted);
-	font-family: var(--amy-font-body);
 	font-size: 0.9rem;
 	font-weight: 400;
 	line-height: 1.5;
+}
+
+/* —— Activity timeline —— */
+
+.amy-agent-my-profile__timeline {
+	list-style: none;
+	margin: 0;
+	padding: 0.35rem 0 0.5rem 0.35rem;
+	position: relative;
+	flex: 1;
+}
+
+.amy-agent-my-profile__timeline::before {
+	content: '';
+	position: absolute;
+	top: 0.55rem;
+	bottom: 0.55rem;
+	left: 0.72rem;
+	border-left: 2px dashed rgba(247, 148, 29, 0.35);
+}
+
+.amy-agent-my-profile__timeline-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.85rem;
+	position: relative;
+	margin: 0 0 1.1rem;
+}
+
+.amy-agent-my-profile__timeline-item:last-child {
+	margin-bottom: 0;
+}
+
+.amy-agent-my-profile__timeline-dot {
+	flex-shrink: 0;
+	width: 0.7rem;
+	height: 0.7rem;
+	margin-top: 0.35rem;
+	margin-left: 0.12rem;
+	border-radius: 50%;
+	background: var(--amy-grad-start);
+	box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.18);
+	z-index: 1;
+}
+
+.amy-agent-my-profile__timeline-body {
+	flex: 1;
+	min-width: 0;
+}
+
+.amy-agent-my-profile__timeline-bar {
+	display: block;
+	height: 0.7rem;
+	width: 72%;
+	max-width: 12rem;
+	margin-bottom: 0.35rem;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.amy-agent-my-profile__timeline-label {
+	display: block;
+	color: var(--amy-text-muted);
+	font-size: 0.75rem;
+	line-height: 1.35;
+	opacity: 0.9;
+}
+
+/* —— Modal —— */
+
+.amy-agent-my-profile__modal[hidden] {
+	display: none !important;
+}
+
+.amy-agent-my-profile__modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.25rem;
+}
+
+.amy-agent-my-profile__modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.65);
+}
+
+.amy-agent-my-profile__modal-dialog {
+	position: relative;
+	z-index: 1;
+	width: min(28rem, 100%);
+	max-height: calc(100vh - 2.5rem);
+	overflow: auto;
+	padding: 1.25rem 1.35rem 1.4rem;
+	border: 1px solid var(--amy-border);
+	border-radius: 14px;
+	background: var(--amy-panel);
+	box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.amy-agent-my-profile__modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin: 0 0 1.15rem;
+}
+
+.amy-agent-my-profile__modal-title {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.25rem;
+	font-style: normal;
+	font-weight: 700;
+}
+
+.amy-agent-my-profile__modal-close {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--amy-text-muted);
+	cursor: pointer;
+}
+
+.amy-agent-my-profile__modal-close:hover,
+.amy-agent-my-profile__modal-close:focus-visible {
+	color: var(--amy-text);
+	background: rgba(255, 255, 255, 0.06);
+	outline: none;
+}
+
+.amy-agent-my-profile__modal-form {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.amy-agent-my-profile__field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+}
+
+.amy-agent-my-profile__field-label {
+	color: var(--amy-text-muted);
+	font-size: 0.8rem;
+	font-weight: 500;
+}
+
+.amy-agent-my-profile__field input[type='text'],
+.amy-agent-my-profile__field input[type='email'] {
+	width: 100%;
+	padding: 0.7rem 0.85rem;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 10px;
+	background: #0f0f0f;
+	color: var(--amy-text);
+	font-family: var(--amy-font-body);
+	font-size: 0.9rem;
+	line-height: 1.3;
+}
+
+.amy-agent-my-profile__field input:focus {
+	border-color: var(--amy-border);
+	outline: none;
+	box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.35);
+}
+
+.amy-agent-my-profile__field input.is-invalid {
+	border-color: #e35d6a;
+	box-shadow: 0 0 0 1px rgba(227, 93, 106, 0.35);
+}
+
+.amy-agent-my-profile__field-error {
+	margin: 0;
+	padding: 0.65rem 0.8rem;
+	border-radius: 10px;
+	background: rgba(227, 93, 106, 0.12);
+	border: 1px solid rgba(227, 93, 106, 0.45);
+	color: #ffb4bc;
+	font-size: 0.85rem;
+	line-height: 1.4;
+}
+
+.amy-agent-my-profile__avatar-editor {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+}
+
+.amy-agent-my-profile__avatar-preview {
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	object-fit: cover;
+	border: 2px solid rgba(247, 148, 29, 0.55);
+	background: #1a1a1a;
+}
+
+.amy-agent-my-profile__avatar-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.amy-agent-my-profile__modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.55rem;
+	margin-top: 0.35rem;
+}
+
+/* —— Responsive —— */
+
+@media (max-width: 960px) {
+	.amy-agent-my-profile__layout {
+		grid-template-columns: 1fr;
+	}
+
+	.amy-agent-my-profile__stats {
+		grid-template-columns: 1fr;
+	}
+
+	.amy-agent-my-profile__panel--open,
+	.amy-agent-my-profile__panel--completed,
+	.amy-agent-my-profile__panel--activity {
+		min-height: 0;
+	}
 }
 
 @media (max-width: 720px) {
@@ -142,7 +686,21 @@
 		padding: 1.25rem;
 	}
 
-	.amy-agent-my-profile__section {
-		min-height: 12rem;
+	.amy-agent-my-profile__header {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.amy-agent-my-profile__header-actions {
+		text-align: left;
+	}
+
+	.amy-agent-my-profile__identity {
+		flex-wrap: wrap;
+	}
+
+	.amy-agent-my-profile__identity > .amy-agent-my-profile__btn {
+		width: 100%;
+		margin-left: 0;
 	}
 }

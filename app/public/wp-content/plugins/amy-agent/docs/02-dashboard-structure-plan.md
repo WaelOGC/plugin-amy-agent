@@ -89,19 +89,36 @@ Service, which is fully transparent/shared across everyone (§6, and
 
 - **Header:** page title "My Profile" (static label for all users, not
   personalized per name), short description ("Your personal task
-  activity").
-- **My open tasks:** list/table of tasks assigned to this specific user,
-  not yet completed — title, assigned by, due date, status, extension
-  status if relevant (ties to `08-task-service-plan.md` §4–5).
-- **My completed tasks:** collapsed/paginated history list — title,
-  completed date, who assigned it.
-- **My activity log:** a simple reverse-chronological feed of this user's
-  own actions across tools where relevant (task updates, chat sessions
-  they had with Amy, etc.) — expand this as each underlying tool actually
-  exists; do not invent activity types ahead of the tools that produce
-  them.
-- No settings or admin controls live on this page — it is read/status only
-  for the current user's own work.
+  activity"), and a right-aligned **"+ New Task"** button. Until Task
+  Service exists, that button is present but disabled with a clear
+  "coming soon" note; once Task Service is live it becomes the personal
+  entry point for creating a task from this page.
+- **Employee identity block:** circular avatar, full name, role pill
+  badge (WP primary role for now; later the Admin Roles & Social role),
+  email, and join date. Includes an **Edit Profile** control that opens a
+  **separate custom form inside this plugin** (modal) — not WordPress
+  core `profile.php` — for editing display name, email, and avatar
+  (Media Library picker, same UX pattern as Brand & Avatar; avatar stored
+  as per-user meta, mirroring Brand's URL-based storage approach).
+- **Stat strip:** Open Tasks / Completed Tasks / This Week summary cards
+  (honest empty/"coming soon" values until Task Service can supply real
+  numbers).
+- **Main layout (two columns on wide screens):**
+  - **Open Tasks** (larger left column): tasks assigned to this user that
+    are not yet completed — title, assigned by, due date, status,
+    extension status if relevant (ties to `08-task-service-plan.md`
+    §4–5). Empty state includes a disabled **"Go to Task Service"**
+    button until that menu page exists.
+  - **Completed Tasks** (upper right): collapsed/paginated history —
+    title, completed date, who assigned it.
+  - **Recent Activity** (lower right, timeline): reverse-chronological
+    feed of this user's own actions across tools where relevant (task
+    updates, chat sessions with Amy, etc.) — expand as each underlying
+    tool actually exists; do not invent activity types ahead of the tools
+    that produce them.
+- Personal controls that belong here (Edit Profile, New Task entry point)
+  are allowed; system-admin / team-wide settings stay on Settings, Admin
+  Roles & Social, and Task Service.
 
 ## 5. Task Service (page 3)
 
