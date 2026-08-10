@@ -72,7 +72,10 @@ array) — these are **not partially built**, they are literally one hardcoded s
 
 ## ❌ NOT STARTED — no code, no admin page, design-only in the roadmap doc
 
-- **Telegram Notifications** (priority #4) — no integration anywhere in the codebase.
+- **Admin Roles, Permissions & Social Publishing** (priority #4) — no
+  integration anywhere in the codebase. Formerly labeled "Telegram
+  Notifications"; scope expanded and renamed, see
+  `05-admin-roles-and-social-publishing-plan.md`.
   Note: Telegram *Admin Bot* (chat surface) is scoped under Dashboard Chat (#3),
   not under this notifications item. Support Bot + News Channel are also in
   `03-dashboard-chat-plan.md` but deferred relative to the admin surfaces.
@@ -104,7 +107,9 @@ Given the agreed priority order and what's already live:
 - **Submit Your Idea 4.2 improvements** (still priority #1 territory): autosave draft,
   follow-up if visitor abandons page — lead scoring now lives under Analytics
   (`07-analytics-plan.md`), not as a separate SI-only feature.
-- **Telegram Notifications** (#4): event alerts (e.g. hot lead) via the pluggable
+- **Admin Roles, Permissions & Social Publishing** (#4): admin roles,
+  invitations, usage limits, and multi-platform (Telegram/X/LinkedIn/
+  Discord) automated publishing via the pluggable
   notification layer — distinct from the Admin Bot chat surface in #3.
 
 **Do not jump to Analytics/SEO/Email Marketing (#5–#8) implementation yet** —
