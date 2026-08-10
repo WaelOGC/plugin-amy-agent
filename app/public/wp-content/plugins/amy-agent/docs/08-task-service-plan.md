@@ -2,7 +2,16 @@
 
 > Priority #6 in `roadmap-status.md`.
 
-## Status: Locked (planning decisions), 2026-08-10 — no code yet
+## Status: Partial (Task 1 of 2) — core data layer + CRUD live, 2026-08-10
+
+**Done (Task 1):** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats
+endpoints, WordPress API client + admin-ajax proxies, real assignee list (WP users
+with `manage_options` + Amy), Task Service board/list wired to real create / edit
+(status dropdown) / delete, and My Profile **+ New Task** → Task Service modal.
+
+**Still pending (Task 2 — separate build):** Amy's active reminder / deadline
+escalation / extension-request / auto-reassignment behavior described in §3–§5
+below. Do not treat this surface as fully complete until that lands.
 
 ## 1. What this is
 

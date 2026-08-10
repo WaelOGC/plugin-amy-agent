@@ -51,6 +51,8 @@ PHP may need a different host than the browser:
 
 Submit Your Idea sessions are stored in SQLite at `data/submit_idea_sessions.db` (created automatically). This survives **process restarts** on the same filesystem. A **Dokploy redeploy** that starts a fresh container will still wipe sessions unless `data/` (or the app directory) is mounted as a persistent volume in the Dokploy service config (Application → Volumes).
 
+Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (created automatically, no TTL). It has the **exact same volume-mounting requirement** as `submit_idea_sessions.db`: a Dokploy redeploy will wipe tasks unless `data/` is mounted as a persistent volume in the Dokploy service configuration. Do not mount only one of the two DB files — mount the whole `data/` directory.
+
 ## Endpoints (see plugin `docs/api-contract.md`)
 
 | Method | Path | Notes |
@@ -58,6 +60,12 @@ Submit Your Idea sessions are stored in SQLite at `data/submit_idea_sessions.db`
 | GET | `/v1/health` | Requires `X-Amy-Secret` |
 | POST | `/v1/config/validate` | Schema check only |
 | POST | `/v1/chat` | Calls selected provider; `200` / `502` |
+| GET | `/v1/tasks` | List tasks (optional `status`, `priority`, `assignee_wp_user_id`) |
+| POST | `/v1/tasks` | Create task |
+| GET | `/v1/tasks/stats` | Aggregate counts for Task Service stat cards |
+| GET | `/v1/tasks/{id}` | Fetch one task |
+| PATCH | `/v1/tasks/{id}` | Partial update |
+| DELETE | `/v1/tasks/{id}` | Delete task |
 | GET | `/uploads/submit-idea/{session_id}/{file}` | Public static files (no auth); scoped to upload dir |
 
 ## Tests

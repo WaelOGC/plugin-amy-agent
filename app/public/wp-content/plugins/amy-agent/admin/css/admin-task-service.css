@@ -85,25 +85,44 @@
 	box-shadow: none;
 }
 
-.amy-agent-task-service__coming-note,
-.amy-agent-task-service__coming-soon {
-	display: block;
-	color: var(--amy-text-muted);
+.amy-agent-task-service__btn--danger {
+	margin-right: auto;
+	background: transparent;
+	border: 1px solid rgba(239, 68, 68, 0.45);
+	color: #ef4444;
+}
+
+.amy-agent-task-service__btn--danger:hover,
+.amy-agent-task-service__btn--danger:focus-visible {
+	background: rgba(239, 68, 68, 0.08);
+	outline: none;
+}
+
+.amy-agent-task-service__notice {
+	margin: 0 0 1rem;
+	padding: 0.65rem 0.9rem;
+	border-radius: 8px;
+	background: rgba(34, 197, 94, 0.12);
+	border: 1px solid rgba(34, 197, 94, 0.35);
+	color: var(--amy-text);
 	font-family: var(--amy-font-body);
-	font-weight: 400;
-	opacity: 0.85;
+	font-size: 0.875rem;
 }
 
-.amy-agent-task-service__coming-soon {
-	margin-top: 0.2rem;
-	font-size: 0.6875rem;
+.amy-agent-task-service__notice.is-error {
+	background: rgba(239, 68, 68, 0.1);
+	border-color: rgba(239, 68, 68, 0.35);
 }
 
-.amy-agent-task-service__coming-note {
-	margin: 0.35rem 0 0;
-	font-size: 0.75rem;
-	line-height: 1.35;
-	text-align: right;
+.amy-agent-task-service__form-error {
+	margin: 0;
+	padding: 0.55rem 0.75rem;
+	border-radius: 8px;
+	background: rgba(239, 68, 68, 0.1);
+	border: 1px solid rgba(239, 68, 68, 0.35);
+	color: #ef4444;
+	font-family: var(--amy-font-body);
+	font-size: 0.8125rem;
 }
 
 /* —— Header —— */
@@ -260,9 +279,16 @@
 	border: 1px solid rgba(247, 148, 29, 0.35);
 	border-radius: 10px;
 	background: #0f0f0f;
-	color: var(--amy-text);
+	color: var(--amy-grad-start);
 	font-family: var(--amy-font-body);
 	font-size: 0.8125rem;
+	color-scheme: dark;
+}
+
+.amy-agent-task-service__select option,
+.amy-agent-task-service__field select option {
+	background: #141414;
+	color: var(--amy-grad-start);
 }
 
 .amy-agent-task-service__select {
@@ -348,8 +374,16 @@
 	border-radius: 8px;
 	background: transparent;
 	color: var(--amy-text-muted);
-	opacity: 0.55;
-	cursor: not-allowed;
+	opacity: 0.85;
+	cursor: pointer;
+}
+
+.amy-agent-task-service__column-add:hover,
+.amy-agent-task-service__column-add:focus-visible {
+	opacity: 1;
+	color: var(--amy-grad-start);
+	border-color: rgba(247, 148, 29, 0.65);
+	outline: none;
 }
 
 .amy-agent-task-service__column-add .dashicons {
@@ -370,6 +404,13 @@
 	border: 1px solid rgba(247, 148, 29, 0.35);
 	border-radius: 12px;
 	background: #101010;
+	cursor: pointer;
+}
+
+.amy-agent-task-service__card:hover,
+.amy-agent-task-service__card:focus-visible {
+	border-color: rgba(247, 148, 29, 0.65);
+	outline: none;
 }
 
 .amy-agent-task-service__card.is-urgent {
@@ -522,6 +563,14 @@
 	font-family: var(--amy-font-body);
 }
 
+.amy-agent-task-service__table tbody tr[data-id] {
+	cursor: pointer;
+}
+
+.amy-agent-task-service__table tbody tr[data-id]:hover td {
+	background: rgba(255, 255, 255, 0.03);
+}
+
 .amy-agent-task-service__table tr.is-urgent td:first-child {
 	box-shadow: inset 3px 0 0 var(--amy-urgent);
 }
@@ -648,10 +697,20 @@
 	border: 1px solid rgba(247, 148, 29, 0.35);
 	border-radius: 10px;
 	background: #0f0f0f;
-	color: var(--amy-text);
+	color: var(--amy-grad-start);
 	font-family: var(--amy-font-body);
 	font-size: 0.9rem;
 	line-height: 1.3;
+	color-scheme: dark;
+}
+
+/* Beat WP admin's default dark-on-light select text. */
+.amy-agent-task-service select,
+.amy-agent-task-service .amy-agent-task-service__field select,
+.amy-agent-task-service .amy-agent-task-service__select {
+	color: var(--amy-grad-start) !important;
+	background-color: #0f0f0f !important;
+	-webkit-text-fill-color: var(--amy-grad-start);
 }
 
 .amy-agent-task-service__field textarea {

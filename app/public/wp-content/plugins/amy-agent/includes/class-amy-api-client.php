@@ -177,6 +177,67 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * GET /v1/tasks — optional filters: status, priority, assignee_wp_user_id.
+	 *
+	 * @param array<string, mixed> $filters Query filters.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_tasks( array $filters = array() ) {
+		$allowed = array( 'status', 'priority', 'assignee_wp_user_id' );
+		$query   = array();
+		foreach ( $allowed as $key ) {
+			if ( isset( $filters[ $key ] ) && '' !== $filters[ $key ] && null !== $filters[ $key ] ) {
+				$query[ $key ] = $filters[ $key ];
+			}
+		}
+		$path = '/v1/tasks';
+		if ( ! empty( $query ) ) {
+			$path .= '?' . http_build_query( $query );
+		}
+		return $this->request( 'GET', $path );
+	}
+
+	/**
+	 * POST /v1/tasks — create a task.
+	 *
+	 * @param array<string, mixed> $payload TaskCreateRequest body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function create_task( array $payload ) {
+		return $this->request( 'POST', '/v1/tasks', $payload );
+	}
+
+	/**
+	 * PATCH /v1/tasks/{id} — partial update.
+	 *
+	 * @param string               $id      Task UUID.
+	 * @param array<string, mixed> $payload TaskUpdateRequest body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function update_task( $id, array $payload ) {
+		return $this->request( 'PATCH', '/v1/tasks/' . rawurlencode( (string) $id ), $payload );
+	}
+
+	/**
+	 * DELETE /v1/tasks/{id}.
+	 *
+	 * @param string $id Task UUID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function delete_task( $id ) {
+		return $this->request( 'DELETE', '/v1/tasks/' . rawurlencode( (string) $id ) );
+	}
+
+	/**
+	 * GET /v1/tasks/stats — aggregate counts for Task Service cards.
+	 *
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function get_task_stats() {
+		return $this->request( 'GET', '/v1/tasks/stats' );
+	}
+
+	/**
 	 * Perform an authenticated request to the Python service.
 	 *
 	 * @param string     $method  HTTP method.

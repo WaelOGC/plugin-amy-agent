@@ -9,8 +9,9 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-08-10 (amy-agent v0.2.11, live Python service confirmed
-> running on Dokploy — repo `plugin-amy-agent`, path `/amy-agent-service`, branch `main`).
+> Last verified against code: 2026-08-10 (amy-agent v0.2.14 / amy-agent-service v0.1.2,
+> live Python service confirmed running on Dokploy — repo `plugin-amy-agent`, path
+> `/amy-agent-service`, branch `main`).
 
 ---
 
@@ -56,6 +57,16 @@
   build path `/amy-agent-service`, branch `main`, autodeploy on push
 - Admin pages exist for: Overview, Settings, Brand & Avatar (all functional)
 
+### 4. Task Service — core data layer + CRUD (Task 1 of 2)
+- Backend: persistent SQLite at `data/tasks.db` (no TTL), FastAPI
+  `GET/POST /v1/tasks`, `GET/PATCH/DELETE /v1/tasks/{id}`, `GET /v1/tasks/stats`
+- WP: `Amy_Api_Client` task wrappers + `Amy_Tasks_Ajax` (`amy_task_list|create|update|delete|stats`)
+- Admin UI: Task Service board/list uses real data; create / edit (status dropdown) /
+  delete work; assignees are real WP `manage_options` users + Amy; My Profile
+  **+ New Task** opens Task Service with modal (`?amy_new_task=1`)
+- **Not done yet (Task 2):** Amy reminders, deadline escalation, extension requests,
+  auto-reassignment — see `08-task-service-plan.md` §3–§5
+
 ---
 
 ## 🚧 STUB ONLY — menu item exists, page says "Coming soon.", zero logic behind it
@@ -84,8 +95,9 @@ array) — these are **not partially built**, they are literally one hardcoded s
   Note: Telegram *Admin Bot* (chat surface) is scoped under Dashboard Chat (#3),
   not under this notifications item. Support Bot + News Channel are also in
   `03-dashboard-chat-plan.md` but deferred relative to the admin surfaces.
-- **Task Service** (priority #6) — no integration anywhere in the codebase. Plan
-  locked: `08-task-service-plan.md`.
+- **Task Service active Amy behavior** (priority #6, Task 2 of 2) — reminders,
+  escalation, extensions, auto-reassignment from `08-task-service-plan.md` §3–§5.
+  Core CRUD (Task 1) is live under DONE above; do not mark #6 fully complete.
 - **Agent Orchestrator** layer — design locked in `03-dashboard-chat-plan.md`;
   not implemented. `/v1/chat` currently handles everything itself. v1 of #3 is
   Amy the Leader only (no specialist delegation until tools exist).

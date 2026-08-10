@@ -1,6 +1,6 @@
 [project]
 name = "amy-agent-service"
-version = "0.1.1"
+version = "0.1.2"
 description = "Amy Agent Python intelligence service (Phase 1 scaffold)"
 readme = "README.md"
 requires-python = ">=3.11"
