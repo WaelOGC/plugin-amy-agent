@@ -23,6 +23,13 @@ class Amy_Settings {
 	const OPTION_AVATAR_URL    = 'amy_agent_avatar_url';
 
 	/**
+	 * Hook suffix returned by add_submenu_page() for Settings.
+	 *
+	 * @var string|false|null
+	 */
+	private $page_hook;
+
+	/**
 	 * Allowed AI provider slugs (must match Python registry).
 	 *
 	 * @return array<string, string> slug => label
@@ -34,6 +41,15 @@ class Amy_Settings {
 			'anthropic' => 'Anthropic Claude',
 			'deepseek'  => 'DeepSeek',
 		);
+	}
+
+	/**
+	 * Store the real Settings screen hook (from add_submenu_page return value).
+	 *
+	 * @param string|false $hook Hook suffix from WordPress.
+	 */
+	public function set_page_hook( $hook ) {
+		$this->page_hook = $hook;
 	}
 
 	/**
@@ -237,7 +253,7 @@ class Amy_Settings {
 	 * @param string $hook_suffix Current admin page hook.
 	 */
 	public function enqueue_assets( $hook_suffix ) {
-		if ( 'amy-overview_page_amy-settings' !== $hook_suffix ) {
+		if ( ! $this->page_hook || $this->page_hook !== $hook_suffix ) {
 			return;
 		}
 

@@ -22,6 +22,31 @@ class Amy_Admin_Menu {
 	private $settings;
 
 	/**
+	 * @var string|false|null
+	 */
+	private $hook_overview;
+
+	/**
+	 * @var string|false|null
+	 */
+	private $hook_my_profile;
+
+	/**
+	 * @var string|false|null
+	 */
+	private $hook_settings;
+
+	/**
+	 * @var string|false|null
+	 */
+	private $hook_brand;
+
+	/**
+	 * @var array<string, string|false>
+	 */
+	private $hook_placeholders = array();
+
+	/**
 	 * @param Amy_Settings $settings Settings instance (existing settings page).
 	 */
 	public function __construct( Amy_Settings $settings ) {
@@ -50,7 +75,7 @@ class Amy_Admin_Menu {
 			58
 		);
 
-		add_submenu_page(
+		$this->hook_overview = add_submenu_page(
 			self::PARENT_SLUG,
 			__( 'Overview', 'amy-agent' ),
 			__( 'Overview', 'amy-agent' ),
@@ -59,7 +84,7 @@ class Amy_Admin_Menu {
 			array( $this, 'render_overview' )
 		);
 
-		add_submenu_page(
+		$this->hook_my_profile = add_submenu_page(
 			self::PARENT_SLUG,
 			__( 'My Profile', 'amy-agent' ),
 			__( 'My Profile', 'amy-agent' ),
@@ -68,7 +93,7 @@ class Amy_Admin_Menu {
 			array( $this, 'render_my_profile' )
 		);
 
-		add_submenu_page(
+		$this->hook_settings = add_submenu_page(
 			self::PARENT_SLUG,
 			__( 'Settings', 'amy-agent' ),
 			__( 'Settings', 'amy-agent' ),
@@ -76,8 +101,9 @@ class Amy_Admin_Menu {
 			Amy_Settings::PAGE_SLUG,
 			array( $this->settings, 'render_page' )
 		);
+		$this->settings->set_page_hook( $this->hook_settings );
 
-		add_submenu_page(
+		$this->hook_brand = add_submenu_page(
 			self::PARENT_SLUG,
 			__( 'Brand & Avatar', 'amy-agent' ),
 			__( 'Brand & Avatar', 'amy-agent' ),
@@ -94,7 +120,7 @@ class Amy_Admin_Menu {
 		);
 
 		foreach ( $placeholders as $slug => $title ) {
-			add_submenu_page(
+			$this->hook_placeholders[ $slug ] = add_submenu_page(
 				self::PARENT_SLUG,
 				$title,
 				$title,
@@ -113,7 +139,7 @@ class Amy_Admin_Menu {
 	 * @param string $hook_suffix Current admin page hook.
 	 */
 	public function enqueue_assets( $hook_suffix ) {
-		if ( 'toplevel_page_amy-overview' === $hook_suffix ) {
+		if ( $this->hook_overview === $hook_suffix ) {
 			wp_enqueue_style(
 				'amy-agent-admin-overview-fonts',
 				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
@@ -130,7 +156,7 @@ class Amy_Admin_Menu {
 			return;
 		}
 
-		if ( 'amy-overview_page_' . self::MY_PROFILE_PAGE_SLUG === $hook_suffix ) {
+		if ( $this->hook_my_profile === $hook_suffix ) {
 			wp_enqueue_style(
 				'amy-agent-admin-my-profile-fonts',
 				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
@@ -147,7 +173,7 @@ class Amy_Admin_Menu {
 			return;
 		}
 
-		if ( 'amy-overview_page_amy-brand-avatar' !== $hook_suffix ) {
+		if ( $this->hook_brand !== $hook_suffix ) {
 			return;
 		}
 
