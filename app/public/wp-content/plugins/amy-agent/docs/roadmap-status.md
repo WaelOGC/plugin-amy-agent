@@ -15,7 +15,7 @@
 1. Submit Your Idea (Finish)
 2. Frontend Amy Assistant
 3. Dashboard Chat
-4. Telegram Notifications
+4. Admin Roles, Permissions & Social Publishing (Telegram, X, LinkedIn, Discord)
 5. Analytics Service
 6. Task Service
 7. SEO Service
