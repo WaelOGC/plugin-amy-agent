@@ -893,6 +893,76 @@ class Amy_Admin_Menu {
 	}
 
 	/**
+	 * Per-user task counts for My Profile stat cards.
+	 *
+	 * Uses GET /v1/tasks?assignee_wp_user_id=… (same list filter as Task Service)
+	 * and aggregates client-side-equivalent counts in PHP so My Profile's
+	 * edit-only JS does not need a parallel task-fetch path.
+	 *
+	 * @param int $user_id Current WordPress user ID.
+	 * @return array{open_tasks: int, completed_tasks: int, completed_this_week: int}
+	 */
+	private function fetch_my_profile_task_stats( $user_id ) {
+		$defaults = array(
+			'open_tasks'          => 0,
+			'completed_tasks'     => 0,
+			'completed_this_week' => 0,
+		);
+
+		$user_id = (int) $user_id;
+		if ( $user_id < 1 || ! function_exists( 'amy_agent' ) ) {
+			return $defaults;
+		}
+
+		$result = amy_agent()->api_client->list_tasks(
+			array( 'assignee_wp_user_id' => $user_id )
+		);
+		if ( ! $result['ok'] || ! is_array( $result['body'] ) ) {
+			return $defaults;
+		}
+
+		$tasks = isset( $result['body']['tasks'] ) && is_array( $result['body']['tasks'] )
+			? $result['body']['tasks']
+			: array();
+
+		$week_ago = time() - ( 7 * DAY_IN_SECONDS );
+		$open     = 0;
+		$done     = 0;
+		$week     = 0;
+
+		foreach ( $tasks as $task ) {
+			if ( ! is_array( $task ) ) {
+				continue;
+			}
+			// List is already filtered by assignee_wp_user_id; still require human assignee.
+			if ( ( $task['assignee_type'] ?? '' ) !== 'human' ) {
+				continue;
+			}
+			if ( (int) ( $task['assignee_wp_user_id'] ?? 0 ) !== $user_id ) {
+				continue;
+			}
+
+			$status = (string) ( $task['status'] ?? '' );
+			if ( 'done' !== $status ) {
+				++$open;
+				continue;
+			}
+
+			++$done;
+			$updated = isset( $task['updated_at'] ) ? (float) $task['updated_at'] : 0.0;
+			if ( $updated >= $week_ago ) {
+				++$week;
+			}
+		}
+
+		return array(
+			'open_tasks'          => $open,
+			'completed_tasks'     => $done,
+			'completed_this_week' => $week,
+		);
+	}
+
+	/**
 	 * My Profile — personal task activity for the logged-in user.
 	 */
 	public function render_my_profile() {
@@ -900,28 +970,28 @@ class Amy_Admin_Menu {
 			return;
 		}
 
-		$user        = wp_get_current_user();
-		$coming_soon = __( '(coming soon)', 'amy-agent' );
-		$avatar_url  = $this->get_user_avatar_url( $user->ID );
-		$role_label  = $this->get_primary_role_label( $user );
-		$joined      = $this->format_joined_date( $user->user_registered );
+		$user          = wp_get_current_user();
+		$avatar_url    = $this->get_user_avatar_url( $user->ID );
+		$role_label    = $this->get_primary_role_label( $user );
+		$joined        = $this->format_joined_date( $user->user_registered );
 		$custom_avatar = trim( (string) get_user_meta( $user->ID, self::USER_AVATAR_META, true ) );
+		$user_stats    = $this->fetch_my_profile_task_stats( (int) $user->ID );
 
 		$top_stats = array(
-			// TODO: wire to Task Service once built.
 			array(
 				'label' => __( 'Open Tasks', 'amy-agent' ),
 				'icon'  => 'clipboard',
+				'value' => (string) (int) $user_stats['open_tasks'],
 			),
-			// TODO: wire to Task Service once built.
 			array(
 				'label' => __( 'Completed Tasks', 'amy-agent' ),
 				'icon'  => 'yes-alt',
+				'value' => (string) (int) $user_stats['completed_tasks'],
 			),
-			// TODO: wire to Task Service / activity once built.
 			array(
 				'label' => __( 'This Week', 'amy-agent' ),
 				'icon'  => 'calendar-alt',
+				'value' => (string) (int) $user_stats['completed_this_week'],
 			),
 		);
 		?>
@@ -988,8 +1058,7 @@ class Amy_Admin_Menu {
 						<div class="amy-agent-my-profile__stat-body">
 							<p class="amy-agent-my-profile__stat-label"><?php echo esc_html( $stat['label'] ); ?></p>
 							<p class="amy-agent-my-profile__stat-value">
-								—
-								<span class="amy-agent-my-profile__coming-soon"><?php echo esc_html( $coming_soon ); ?></span>
+								<?php echo esc_html( $stat['value'] ); ?>
 							</p>
 						</div>
 					</div>
