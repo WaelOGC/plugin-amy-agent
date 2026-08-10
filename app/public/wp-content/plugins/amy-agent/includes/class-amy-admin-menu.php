@@ -8,14 +8,15 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers Amy → Overview / My Profile / Settings / Brand & Avatar / placeholders in wp-admin.
+ * Registers Amy → Overview / My Profile / Task Service / Settings / Brand & Avatar / placeholders in wp-admin.
  */
 class Amy_Admin_Menu {
 
-	const PARENT_SLUG          = 'amy-overview';
-	const MY_PROFILE_PAGE_SLUG = 'amy-my-profile';
-	const BRAND_PAGE_SLUG      = 'amy-brand-avatar';
-	const USER_AVATAR_META     = 'amy_agent_user_avatar_url';
+	const PARENT_SLUG             = 'amy-overview';
+	const MY_PROFILE_PAGE_SLUG    = 'amy-my-profile';
+	const TASK_SERVICE_PAGE_SLUG  = 'amy-task-service';
+	const BRAND_PAGE_SLUG         = 'amy-brand-avatar';
+	const USER_AVATAR_META        = 'amy_agent_user_avatar_url';
 
 	/**
 	 * @var Amy_Settings
@@ -31,6 +32,11 @@ class Amy_Admin_Menu {
 	 * @var string|false|null
 	 */
 	private $hook_my_profile;
+
+	/**
+	 * @var string|false|null
+	 */
+	private $hook_task_service;
 
 	/**
 	 * @var string|false|null
@@ -93,6 +99,15 @@ class Amy_Admin_Menu {
 			'manage_options',
 			self::MY_PROFILE_PAGE_SLUG,
 			array( $this, 'render_my_profile' )
+		);
+
+		$this->hook_task_service = add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Task Service', 'amy-agent' ),
+			__( 'Task Service', 'amy-agent' ),
+			'manage_options',
+			self::TASK_SERVICE_PAGE_SLUG,
+			array( $this, 'render_task_service' )
 		);
 
 		$this->hook_settings = add_submenu_page(
@@ -205,6 +220,43 @@ class Amy_Admin_Menu {
 			return;
 		}
 
+		if ( $this->hook_task_service === $hook_suffix ) {
+			wp_enqueue_style(
+				'amy-agent-admin-task-service-fonts',
+				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+				array(),
+				null
+			);
+
+			wp_enqueue_style(
+				'amy-agent-admin-task-service',
+				AMY_AGENT_URL . 'admin/css/admin-task-service.css',
+				array( 'amy-agent-admin-task-service-fonts', 'dashicons' ),
+				AMY_AGENT_VERSION
+			);
+
+			wp_enqueue_script(
+				'amy-agent-admin-task-service',
+				AMY_AGENT_URL . 'admin/js/admin-task-service.js',
+				array( 'jquery' ),
+				AMY_AGENT_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'amy-agent-admin-task-service',
+				'amyAgentTaskService',
+				array(
+					'tasks' => $this->get_placeholder_tasks(),
+					'i18n'  => array(
+						'comingSoon' => __( 'Coming soon — task creation will be available once the data layer is built.', 'amy-agent' ),
+						'noResults'  => __( 'No tasks match your filters.', 'amy-agent' ),
+					),
+				)
+			);
+			return;
+		}
+
 		if ( $this->hook_brand !== $hook_suffix ) {
 			return;
 		}
@@ -271,17 +323,15 @@ class Amy_Admin_Menu {
 
 		$cards = array(
 			array(
-				// TODO: point to amy-task-service once its menu page exists.
-				'slug'        => '',
-				'href'        => '#',
+				'slug'        => self::TASK_SERVICE_PAGE_SLUG,
 				'title'       => __( 'Task Service', 'amy-agent' ),
 				'description' => __( 'Assign, track, and escalate work across the team and Amy.', 'amy-agent' ),
 				'icon'        => 'yes-alt',
 				'hero'        => true,
 				'metrics'     => array(
-					// TODO: wire to Task Service once built.
+					// TODO: wire to Task Service real counts once the data layer is built.
 					__( 'Open', 'amy-agent' ),
-					// TODO: wire to Task Service once built.
+					// TODO: wire to Task Service real counts once the data layer is built.
 					__( 'Urgent', 'amy-agent' ),
 				),
 			),
@@ -448,6 +498,390 @@ class Amy_Admin_Menu {
 	}
 
 	/**
+	 * Task Service — visual board/list surface (static placeholder data this phase).
+	 */
+	public function render_task_service() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$coming_soon = __( '(coming soon)', 'amy-agent' );
+		$stats       = array(
+			array(
+				'label' => __( 'Open Tasks', 'amy-agent' ),
+				'icon'  => 'clipboard',
+			),
+			array(
+				'label' => __( 'Urgent Tasks', 'amy-agent' ),
+				'icon'  => 'warning',
+			),
+			array(
+				'label' => __( 'Completed This Week', 'amy-agent' ),
+				'icon'  => 'yes-alt',
+			),
+			array(
+				'label' => __( 'Team Completion Rate', 'amy-agent' ),
+				'icon'  => 'chart-bar',
+			),
+		);
+
+		$columns = array(
+			'todo'              => __( 'To Do', 'amy-agent' ),
+			'in_progress'       => __( 'In Progress', 'amy-agent' ),
+			'waiting_extension' => __( 'Waiting on Extension', 'amy-agent' ),
+			'done'              => __( 'Done', 'amy-agent' ),
+		);
+		?>
+		<div class="wrap amy-agent-task-service" id="amy-agent-task-service">
+			<header class="amy-agent-task-service__header">
+				<div class="amy-agent-task-service__header-main">
+					<h1 class="amy-agent-task-service__title"><?php echo esc_html__( 'Task Service', 'amy-agent' ); ?></h1>
+					<p class="amy-agent-task-service__intro">
+						<?php echo esc_html__( 'Every task, every assignee, fully transparent.', 'amy-agent' ); ?>
+					</p>
+					<span class="amy-agent-task-service__underline" aria-hidden="true"></span>
+				</div>
+				<div class="amy-agent-task-service__header-actions">
+					<button
+						type="button"
+						class="amy-agent-task-service__btn amy-agent-task-service__btn--accent"
+						id="amy-agent-task-new"
+					>
+						<?php echo esc_html__( '+ New Task', 'amy-agent' ); ?>
+					</button>
+				</div>
+			</header>
+
+			<div class="amy-agent-task-service__stats">
+				<?php foreach ( $stats as $stat ) : ?>
+					<div class="amy-agent-task-service__stat">
+						<span class="amy-agent-task-service__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-<?php echo esc_attr( $stat['icon'] ); ?>"></span>
+						</span>
+						<div class="amy-agent-task-service__stat-body">
+							<p class="amy-agent-task-service__stat-label"><?php echo esc_html( $stat['label'] ); ?></p>
+							<p class="amy-agent-task-service__stat-value">
+								—
+								<span class="amy-agent-task-service__coming-soon"><?php echo esc_html( $coming_soon ); ?></span>
+							</p>
+						</div>
+					</div>
+				<?php endforeach; ?>
+			</div>
+
+			<div class="amy-agent-task-service__toolbar">
+				<div class="amy-agent-task-service__view-toggle" role="tablist" aria-label="<?php echo esc_attr__( 'Task view', 'amy-agent' ); ?>">
+					<button
+						type="button"
+						class="amy-agent-task-service__view-btn is-active"
+						role="tab"
+						aria-selected="true"
+						data-amy-view="board"
+						id="amy-agent-view-board"
+					>
+						<?php echo esc_html__( 'Board', 'amy-agent' ); ?>
+					</button>
+					<button
+						type="button"
+						class="amy-agent-task-service__view-btn"
+						role="tab"
+						aria-selected="false"
+						data-amy-view="list"
+						id="amy-agent-view-list"
+					>
+						<?php echo esc_html__( 'List', 'amy-agent' ); ?>
+					</button>
+				</div>
+
+				<div class="amy-agent-task-service__filters">
+					<label class="screen-reader-text" for="amy-agent-filter-assignee"><?php echo esc_html__( 'Filter by assignee', 'amy-agent' ); ?></label>
+					<select id="amy-agent-filter-assignee" class="amy-agent-task-service__select">
+						<option value=""><?php echo esc_html__( 'All Assignees', 'amy-agent' ); ?></option>
+					</select>
+
+					<label class="screen-reader-text" for="amy-agent-filter-priority"><?php echo esc_html__( 'Filter by priority', 'amy-agent' ); ?></label>
+					<select id="amy-agent-filter-priority" class="amy-agent-task-service__select">
+						<option value=""><?php echo esc_html__( 'All Priorities', 'amy-agent' ); ?></option>
+						<option value="normal"><?php echo esc_html__( 'Normal', 'amy-agent' ); ?></option>
+						<option value="urgent"><?php echo esc_html__( 'Urgent', 'amy-agent' ); ?></option>
+					</select>
+
+					<label class="screen-reader-text" for="amy-agent-filter-search"><?php echo esc_html__( 'Search tasks', 'amy-agent' ); ?></label>
+					<input
+						type="search"
+						id="amy-agent-filter-search"
+						class="amy-agent-task-service__search"
+						placeholder="<?php echo esc_attr__( 'Search tasks...', 'amy-agent' ); ?>"
+					/>
+				</div>
+			</div>
+
+			<div
+				class="amy-agent-task-service__board"
+				id="amy-agent-task-board"
+				role="tabpanel"
+				aria-labelledby="amy-agent-view-board"
+			>
+				<?php foreach ( $columns as $status_key => $status_label ) : ?>
+					<section class="amy-agent-task-service__column" data-status="<?php echo esc_attr( $status_key ); ?>">
+						<header class="amy-agent-task-service__column-header">
+							<h2 class="amy-agent-task-service__column-title">
+								<?php echo esc_html( $status_label ); ?>
+								<span class="amy-agent-task-service__column-count" data-count-for="<?php echo esc_attr( $status_key ); ?>">0</span>
+							</h2>
+							<button
+								type="button"
+								class="amy-agent-task-service__column-add"
+								disabled
+								aria-disabled="true"
+								title="<?php echo esc_attr__( 'Coming soon — task creation will be available once the data layer is built.', 'amy-agent' ); ?>"
+							>
+								<span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>
+								<span class="screen-reader-text"><?php echo esc_html__( 'Quick add (coming soon)', 'amy-agent' ); ?></span>
+							</button>
+						</header>
+						<div class="amy-agent-task-service__column-cards" data-cards-for="<?php echo esc_attr( $status_key ); ?>"></div>
+					</section>
+				<?php endforeach; ?>
+			</div>
+
+			<div
+				class="amy-agent-task-service__list"
+				id="amy-agent-task-list"
+				role="tabpanel"
+				aria-labelledby="amy-agent-view-list"
+				hidden
+			>
+				<table class="amy-agent-task-service__table">
+					<thead>
+						<tr>
+							<th scope="col"><?php echo esc_html__( 'Task', 'amy-agent' ); ?></th>
+							<th scope="col"><?php echo esc_html__( 'Assignee', 'amy-agent' ); ?></th>
+							<th scope="col"><?php echo esc_html__( 'Priority', 'amy-agent' ); ?></th>
+							<th scope="col"><?php echo esc_html__( 'Status', 'amy-agent' ); ?></th>
+							<th scope="col"><?php echo esc_html__( 'Due Date', 'amy-agent' ); ?></th>
+						</tr>
+					</thead>
+					<tbody id="amy-agent-task-list-body"></tbody>
+				</table>
+				<p class="amy-agent-task-service__empty-filter" id="amy-agent-task-empty" hidden></p>
+			</div>
+
+			<div
+				class="amy-agent-task-service__modal"
+				id="amy-agent-task-modal"
+				hidden
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="amy-agent-task-modal-title"
+			>
+				<div class="amy-agent-task-service__modal-backdrop" data-amy-modal-close></div>
+				<div class="amy-agent-task-service__modal-dialog">
+					<header class="amy-agent-task-service__modal-header">
+						<h2 id="amy-agent-task-modal-title" class="amy-agent-task-service__modal-title">
+							<?php echo esc_html__( 'New Task', 'amy-agent' ); ?>
+						</h2>
+						<button
+							type="button"
+							class="amy-agent-task-service__modal-close"
+							data-amy-modal-close
+							aria-label="<?php echo esc_attr__( 'Close', 'amy-agent' ); ?>"
+						>
+							<span class="dashicons dashicons-no-alt" aria-hidden="true"></span>
+						</button>
+					</header>
+					<form class="amy-agent-task-service__modal-form" id="amy-agent-task-form" novalidate>
+						<label class="amy-agent-task-service__field" for="amy-agent-task-title">
+							<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Title', 'amy-agent' ); ?></span>
+							<input type="text" id="amy-agent-task-title" name="title" placeholder="<?php echo esc_attr__( 'What needs to be done?', 'amy-agent' ); ?>" />
+						</label>
+
+						<label class="amy-agent-task-service__field" for="amy-agent-task-assignee">
+							<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Assignee', 'amy-agent' ); ?></span>
+							<select id="amy-agent-task-assignee" name="assignee">
+								<option value=""><?php echo esc_html__( 'Select assignee…', 'amy-agent' ); ?></option>
+								<option value="amy"><?php echo esc_html__( 'Amy', 'amy-agent' ); ?></option>
+								<option value="sarah"><?php echo esc_html__( 'Sarah Chen', 'amy-agent' ); ?></option>
+								<option value="marcus"><?php echo esc_html__( 'Marcus Webb', 'amy-agent' ); ?></option>
+								<option value="lena"><?php echo esc_html__( 'Lena Ortiz', 'amy-agent' ); ?></option>
+							</select>
+						</label>
+
+						<fieldset class="amy-agent-task-service__field amy-agent-task-service__field--priority">
+							<legend class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Priority', 'amy-agent' ); ?></legend>
+							<label class="amy-agent-task-service__radio">
+								<input type="radio" name="priority" value="normal" checked />
+								<span><?php echo esc_html__( 'Normal', 'amy-agent' ); ?></span>
+							</label>
+							<label class="amy-agent-task-service__radio">
+								<input type="radio" name="priority" value="urgent" />
+								<span><?php echo esc_html__( 'Urgent', 'amy-agent' ); ?></span>
+							</label>
+						</fieldset>
+
+						<label class="amy-agent-task-service__field" for="amy-agent-task-due">
+							<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Due date', 'amy-agent' ); ?></span>
+							<input type="date" id="amy-agent-task-due" name="due" />
+						</label>
+
+						<label class="amy-agent-task-service__field" for="amy-agent-task-description">
+							<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Description', 'amy-agent' ); ?></span>
+							<textarea id="amy-agent-task-description" name="description" rows="4" placeholder="<?php echo esc_attr__( 'Add context, links, or acceptance criteria…', 'amy-agent' ); ?>"></textarea>
+						</label>
+
+						<div class="amy-agent-task-service__modal-actions">
+							<button type="button" class="amy-agent-task-service__btn amy-agent-task-service__btn--ghost" data-amy-modal-close>
+								<?php echo esc_html__( 'Cancel', 'amy-agent' ); ?>
+							</button>
+							<button
+								type="button"
+								class="amy-agent-task-service__btn amy-agent-task-service__btn--accent amy-agent-task-service__btn--disabled"
+								id="amy-agent-task-create"
+								disabled
+								aria-disabled="true"
+								title="<?php echo esc_attr__( 'Coming soon — task creation will be available once the data layer is built.', 'amy-agent' ); ?>"
+							>
+								<?php echo esc_html__( 'Create Task', 'amy-agent' ); ?>
+							</button>
+						</div>
+						<p class="amy-agent-task-service__coming-note">
+							<?php echo esc_html__( 'Coming soon — task creation will be available once the data layer is built.', 'amy-agent' ); ?>
+						</p>
+					</form>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Static placeholder tasks for the visual-only Task Service phase.
+	 *
+	 * TODO: replace with real task query once the Task Service data layer
+	 * (CPT/DB table + CRUD) is built in a future phase.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function get_placeholder_tasks() {
+		$amy_avatar = $this->settings->get_avatar_url();
+
+		return array(
+			array(
+				'id'           => 't1',
+				'title'        => 'Rewrite homepage hero copy',
+				'assignee'     => 'Sarah Chen',
+				'assigneeKey'  => 'sarah',
+				'assigneeType' => 'human',
+				'initials'     => 'SC',
+				'color'        => '#3D8BFF',
+				'avatarUrl'    => '',
+				'priority'     => 'normal',
+				'status'       => 'todo',
+				'statusLabel'  => 'To Do',
+				'due'          => 'Aug 14',
+			),
+			array(
+				'id'           => 't2',
+				'title'        => 'Patch login rate-limit gap',
+				'assignee'     => 'Marcus Webb',
+				'assigneeKey'  => 'marcus',
+				'assigneeType' => 'human',
+				'initials'     => 'MW',
+				'color'        => '#22C55E',
+				'avatarUrl'    => '',
+				'priority'     => 'urgent',
+				'status'       => 'todo',
+				'statusLabel'  => 'To Do',
+				'due'          => 'Aug 11',
+			),
+			array(
+				'id'           => 't3',
+				'title'        => 'Draft Q3 email nurture sequence',
+				'assignee'     => 'Amy',
+				'assigneeKey'  => 'amy',
+				'assigneeType' => 'amy',
+				'initials'     => 'A',
+				'color'        => '#FF7A18',
+				'avatarUrl'    => $amy_avatar,
+				'priority'     => 'normal',
+				'status'       => 'in_progress',
+				'statusLabel'  => 'In Progress',
+				'due'          => 'Aug 16',
+			),
+			array(
+				'id'           => 't4',
+				'title'        => 'Fix broken OG images on blog posts',
+				'assignee'     => 'Lena Ortiz',
+				'assigneeKey'  => 'lena',
+				'assigneeType' => 'human',
+				'initials'     => 'LO',
+				'color'        => '#A855F7',
+				'avatarUrl'    => '',
+				'priority'     => 'urgent',
+				'status'       => 'in_progress',
+				'statusLabel'  => 'In Progress',
+				'due'          => 'Aug 12',
+			),
+			array(
+				'id'           => 't5',
+				'title'        => 'Audit unused CSS on service pages',
+				'assignee'     => 'Sarah Chen',
+				'assigneeKey'  => 'sarah',
+				'assigneeType' => 'human',
+				'initials'     => 'SC',
+				'color'        => '#3D8BFF',
+				'avatarUrl'    => '',
+				'priority'     => 'normal',
+				'status'       => 'in_progress',
+				'statusLabel'  => 'In Progress',
+				'due'          => 'Aug 18',
+			),
+			array(
+				'id'           => 't6',
+				'title'        => 'Migrate contact form spam rules',
+				'assignee'     => 'Marcus Webb',
+				'assigneeKey'  => 'marcus',
+				'assigneeType' => 'human',
+				'initials'     => 'MW',
+				'color'        => '#22C55E',
+				'avatarUrl'    => '',
+				'priority'     => 'normal',
+				'status'       => 'waiting_extension',
+				'statusLabel'  => 'Waiting on Extension',
+				'due'          => 'Aug 13',
+			),
+			array(
+				'id'           => 't7',
+				'title'        => 'Prepare client kickoff deck',
+				'assignee'     => 'Lena Ortiz',
+				'assigneeKey'  => 'lena',
+				'assigneeType' => 'human',
+				'initials'     => 'LO',
+				'color'        => '#A855F7',
+				'avatarUrl'    => '',
+				'priority'     => 'normal',
+				'status'       => 'done',
+				'statusLabel'  => 'Done',
+				'due'          => 'Aug 9',
+			),
+			array(
+				'id'           => 't8',
+				'title'        => 'Summarize last week’s support tickets',
+				'assignee'     => 'Amy',
+				'assigneeKey'  => 'amy',
+				'assigneeType' => 'amy',
+				'initials'     => 'A',
+				'color'        => '#FF7A18',
+				'avatarUrl'    => $amy_avatar,
+				'priority'     => 'normal',
+				'status'       => 'done',
+				'statusLabel'  => 'Done',
+				'due'          => 'Aug 8',
+			),
+		);
+	}
+
+	/**
 	 * My Profile — personal task activity for the logged-in user.
 	 */
 	public function render_my_profile() {
@@ -490,21 +924,12 @@ class Amy_Admin_Menu {
 					<span class="amy-agent-my-profile__underline" aria-hidden="true"></span>
 				</div>
 				<div class="amy-agent-my-profile__header-actions">
-					<?php
-					// TODO: enable New Task once Task Service exists.
-					?>
-					<button
-						type="button"
-						class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent amy-agent-my-profile__btn--disabled"
-						disabled
-						aria-disabled="true"
-						title="<?php echo esc_attr__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>"
+					<a
+						class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent"
+						href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::TASK_SERVICE_PAGE_SLUG ) ); ?>"
 					>
 						<?php echo esc_html__( '+ New Task', 'amy-agent' ); ?>
-					</button>
-					<span class="amy-agent-my-profile__coming-note">
-						<?php echo esc_html__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>
-					</span>
+					</a>
 				</div>
 			</header>
 
@@ -579,23 +1004,14 @@ class Amy_Admin_Menu {
 							</span>
 						</div>
 						<p class="amy-agent-my-profile__empty-text">
-							<?php echo esc_html__( 'No tasks yet — Task Service is being built next.', 'amy-agent' ); ?>
+							<?php echo esc_html__( 'No tasks yet — open Task Service to create and track work.', 'amy-agent' ); ?>
 						</p>
-						<?php
-						// TODO: point to Task Service once its menu page exists.
-						?>
-						<button
-							type="button"
-							class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent amy-agent-my-profile__btn--disabled"
-							disabled
-							aria-disabled="true"
-							title="<?php echo esc_attr__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>"
+						<a
+							class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent"
+							href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::TASK_SERVICE_PAGE_SLUG ) ); ?>"
 						>
 							<?php echo esc_html__( 'Go to Task Service', 'amy-agent' ); ?>
-						</button>
-						<span class="amy-agent-my-profile__coming-note">
-							<?php echo esc_html__( 'Coming soon — once Task Service is live.', 'amy-agent' ); ?>
-						</span>
+						</a>
 					</div>
 				</section>
 

@@ -84,15 +84,14 @@ status of every tool, without needing to open each one.
 ## 4. My Profile (page 2)
 
 Personal page, scoped to the logged-in user only — distinct from Task
-Service, which is fully transparent/shared across everyone (§6, and
+Service, which is fully transparent/shared across everyone (§5, and
 `08-task-service-plan.md` §2).
 
 - **Header:** page title "My Profile" (static label for all users, not
   personalized per name), short description ("Your personal task
-  activity"), and a right-aligned **"+ New Task"** button. Until Task
-  Service exists, that button is present but disabled with a clear
-  "coming soon" note; once Task Service is live it becomes the personal
-  entry point for creating a task from this page.
+  activity"), and a right-aligned **"+ New Task"** link to the live Task
+  Service page (navigation only in the visual phase — does not create a
+  task until the data layer exists).
 - **Employee identity block:** circular avatar, full name, role pill
   badge (WP primary role for now; later the Admin Roles & Social role),
   email, and join date. Includes an **Edit Profile** control that opens a
@@ -107,8 +106,8 @@ Service, which is fully transparent/shared across everyone (§6, and
   - **Open Tasks** (larger left column): tasks assigned to this user that
     are not yet completed — title, assigned by, due date, status,
     extension status if relevant (ties to `08-task-service-plan.md`
-    §4–5). Empty state includes a disabled **"Go to Task Service"**
-    button until that menu page exists.
+    §4–5). Empty state includes a **"Go to Task Service"** link to the live
+    Task Service page (navigation only).
   - **Completed Tasks** (upper right): collapsed/paginated history —
     title, completed date, who assigned it.
   - **Recent Activity** (lower right, timeline): reverse-chronological
@@ -116,26 +115,45 @@ Service, which is fully transparent/shared across everyone (§6, and
     updates, chat sessions with Amy, etc.) — expand as each underlying
     tool actually exists; do not invent activity types ahead of the tools
     that produce them.
-- Personal controls that belong here (Edit Profile, New Task entry point)
-  are allowed; system-admin / team-wide settings stay on Settings, Admin
-  Roles & Social, and Task Service.
+- Personal controls that belong here (Edit Profile, New Task entry point
+  linking to Task Service) are allowed; system-admin / team-wide settings
+  stay on Settings, Admin Roles & Social, and Task Service.
 
 ## 5. Task Service (page 3)
 
-Full spec: `08-task-service-plan.md`. Dashboard layout for this page:
+Full spec: `08-task-service-plan.md`. Dashboard layout for this page.
 
-- **Header:** page title, short description, a primary "New Task" button.
-- **Top stat row:** Open / Urgent / Completed counts (matches the approved
-  Overview reference's Task Service card, expanded to full page here).
-- **Board/list view** of all tasks, system-wide (full transparency per
-  `08-task-service-plan.md` §2) — columns or filters for status (open,
-  in progress, urgent, completed), assignee (human or Amy), creator, due
-  date, and extension state.
-- **Recent Activity feed** (full version of the Overview card's short
-  list) — every task event across the whole system, not just this user's.
-- Clicking a task opens task detail (assignee, deadline, Amy's
-  reminder/escalation state per `08-task-service-plan.md` §3–5,
-  reassignment controls for the creator).
+**Current build status (visual phase, 2026-08-10):** the real **Task
+Service** submenu page is live under Amy (slug `amy-task-service`). This
+phase ships the polished UI surface only — **no** CPT/DB table, **no**
+persisted tasks, **no** working create/edit/move, and **none** of Amy’s
+automation logic from `08-task-service-plan.md` §3–6 (reminders,
+extensions, auto-escalation). Those land in a future data-layer phase.
+
+What exists now:
+
+- **Header:** page title "Task Service", subtitle ("Every task, every
+  assignee, fully transparent."), gradient underline, primary **"+ New
+  Task"** button (opens a creation modal whose fields are laid out but
+  whose **Create Task** submit stays disabled / "coming soon").
+- **Stat strip:** Open Tasks / Urgent Tasks / Completed This Week / Team
+  Completion Rate — honest `—` + "(coming soon)" placeholders until real
+  counts exist.
+- **Board / List toggle** (client-side; Board default) plus filters row
+  (All Assignees, All Priorities, search) that can filter the static
+  placeholder set client-side.
+- **Board (Kanban):** To Do / In Progress / Waiting on Extension / Done
+  columns with count badges and disabled quick-add "+" icons. Cards use
+  **static placeholder task data** (human assignees + at least one Amy
+  assignee, urgent badges, due chips) — display only, not draggable.
+- **List/table view:** same placeholder data as columns Task / Assignee /
+  Priority / Status / Due Date, with the same urgent accent treatment.
+- My Profile’s **"+ New Task"** and **"Go to Task Service"** controls now
+  link to this page (navigation only — they do not create tasks yet).
+
+Still future (not this phase): real task storage + CRUD, drag-and-drop
+status changes, live filters against real data, task detail, and Amy’s
+reminder / extension / escalation behavior per `08-task-service-plan.md`.
 
 ## 6. Analytics (page 4)
 

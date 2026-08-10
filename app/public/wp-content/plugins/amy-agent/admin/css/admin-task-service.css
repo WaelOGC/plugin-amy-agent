@@ -1,0 +1,731 @@
+/**
+ * Amy Agent — Task Service admin page (brand surface inside wp-admin).
+ */
+
+.amy-agent-task-service {
+	--amy-bg: #0A0A0A;
+	--amy-panel: #141414;
+	--amy-border: #F7941D;
+	--amy-grad-start: #FF7A18;
+	--amy-grad-end: #FFC542;
+	--amy-text: #FFFFFF;
+	--amy-text-muted: #C9C9C9;
+	--amy-text-on-accent: #1A1200;
+	--amy-urgent: #E35D6A;
+	--amy-font-heading: 'Space Grotesk', sans-serif;
+	--amy-font-body: 'Inter', sans-serif;
+
+	box-sizing: border-box;
+	max-width: 100rem;
+	margin: 1.25rem 1.25rem 1.25rem 0;
+	padding: 1.75rem 1.75rem 2rem;
+	background: var(--amy-bg);
+	border-radius: 16px;
+	color: var(--amy-text);
+	font-family: var(--amy-font-body);
+}
+
+.amy-agent-task-service *,
+.amy-agent-task-service *::before,
+.amy-agent-task-service *::after {
+	box-sizing: border-box;
+}
+
+/* —— Buttons —— */
+
+.amy-agent-task-service__btn {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.35rem;
+	margin: 0;
+	padding: 0.65rem 1.15rem;
+	border-radius: 10px;
+	border: 1px solid transparent;
+	font-family: var(--amy-font-body);
+	font-size: 0.875rem;
+	font-weight: 600;
+	line-height: 1.2;
+	cursor: pointer;
+	transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.amy-agent-task-service__btn--accent {
+	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end));
+	color: var(--amy-text-on-accent);
+	border-color: transparent;
+}
+
+.amy-agent-task-service__btn--accent:hover,
+.amy-agent-task-service__btn--accent:focus-visible {
+	opacity: 0.92;
+	outline: none;
+}
+
+.amy-agent-task-service__btn--ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--amy-text-muted);
+}
+
+.amy-agent-task-service__btn--ghost:hover,
+.amy-agent-task-service__btn--ghost:focus-visible {
+	color: var(--amy-text);
+	outline: none;
+}
+
+.amy-agent-task-service__btn--disabled,
+.amy-agent-task-service__btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+	background: transparent;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	color: var(--amy-text-muted);
+	box-shadow: none;
+}
+
+.amy-agent-task-service__coming-note,
+.amy-agent-task-service__coming-soon {
+	display: block;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-weight: 400;
+	opacity: 0.85;
+}
+
+.amy-agent-task-service__coming-soon {
+	margin-top: 0.2rem;
+	font-size: 0.6875rem;
+}
+
+.amy-agent-task-service__coming-note {
+	margin: 0.35rem 0 0;
+	font-size: 0.75rem;
+	line-height: 1.35;
+	text-align: right;
+}
+
+/* —— Header —— */
+
+.amy-agent-task-service__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1.25rem;
+	margin: 0 0 1.5rem;
+}
+
+.amy-agent-task-service__header-main {
+	min-width: 0;
+	flex: 1;
+}
+
+.amy-agent-task-service__title {
+	margin: 0 0 0.5rem;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: clamp(2rem, 3.5vw, 2.75rem);
+	font-style: normal;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1.15;
+}
+
+.amy-agent-task-service__intro {
+	max-width: 40rem;
+	margin: 0 0 1rem;
+	color: var(--amy-text-muted);
+	font-size: 0.95rem;
+	line-height: 1.5;
+}
+
+.amy-agent-task-service__underline {
+	display: block;
+	width: min(18rem, 70%);
+	height: 3px;
+	border: 0;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end), transparent);
+	transform: rotate(-1.5deg);
+	transform-origin: left center;
+}
+
+/* —— Stats —— */
+
+.amy-agent-task-service__stats {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.85rem;
+	margin: 0 0 1.25rem;
+}
+
+.amy-agent-task-service__stat {
+	display: flex;
+	align-items: center;
+	gap: 0.85rem;
+	padding: 1rem 1.1rem;
+	border: 1px solid rgba(247, 148, 29, 0.45);
+	border-radius: 12px;
+	background: var(--amy-panel);
+}
+
+.amy-agent-task-service__stat-icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: 50%;
+	background: linear-gradient(145deg, rgba(255, 122, 24, 0.22), rgba(255, 197, 66, 0.1));
+	border: 1px solid rgba(247, 148, 29, 0.45);
+	color: var(--amy-grad-start);
+}
+
+.amy-agent-task-service__stat-icon .dashicons {
+	width: 1.2rem;
+	height: 1.2rem;
+	font-size: 1.2rem;
+	line-height: 1.2rem;
+}
+
+.amy-agent-task-service__stat-label {
+	margin: 0 0 0.2rem;
+	color: var(--amy-text-muted);
+	font-size: 0.75rem;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
+.amy-agent-task-service__stat-value {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.5rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+/* —— Toolbar —— */
+
+.amy-agent-task-service__toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.85rem;
+	margin: 0 0 1.15rem;
+}
+
+.amy-agent-task-service__view-toggle {
+	display: inline-flex;
+	padding: 0.2rem;
+	border-radius: 999px;
+	border: 1px solid rgba(247, 148, 29, 0.4);
+	background: rgba(255, 255, 255, 0.03);
+}
+
+.amy-agent-task-service__view-btn {
+	appearance: none;
+	margin: 0;
+	padding: 0.45rem 1rem;
+	border: 0;
+	border-radius: 999px;
+	background: transparent;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.amy-agent-task-service__view-btn.is-active {
+	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end));
+	color: var(--amy-text-on-accent);
+}
+
+.amy-agent-task-service__filters {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.55rem;
+}
+
+.amy-agent-task-service__select,
+.amy-agent-task-service__search {
+	min-height: 2.35rem;
+	padding: 0.45rem 0.75rem;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 10px;
+	background: #0f0f0f;
+	color: var(--amy-text);
+	font-family: var(--amy-font-body);
+	font-size: 0.8125rem;
+}
+
+.amy-agent-task-service__select {
+	min-width: 9.5rem;
+}
+
+.amy-agent-task-service__search {
+	min-width: 12rem;
+}
+
+.amy-agent-task-service__select:focus,
+.amy-agent-task-service__search:focus {
+	border-color: var(--amy-border);
+	outline: none;
+	box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.35);
+}
+
+/* —— Board —— */
+
+.amy-agent-task-service__board {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.85rem;
+	align-items: start;
+}
+
+.amy-agent-task-service__column {
+	min-width: 0;
+	padding: 0.85rem;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 14px;
+	background: var(--amy-panel);
+	min-height: 18rem;
+}
+
+.amy-agent-task-service__column-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin: 0 0 0.85rem;
+}
+
+.amy-agent-task-service__column-title {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 0.95rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.25;
+}
+
+.amy-agent-task-service__column-count {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 1.35rem;
+	height: 1.35rem;
+	padding: 0 0.35rem;
+	border-radius: 999px;
+	background: rgba(255, 122, 24, 0.18);
+	border: 1px solid rgba(247, 148, 29, 0.4);
+	color: var(--amy-grad-start);
+	font-family: var(--amy-font-body);
+	font-size: 0.7rem;
+	font-weight: 600;
+}
+
+.amy-agent-task-service__column-add {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	margin: 0;
+	padding: 0;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 8px;
+	background: transparent;
+	color: var(--amy-text-muted);
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.amy-agent-task-service__column-add .dashicons {
+	width: 1rem;
+	height: 1rem;
+	font-size: 1rem;
+	line-height: 1rem;
+}
+
+.amy-agent-task-service__column-cards {
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+}
+
+.amy-agent-task-service__card {
+	padding: 0.85rem 0.9rem;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 12px;
+	background: #101010;
+}
+
+.amy-agent-task-service__card.is-urgent {
+	border-color: rgba(227, 93, 106, 0.75);
+	background: linear-gradient(180deg, rgba(227, 93, 106, 0.12), #101010 55%);
+	box-shadow: inset 3px 0 0 var(--amy-urgent);
+}
+
+.amy-agent-task-service__card-top {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 0.5rem;
+	margin: 0 0 0.55rem;
+}
+
+.amy-agent-task-service__card-title {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 0.9rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.35;
+}
+
+.amy-agent-task-service__urgent-badge {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	padding: 0.15rem 0.45rem;
+	border-radius: 999px;
+	background: rgba(227, 93, 106, 0.2);
+	border: 1px solid rgba(227, 93, 106, 0.65);
+	color: #ffb4bc;
+	font-size: 0.625rem;
+	font-weight: 700;
+	letter-spacing: 0.05em;
+	line-height: 1.2;
+	text-transform: uppercase;
+}
+
+.amy-agent-task-service__card-meta {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+}
+
+.amy-agent-task-service__assignee {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	min-width: 0;
+	color: var(--amy-text-muted);
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+.amy-agent-task-service__avatar {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 50%;
+	overflow: hidden;
+	font-size: 0.625rem;
+	font-weight: 700;
+	color: #fff;
+	background: #333;
+}
+
+.amy-agent-task-service__avatar img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+
+.amy-agent-task-service__avatar.is-amy {
+	border: 1px solid rgba(247, 148, 29, 0.65);
+	background: linear-gradient(145deg, #2a1a08, #1a1200);
+}
+
+.amy-agent-task-service__due {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	padding: 0.15rem 0.5rem;
+	border-radius: 999px;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(247, 148, 29, 0.25);
+	color: var(--amy-text-muted);
+	font-size: 0.6875rem;
+	font-weight: 500;
+}
+
+.amy-agent-task-service__priority-flag {
+	margin-left: 0.25rem;
+	color: var(--amy-grad-start);
+	font-size: 0.7rem;
+}
+
+.amy-agent-task-service__priority-flag.is-urgent {
+	color: var(--amy-urgent);
+}
+
+/* —— List —— */
+
+.amy-agent-task-service__list[hidden],
+.amy-agent-task-service__board[hidden] {
+	display: none !important;
+}
+
+.amy-agent-task-service__list {
+	overflow-x: auto;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 14px;
+	background: var(--amy-panel);
+}
+
+.amy-agent-task-service__table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.875rem;
+}
+
+.amy-agent-task-service__table th,
+.amy-agent-task-service__table td {
+	padding: 0.85rem 1rem;
+	text-align: left;
+	border-bottom: 1px solid rgba(247, 148, 29, 0.18);
+	vertical-align: middle;
+}
+
+.amy-agent-task-service__table th {
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+	background: rgba(255, 255, 255, 0.02);
+}
+
+.amy-agent-task-service__table td {
+	color: var(--amy-text);
+	font-family: var(--amy-font-body);
+}
+
+.amy-agent-task-service__table tr.is-urgent td:first-child {
+	box-shadow: inset 3px 0 0 var(--amy-urgent);
+}
+
+.amy-agent-task-service__table tr.is-urgent {
+	background: rgba(227, 93, 106, 0.06);
+}
+
+.amy-agent-task-service__table-task {
+	font-family: var(--amy-font-heading);
+	font-weight: 700;
+}
+
+.amy-agent-task-service__empty-filter {
+	margin: 0;
+	padding: 1.5rem;
+	text-align: center;
+	color: var(--amy-text-muted);
+	font-size: 0.9rem;
+}
+
+/* —— Modal —— */
+
+.amy-agent-task-service__modal[hidden] {
+	display: none !important;
+}
+
+.amy-agent-task-service__modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100100;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 1.25rem;
+}
+
+.amy-agent-task-service__modal-backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.65);
+}
+
+.amy-agent-task-service__modal-dialog {
+	position: relative;
+	z-index: 1;
+	width: min(30rem, 100%);
+	max-height: calc(100vh - 2.5rem);
+	overflow: auto;
+	padding: 1.25rem 1.35rem 1.4rem;
+	border: 1px solid var(--amy-border);
+	border-radius: 14px;
+	background: var(--amy-panel);
+	box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.amy-agent-task-service__modal-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin: 0 0 1.15rem;
+}
+
+.amy-agent-task-service__modal-title {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.25rem;
+	font-style: normal;
+	font-weight: 700;
+}
+
+.amy-agent-task-service__modal-close {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2rem;
+	height: 2rem;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--amy-text-muted);
+	cursor: pointer;
+}
+
+.amy-agent-task-service__modal-close:hover,
+.amy-agent-task-service__modal-close:focus-visible {
+	color: var(--amy-text);
+	background: rgba(255, 255, 255, 0.06);
+	outline: none;
+}
+
+.amy-agent-task-service__modal-form {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.amy-agent-task-service__field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin: 0;
+	padding: 0;
+	border: 0;
+}
+
+.amy-agent-task-service__field-label {
+	color: var(--amy-text-muted);
+	font-size: 0.8rem;
+	font-weight: 500;
+}
+
+.amy-agent-task-service__field input[type='text'],
+.amy-agent-task-service__field input[type='date'],
+.amy-agent-task-service__field select,
+.amy-agent-task-service__field textarea {
+	width: 100%;
+	padding: 0.7rem 0.85rem;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 10px;
+	background: #0f0f0f;
+	color: var(--amy-text);
+	font-family: var(--amy-font-body);
+	font-size: 0.9rem;
+	line-height: 1.3;
+}
+
+.amy-agent-task-service__field textarea {
+	resize: vertical;
+	min-height: 6rem;
+}
+
+.amy-agent-task-service__field input:focus,
+.amy-agent-task-service__field select:focus,
+.amy-agent-task-service__field textarea:focus {
+	border-color: var(--amy-border);
+	outline: none;
+	box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.35);
+}
+
+.amy-agent-task-service__field--priority {
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.75rem 1rem;
+}
+
+.amy-agent-task-service__field--priority .amy-agent-task-service__field-label {
+	flex: 0 0 100%;
+}
+
+.amy-agent-task-service__radio {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	color: var(--amy-text);
+	font-size: 0.875rem;
+	cursor: pointer;
+}
+
+.amy-agent-task-service__modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 0.55rem;
+	margin-top: 0.25rem;
+}
+
+/* —— Responsive —— */
+
+@media (max-width: 1200px) {
+	.amy-agent-task-service__board {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.amy-agent-task-service__stats {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 720px) {
+	.amy-agent-task-service {
+		margin-right: 0;
+		padding: 1.25rem;
+	}
+
+	.amy-agent-task-service__header {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.amy-agent-task-service__board,
+	.amy-agent-task-service__stats {
+		grid-template-columns: 1fr;
+	}
+
+	.amy-agent-task-service__filters,
+	.amy-agent-task-service__search,
+	.amy-agent-task-service__select {
+		width: 100%;
+		min-width: 0;
+	}
+}

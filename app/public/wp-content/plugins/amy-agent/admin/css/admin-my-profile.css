@@ -50,10 +50,18 @@
 	transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
-.amy-agent-my-profile__btn--accent {
+	.amy-agent-my-profile__btn--accent {
 	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end));
 	color: var(--amy-text-on-accent);
 	border-color: transparent;
+	text-decoration: none;
+}
+
+a.amy-agent-my-profile__btn--accent:hover,
+a.amy-agent-my-profile__btn--accent:focus-visible {
+	color: var(--amy-text-on-accent);
+	opacity: 0.92;
+	outline: none;
 }
 
 .amy-agent-my-profile__btn--outline {
