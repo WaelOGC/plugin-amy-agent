@@ -1,54 +1,322 @@
 /**
- * Amy Agent — admin overview dashboard.
+ * Amy Agent — admin overview dashboard (brand surface inside wp-admin).
  */
 
-.amy-agent-overview__intro {
-	max-width: 40rem;
-	margin: 0 0 1.5rem;
-	color: #50575e;
+.amy-agent-overview {
+	--amy-bg: #0A0A0A;
+	--amy-panel: #141414;
+	--amy-border: #F7941D;
+	--amy-grad-start: #FF7A18;
+	--amy-grad-end: #FFC542;
+	--amy-text: #FFFFFF;
+	--amy-text-muted: #C9C9C9;
+	--amy-text-on-accent: #1A1200;
+	--amy-font-heading: 'Space Grotesk', sans-serif;
+	--amy-font-body: 'Inter', sans-serif;
+
+	box-sizing: border-box;
+	max-width: 72rem;
+	margin: 1.25rem 1.25rem 1.25rem 0;
+	padding: 1.75rem 1.75rem 2rem;
+	background: var(--amy-bg);
+	border-radius: 16px;
+	color: var(--amy-text);
+	font-family: var(--amy-font-body);
 }
+
+.amy-agent-overview *,
+.amy-agent-overview *::before,
+.amy-agent-overview *::after {
+	box-sizing: border-box;
+}
+
+/* —— Header band —— */
+
+.amy-agent-overview__header {
+	position: relative;
+	margin: 0 0 1.75rem;
+	padding-right: 7rem;
+	overflow: hidden;
+}
+
+.amy-agent-overview__eyebrow {
+	display: inline-block;
+	margin: 0 0 0.85rem;
+	padding: 0.35rem 0.85rem;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end));
+	color: var(--amy-text-on-accent);
+	font-family: var(--amy-font-body);
+	font-size: 0.6875rem;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	line-height: 1.3;
+	text-transform: uppercase;
+}
+
+.amy-agent-overview__title {
+	margin: 0 0 0.5rem;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: clamp(2rem, 3.5vw, 2.75rem);
+	font-style: normal;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1.15;
+}
+
+.amy-agent-overview__intro {
+	max-width: 36rem;
+	margin: 0 0 1rem;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.95rem;
+	font-weight: 400;
+	line-height: 1.5;
+}
+
+.amy-agent-overview__underline {
+	display: block;
+	width: min(18rem, 70%);
+	height: 3px;
+	border: 0;
+	border-radius: 999px;
+	background: linear-gradient(90deg, var(--amy-grad-start), var(--amy-grad-end), transparent);
+	transform: rotate(-1.5deg);
+	transform-origin: left center;
+}
+
+.amy-agent-overview__orbit {
+	position: absolute;
+	top: -0.5rem;
+	right: -0.25rem;
+	width: 8.5rem;
+	height: 8.5rem;
+	opacity: 0.28;
+	pointer-events: none;
+	color: var(--amy-grad-start);
+}
+
+.amy-agent-overview__orbit svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* —— Top stat strip —— */
+
+.amy-agent-overview__stats {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 0.85rem;
+	margin: 0 0 1.5rem;
+}
+
+.amy-agent-overview__stat {
+	padding: 1rem 1.1rem;
+	border: 1px solid rgba(247, 148, 29, 0.45);
+	border-radius: 12px;
+	background: var(--amy-panel);
+}
+
+.amy-agent-overview__stat-label {
+	margin: 0 0 0.45rem;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	line-height: 1.3;
+}
+
+.amy-agent-overview__stat-value {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.65rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.1;
+}
+
+.amy-agent-overview__coming-soon {
+	display: block;
+	margin-top: 0.25rem;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.6875rem;
+	font-weight: 400;
+	opacity: 0.85;
+}
+
+/* —— Main tool grid —— */
 
 .amy-agent-overview__grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+	grid-template-columns: repeat(2, 1fr);
 	gap: 1rem;
-	max-width: 56rem;
 }
 
 .amy-agent-overview__card {
-	display: block;
-	padding: 1.15rem 1.25rem;
-	border: 1px solid #c3c4c7;
-	border-radius: 8px;
-	background: #fff;
-	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1.25rem 1.35rem;
+	border: 1px solid var(--amy-border);
+	border-radius: 14px;
+	background: var(--amy-panel);
+	color: var(--amy-text);
 	text-decoration: none;
-	color: inherit;
-	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.amy-agent-overview__card:hover,
-.amy-agent-overview__card:focus {
-	border-color: #c9a227;
-	box-shadow: 0 0 0 1px rgba(201, 162, 39, 0.35), 0 4px 12px rgba(0, 0, 0, 0.06);
-	outline: none;
+.amy-agent-overview__card--hero {
+	grid-column: span 2;
+}
+
+.amy-agent-overview__card-top {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.85rem;
+}
+
+.amy-agent-overview__card-icon {
+	flex-shrink: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.35rem;
+	height: 2.35rem;
+	border-radius: 10px;
+	background: linear-gradient(145deg, rgba(255, 122, 24, 0.18), rgba(255, 197, 66, 0.08));
+	border: 1px solid rgba(247, 148, 29, 0.4);
+	color: var(--amy-grad-start);
+}
+
+.amy-agent-overview__card-icon .dashicons {
+	width: 1.25rem;
+	height: 1.25rem;
+	font-size: 1.25rem;
+	line-height: 1.25rem;
+}
+
+.amy-agent-overview__card-icon svg {
+	display: block;
+	width: 1.15rem;
+	height: 1.15rem;
+}
+
+.amy-agent-overview__card-heading {
+	min-width: 0;
 }
 
 .amy-agent-overview__card-title {
-	margin: 0 0 0.4rem;
-	font-size: 1.05rem;
-	font-weight: 600;
-	color: #1d2327;
-}
-
-.amy-agent-overview__card:hover .amy-agent-overview__card-title,
-.amy-agent-overview__card:focus .amy-agent-overview__card-title {
-	color: #8a6d12;
+	margin: 0 0 0.3rem;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.15rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.25;
 }
 
 .amy-agent-overview__card-desc {
 	margin: 0;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
 	font-size: 0.875rem;
+	font-weight: 400;
 	line-height: 1.45;
-	color: #646970;
+}
+
+.amy-agent-overview__card-metrics {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.65rem;
+	margin-top: 0.15rem;
+}
+
+.amy-agent-overview__card-metric {
+	padding: 0.7rem 0.8rem;
+	border-radius: 10px;
+	background: rgba(255, 255, 255, 0.03);
+	border: 1px solid rgba(247, 148, 29, 0.22);
+}
+
+.amy-agent-overview__card-metric-label {
+	margin: 0 0 0.25rem;
+	color: var(--amy-text-muted);
+	font-family: var(--amy-font-body);
+	font-size: 0.6875rem;
+	font-weight: 500;
+	line-height: 1.3;
+}
+
+.amy-agent-overview__card-metric-value {
+	margin: 0;
+	color: var(--amy-text);
+	font-family: var(--amy-font-heading);
+	font-size: 1.25rem;
+	font-style: normal;
+	font-weight: 700;
+	line-height: 1.15;
+}
+
+.amy-agent-overview__card-link {
+	margin-top: auto;
+	padding-top: 0.35rem;
+	color: var(--amy-grad-start);
+	font-family: var(--amy-font-body);
+	font-size: 0.875rem;
+	font-weight: 600;
+	text-decoration: none;
+	transition: color 0.15s ease;
+}
+
+.amy-agent-overview__card-link:hover,
+.amy-agent-overview__card-link:focus {
+	color: var(--amy-grad-end);
+	outline: none;
+}
+
+/* —— Responsive —— */
+
+@media (max-width: 960px) {
+	.amy-agent-overview__stats {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+@media (max-width: 720px) {
+	.amy-agent-overview {
+		margin-right: 0;
+		padding: 1.25rem;
+	}
+
+	.amy-agent-overview__header {
+		padding-right: 0;
+	}
+
+	.amy-agent-overview__orbit {
+		width: 5.5rem;
+		height: 5.5rem;
+		opacity: 0.18;
+	}
+
+	.amy-agent-overview__grid {
+		grid-template-columns: 1fr;
+	}
+
+	.amy-agent-overview__card--hero {
+		grid-column: span 1;
+	}
+}
+
+@media (max-width: 480px) {
+	.amy-agent-overview__stats {
+		grid-template-columns: 1fr;
+	}
+
+	.amy-agent-overview__card-metrics {
+		grid-template-columns: 1fr;
+	}
 }

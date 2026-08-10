@@ -105,9 +105,16 @@ class Amy_Admin_Menu {
 	public function enqueue_assets( $hook_suffix ) {
 		if ( 'toplevel_page_amy-overview' === $hook_suffix ) {
 			wp_enqueue_style(
+				'amy-agent-admin-overview-fonts',
+				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+				array(),
+				null
+			);
+
+			wp_enqueue_style(
 				'amy-agent-admin-overview',
 				AMY_AGENT_URL . 'admin/css/admin-overview.css',
-				array(),
+				array( 'amy-agent-admin-overview-fonts', 'dashicons' ),
 				AMY_AGENT_VERSION
 			);
 			return;
@@ -156,50 +163,199 @@ class Amy_Admin_Menu {
 			return;
 		}
 
+		$coming_soon = __( '(coming soon)', 'amy-agent' );
+
+		$top_stats = array(
+			// TODO: wire to Task Service once built.
+			array(
+				'label' => __( 'Tasks in Progress', 'amy-agent' ),
+			),
+			// TODO: wire to Task Service once built.
+			array(
+				'label' => __( 'Tasks Due Soon', 'amy-agent' ),
+			),
+			// TODO: wire to Chat once built.
+			array(
+				'label' => __( 'Chats This Week', 'amy-agent' ),
+			),
+			// TODO: wire to SEO Tasks once built.
+			array(
+				'label' => __( 'Average SEO Score', 'amy-agent' ),
+			),
+		);
+
 		$cards = array(
+			array(
+				// TODO: point to amy-task-service once its menu page exists.
+				'slug'        => '',
+				'href'        => '#',
+				'title'       => __( 'Task Service', 'amy-agent' ),
+				'description' => __( 'Assign, track, and escalate work across the team and Amy.', 'amy-agent' ),
+				'icon'        => 'yes-alt',
+				'hero'        => true,
+				'metrics'     => array(
+					// TODO: wire to Task Service once built.
+					__( 'Open', 'amy-agent' ),
+					// TODO: wire to Task Service once built.
+					__( 'Urgent', 'amy-agent' ),
+				),
+			),
+			array(
+				'slug'        => 'amy-analytics',
+				'title'       => __( 'Analytics', 'amy-agent' ),
+				'description' => __( 'Review site usage and performance insights.', 'amy-agent' ),
+				'icon'        => 'chart-bar',
+				'metrics'     => array(
+					// TODO: wire to Analytics once built.
+					__( 'Visitors', 'amy-agent' ),
+					// TODO: wire to Analytics once built.
+					__( 'Page views', 'amy-agent' ),
+				),
+			),
+			array(
+				'slug'        => 'amy-seo-tasks',
+				'title'       => __( 'SEO Tasks', 'amy-agent' ),
+				'description' => __( 'Find and fix SEO issues across your content.', 'amy-agent' ),
+				'icon'        => 'search',
+				'metrics'     => array(
+					// TODO: wire to SEO Tasks once built.
+					__( 'Open issues', 'amy-agent' ),
+					// TODO: wire to SEO Tasks once built.
+					__( 'Fixed', 'amy-agent' ),
+				),
+			),
+			array(
+				'slug'        => 'amy-email-marketing',
+				'title'       => __( 'Email Marketing', 'amy-agent' ),
+				'description' => __( 'One-to-one sends and campaign status powered by Amy.', 'amy-agent' ),
+				'icon'        => 'email',
+				'metrics'     => array(
+					// TODO: wire to Email Marketing once built.
+					__( 'Open rate', 'amy-agent' ),
+					// TODO: wire to Email Marketing once built.
+					__( 'Drafts', 'amy-agent' ),
+				),
+			),
+			array(
+				'slug'        => 'amy-chat',
+				'title'       => __( 'Chat', 'amy-agent' ),
+				'description' => __( 'Talk with Amy the Leader from the dashboard.', 'amy-agent' ),
+				'icon'        => 'format-chat',
+				'metrics'     => array(
+					// TODO: wire to Chat once built.
+					__( 'Active now', 'amy-agent' ),
+					// TODO: wire to Chat once built.
+					__( 'This week', 'amy-agent' ),
+				),
+			),
+			array(
+				// TODO: point to amy-admin-roles once its menu page exists.
+				'slug'        => '',
+				'href'        => '#',
+				'title'       => __( 'Admin Roles & Social', 'amy-agent' ),
+				'description' => __( 'Team permissions and connected social platforms.', 'amy-agent' ),
+				'icon'        => 'groups',
+				'metrics'     => array(
+					// TODO: wire to Admin Roles & Social once built.
+					__( 'Team members', 'amy-agent' ),
+					// TODO: wire to Admin Roles & Social once built.
+					__( 'Platforms', 'amy-agent' ),
+				),
+			),
 			array(
 				'slug'        => Amy_Settings::PAGE_SLUG,
 				'title'       => __( 'Settings', 'amy-agent' ),
 				'description' => __( 'Connect the Python service, shared secret, and AI provider.', 'amy-agent' ),
+				'icon'        => 'admin-generic',
 			),
 			array(
 				'slug'        => self::BRAND_PAGE_SLUG,
 				'title'       => __( 'Brand & Avatar', 'amy-agent' ),
 				'description' => __( 'Manage Amy’s look, name, and avatar.', 'amy-agent' ),
-			),
-			array(
-				'slug'        => 'amy-chat',
-				'title'       => __( 'Chat', 'amy-agent' ),
-				'description' => __( 'Configure chat behavior and conversation settings.', 'amy-agent' ),
-			),
-			array(
-				'slug'        => 'amy-analytics',
-				'title'       => __( 'Analytics', 'amy-agent' ),
-				'description' => __( 'Review usage and performance insights.', 'amy-agent' ),
-			),
-			array(
-				'slug'        => 'amy-seo-tasks',
-				'title'       => __( 'SEO Tasks', 'amy-agent' ),
-				'description' => __( 'Plan and track SEO-related work for Amy.', 'amy-agent' ),
-			),
-			array(
-				'slug'        => 'amy-email-marketing',
-				'title'       => __( 'Email Marketing', 'amy-agent' ),
-				'description' => __( 'Email campaigns and automation powered by Amy.', 'amy-agent' ),
+				'icon'        => 'admin-users',
 			),
 		);
 		?>
 		<div class="wrap amy-agent-overview">
-			<h1><?php echo esc_html__( 'Amy', 'amy-agent' ); ?></h1>
-			<p class="amy-agent-overview__intro">
-				<?php echo esc_html__( 'Your digital employee dashboard. Choose a section to get started.', 'amy-agent' ); ?>
-			</p>
+			<header class="amy-agent-overview__header">
+				<span class="amy-agent-overview__eyebrow"><?php echo esc_html__( 'AMY · DIGITAL EMPLOYEE', 'amy-agent' ); ?></span>
+				<h1 class="amy-agent-overview__title"><?php echo esc_html__( 'Overview', 'amy-agent' ); ?></h1>
+				<p class="amy-agent-overview__intro">
+					<?php echo esc_html__( 'Your command center — status of every Amy tool at a glance.', 'amy-agent' ); ?>
+				</p>
+				<span class="amy-agent-overview__underline" aria-hidden="true"></span>
+				<div class="amy-agent-overview__orbit" aria-hidden="true">
+					<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false">
+						<circle cx="60" cy="60" r="10" fill="currentColor" opacity="0.9"/>
+						<ellipse cx="60" cy="60" rx="48" ry="18" stroke="currentColor" stroke-width="1.5" transform="rotate(0 60 60)"/>
+						<ellipse cx="60" cy="60" rx="48" ry="18" stroke="currentColor" stroke-width="1.5" transform="rotate(60 60 60)"/>
+						<ellipse cx="60" cy="60" rx="48" ry="18" stroke="currentColor" stroke-width="1.5" transform="rotate(120 60 60)"/>
+						<circle cx="108" cy="60" r="3" fill="currentColor"/>
+						<circle cx="36" cy="18.5" r="2.5" fill="currentColor"/>
+						<circle cx="36" cy="101.5" r="2.5" fill="currentColor"/>
+					</svg>
+				</div>
+			</header>
+
+			<div class="amy-agent-overview__stats">
+				<?php foreach ( $top_stats as $stat ) : ?>
+					<div class="amy-agent-overview__stat">
+						<p class="amy-agent-overview__stat-label"><?php echo esc_html( $stat['label'] ); ?></p>
+						<p class="amy-agent-overview__stat-value">
+							—
+							<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $coming_soon ); ?></span>
+						</p>
+					</div>
+				<?php endforeach; ?>
+			</div>
+
 			<div class="amy-agent-overview__grid">
 				<?php foreach ( $cards as $card ) : ?>
-					<a class="amy-agent-overview__card" href="<?php echo esc_url( admin_url( 'admin.php?page=' . $card['slug'] ) ); ?>">
-						<h2 class="amy-agent-overview__card-title"><?php echo esc_html( $card['title'] ); ?></h2>
-						<p class="amy-agent-overview__card-desc"><?php echo esc_html( $card['description'] ); ?></p>
-					</a>
+					<?php
+					$is_hero = ! empty( $card['hero'] );
+					$card_classes = 'amy-agent-overview__card';
+					if ( $is_hero ) {
+						$card_classes .= ' amy-agent-overview__card--hero';
+					}
+
+					if ( ! empty( $card['href'] ) ) {
+						$card_url = $card['href'];
+					} else {
+						$card_url = admin_url( 'admin.php?page=' . $card['slug'] );
+					}
+					?>
+					<article class="<?php echo esc_attr( $card_classes ); ?>">
+						<div class="amy-agent-overview__card-top">
+							<span class="amy-agent-overview__card-icon" aria-hidden="true">
+								<span class="dashicons dashicons-<?php echo esc_attr( $card['icon'] ); ?>"></span>
+							</span>
+							<div class="amy-agent-overview__card-heading">
+								<h2 class="amy-agent-overview__card-title"><?php echo esc_html( $card['title'] ); ?></h2>
+								<p class="amy-agent-overview__card-desc"><?php echo esc_html( $card['description'] ); ?></p>
+							</div>
+						</div>
+
+						<?php if ( ! empty( $card['metrics'] ) ) : ?>
+							<div class="amy-agent-overview__card-metrics">
+								<?php foreach ( $card['metrics'] as $metric_label ) : ?>
+									<div class="amy-agent-overview__card-metric">
+										<p class="amy-agent-overview__card-metric-label"><?php echo esc_html( $metric_label ); ?></p>
+										<p class="amy-agent-overview__card-metric-value">
+											—
+											<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $coming_soon ); ?></span>
+										</p>
+									</div>
+								<?php endforeach; ?>
+							</div>
+						<?php endif; ?>
+
+						<a
+							class="amy-agent-overview__card-link"
+							href="<?php echo '#' === $card_url ? '#' : esc_url( $card_url ); ?>"
+						>
+							<?php echo esc_html__( 'See more →', 'amy-agent' ); ?>
+						</a>
+					</article>
 				<?php endforeach; ?>
 			</div>
 		</div>
