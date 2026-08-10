@@ -5,6 +5,10 @@
 > without re-discovering it from scratch. **Update this file at the end of every work session,
 > before closing.** Keep it in `amy-agent/docs/roadmap-status.md`.
 >
+> **Design principle:** every tool in this roadmap follows
+> `docs/00-extensibility-principles.md` — read it once, alongside whichever
+> individual tool plan you're working from.
+>
 > Last verified against code: 2026-08-10 (amy-agent v0.2.11, live Python service confirmed
 > running on Dokploy — repo `plugin-amy-agent`, path `/amy-agent-service`, branch `main`).
 
@@ -17,8 +21,8 @@
 3. Dashboard Chat
 4. Admin Roles, Permissions & Social Publishing (Telegram, X, LinkedIn, Discord)
 5. Analytics Service
-6. Task Service
-7. SEO Service
+6. Task Service — see `08-task-service-plan.md`
+7. SEO Tasks — see `06-seo-tasks-plan.md`
 8. Email Marketing
 
 ---
@@ -64,7 +68,8 @@ array) — these are **not partially built**, they are literally one hardcoded s
   Leader with conversation memory; specialists/`/` deferred until tools exist).
 - **Analytics** (`amy-analytics`) — priority #5. Nothing built. Plan approved:
   `docs/07-analytics-plan.md` (decisions locked 2026-08-10; no code yet).
-- **SEO Tasks** (`amy-seo-tasks`) — priority #7. Nothing built.
+- **SEO Tasks** (`amy-seo-tasks`) — priority #7. Nothing built. Plan locked:
+  `docs/06-seo-tasks-plan.md`.
 - **Email Marketing** (`amy-email-marketing`) — priority #8 stub page; plan locked:
   `docs/04-email-marketing-plan.md`. Not a newsletter tool — Amy-triggered
   1-to-1 sends via Hostinger Agentic Mail REST + `message.received` webhook.
@@ -79,6 +84,8 @@ array) — these are **not partially built**, they are literally one hardcoded s
   Note: Telegram *Admin Bot* (chat surface) is scoped under Dashboard Chat (#3),
   not under this notifications item. Support Bot + News Channel are also in
   `03-dashboard-chat-plan.md` but deferred relative to the admin surfaces.
+- **Task Service** (priority #6) — no integration anywhere in the codebase. Plan
+  locked: `08-task-service-plan.md`.
 - **Agent Orchestrator** layer — design locked in `03-dashboard-chat-plan.md`;
   not implemented. `/v1/chat` currently handles everything itself. v1 of #3 is
   Amy the Leader only (no specialist delegation until tools exist).
