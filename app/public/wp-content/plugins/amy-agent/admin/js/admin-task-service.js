@@ -25,8 +25,13 @@
 		var $deleteBtn = $('#amy-agent-task-delete');
 		var $statusField = $('#amy-agent-task-status-field');
 		var $modalTitle = $('#amy-agent-task-modal-title');
+		var $extension = $('#amy-agent-task-extension');
+		var $extensionHours = $('#amy-agent-task-extension-hours');
+		var $extensionSubmit = $('#amy-agent-task-extension-submit');
+		var $extensionResult = $('#amy-agent-task-extension-result');
 		var noticeTimer = null;
 		var defaultStatus = 'todo';
+		var currentUserId = parseInt(cfg.currentUserId, 10) || 0;
 
 		assignees.forEach(function (a) {
 			assigneeByKey[a.key] = a;
@@ -55,7 +60,8 @@
 			if (!iso) {
 				return i18n.noDue || 'No due date';
 			}
-			var parts = String(iso).split('-');
+			var datePart = String(iso).slice(0, 10);
+			var parts = datePart.split('-');
 			if (parts.length !== 3) {
 				return iso;
 			}
@@ -79,6 +85,13 @@
 				return iso;
 			}
 			return months[monthIndex] + ' ' + day;
+		}
+
+		function dueInputValue(iso) {
+			if (!iso) {
+				return '';
+			}
+			return String(iso).slice(0, 10);
 		}
 
 		function assigneeKeyFromTask(task) {
@@ -136,6 +149,8 @@
 				createdBy: raw.created_by_wp_user_id,
 				createdAt: raw.created_at,
 				updatedAt: raw.updated_at,
+				acknowledgedAt: raw.acknowledged_at,
+				extensionTotalSeconds: raw.extension_total_seconds || 0,
 			};
 		}
 
@@ -354,10 +369,34 @@
 			$('#amy-agent-task-status').val(presetStatus || 'todo');
 			$statusField.prop('hidden', true);
 			$deleteBtn.prop('hidden', true);
+			$extension.prop('hidden', true);
+			$extensionHours.val('');
+			$extensionResult.prop('hidden', true).text('');
 			$modalTitle.text(i18n.newTask || 'New Task');
 			$submitBtn.text(i18n.create || 'Create Task');
 			clearFormError();
 			defaultStatus = presetStatus || 'todo';
+		}
+
+		function maybeAcknowledge(task) {
+			if (
+				!task ||
+				task.assigneeType !== 'human' ||
+				String(task.assigneeWpUserId) !== String(currentUserId)
+			) {
+				return;
+			}
+			ajax('amy_task_acknowledge', { id: task.id });
+		}
+
+		function showExtensionFor(task) {
+			var isAssignee =
+				task.assigneeType === 'human' &&
+				String(task.assigneeWpUserId) === String(currentUserId);
+			var canExtend = isAssignee && task.status !== 'done';
+			$extension.prop('hidden', !canExtend);
+			$extensionHours.val('');
+			$extensionResult.prop('hidden', true).text('');
 		}
 
 		function openCreateModal(presetStatus) {
@@ -372,15 +411,17 @@
 			$('#amy-agent-task-title').val(task.title);
 			$('#amy-agent-task-assignee').val(task.assigneeKey);
 			$('#amy-agent-task-description').val(task.description || '');
-			$('#amy-agent-task-due').val(task.dueDate || '');
+			$('#amy-agent-task-due').val(dueInputValue(task.dueDate));
 			$form.find('input[name="priority"][value="' + (task.priority || 'normal') + '"]').prop('checked', true);
 			$('#amy-agent-task-status').val(task.status);
 			$statusField.prop('hidden', false);
 			$deleteBtn.prop('hidden', false);
+			showExtensionFor(task);
 			$modalTitle.text(i18n.editTask || 'Edit Task');
 			$submitBtn.text(i18n.save || 'Save changes');
 			$modal.prop('hidden', false);
 			$('#amy-agent-task-title').trigger('focus');
+			maybeAcknowledge(task);
 		}
 
 		function closeModal() {
@@ -396,6 +437,22 @@
 			}
 			return null;
 		}
+
+		window.AmyAgentTaskService = {
+			openTaskById: function (id) {
+				var task = findTask(id);
+				if (task) {
+					openEditModal(task);
+					return;
+				}
+				loadTasks().done(function () {
+					var found = findTask(id);
+					if (found) {
+						openEditModal(found);
+					}
+				});
+			},
+		};
 
 		function ajax(action, data) {
 			var payload = $.extend(
@@ -557,6 +614,49 @@
 				})
 				.always(function () {
 					$deleteBtn.prop('disabled', false);
+				});
+		});
+
+		$extensionSubmit.on('click', function (event) {
+			event.preventDefault();
+			var id = String($('#amy-agent-task-id').val() || '');
+			var hours = parseFloat($extensionHours.val(), 10);
+			$extensionResult.prop('hidden', true).text('');
+			if (!id) {
+				return;
+			}
+			if (!hours || hours <= 0) {
+				$extensionResult
+					.text(i18n.extensionInvalid || 'Enter a positive number of hours.')
+					.prop('hidden', false);
+				return;
+			}
+			$extensionSubmit.prop('disabled', true);
+			ajax('amy_task_extension_request', { id: id, hours: hours })
+				.done(function (response) {
+					if (!response || !response.success || !response.data) {
+						$extensionResult
+							.text(extractError(response))
+							.prop('hidden', false);
+						return;
+					}
+					var outcome = response.data.outcome || '';
+					var msg =
+						outcome === 'auto_approved'
+							? i18n.extensionAuto || 'Extension granted automatically. Due date updated.'
+							: i18n.extensionPending ||
+							  'Extension request sent — awaiting creator approval.';
+					$extensionResult.text(msg).prop('hidden', false);
+					loadTasks();
+					if (window.AmyAgentNotifications && window.AmyAgentNotifications.reload) {
+						window.AmyAgentNotifications.reload();
+					}
+				})
+				.fail(function (xhr) {
+					$extensionResult.text(extractError(null, xhr)).prop('hidden', false);
+				})
+				.always(function () {
+					$extensionSubmit.prop('disabled', false);
 				});
 		});
 

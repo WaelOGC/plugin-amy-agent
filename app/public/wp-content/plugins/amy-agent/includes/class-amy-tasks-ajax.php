@@ -35,6 +35,12 @@ class Amy_Tasks_Ajax {
 		add_action( 'wp_ajax_amy_task_update', array( $this, 'ajax_update' ) );
 		add_action( 'wp_ajax_amy_task_delete', array( $this, 'ajax_delete' ) );
 		add_action( 'wp_ajax_amy_task_stats', array( $this, 'ajax_stats' ) );
+		add_action( 'wp_ajax_amy_notifications_list', array( $this, 'ajax_notifications_list' ) );
+		add_action( 'wp_ajax_amy_notification_read', array( $this, 'ajax_notification_read' ) );
+		add_action( 'wp_ajax_amy_task_acknowledge', array( $this, 'ajax_acknowledge' ) );
+		add_action( 'wp_ajax_amy_task_extension_request', array( $this, 'ajax_extension_request' ) );
+		add_action( 'wp_ajax_amy_extension_approve', array( $this, 'ajax_extension_approve' ) );
+		add_action( 'wp_ajax_amy_extension_deny', array( $this, 'ajax_extension_deny' ) );
 	}
 
 	/**
@@ -289,6 +295,144 @@ class Amy_Tasks_Ajax {
 		$this->guard();
 
 		$result = $this->api_client->get_task_stats();
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
+	}
+
+	/**
+	 * List notifications for the current user.
+	 */
+	public function ajax_notifications_list() {
+		$this->guard();
+
+		$user_id = get_current_user_id();
+		$unread  = ! isset( $_REQUEST['unread_only'] ) || '0' !== (string) wp_unslash( $_REQUEST['unread_only'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+		$result = $this->api_client->list_notifications( $user_id, $unread );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array( 'notifications' => array() ) );
+	}
+
+	/**
+	 * Mark a notification as read.
+	 */
+	public function ajax_notification_read() {
+		$this->guard();
+
+		$id = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		if ( '' === $id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Notification ID is required.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$result = $this->api_client->mark_notification_read( $id );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
+	}
+
+	/**
+	 * Acknowledge a task (urgent ack window).
+	 */
+	public function ajax_acknowledge() {
+		$this->guard();
+
+		$id = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		if ( '' === $id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Task ID is required.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$result = $this->api_client->acknowledge_task( $id, get_current_user_id() );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
+	}
+
+	/**
+	 * Request a due-date extension.
+	 */
+	public function ajax_extension_request() {
+		$this->guard();
+
+		$id = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		$hours = isset( $_POST['hours'] ) ? (float) wp_unslash( $_POST['hours'] ) : 0;
+		if ( '' === $id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Task ID is required.', 'amy-agent' ) ),
+				400
+			);
+		}
+		if ( $hours <= 0 ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Please enter a positive number of hours.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$result = $this->api_client->request_extension(
+			$id,
+			get_current_user_id(),
+			$hours * HOUR_IN_SECONDS
+		);
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
+	}
+
+	/**
+	 * Approve a pending extension request.
+	 */
+	public function ajax_extension_approve() {
+		$this->guard();
+
+		$id = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		if ( '' === $id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Extension request ID is required.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$result = $this->api_client->approve_extension( $id, get_current_user_id() );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
+	}
+
+	/**
+	 * Deny a pending extension request.
+	 */
+	public function ajax_extension_deny() {
+		$this->guard();
+
+		$id = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		if ( '' === $id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Extension request ID is required.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$result = $this->api_client->deny_extension( $id, get_current_user_id() );
 		if ( ! $result['ok'] ) {
 			$this->send_api_error( $result );
 		}

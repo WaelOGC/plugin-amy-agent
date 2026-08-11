@@ -11,16 +11,41 @@ from typing import Any, Literal
 AssigneeType = Literal["amy", "human"]
 Priority = Literal["normal", "urgent"]
 TaskStatus = Literal["todo", "in_progress", "waiting_extension", "done"]
+EscalationStage = Literal[
+    "none",
+    "midpoint_sent",
+    "final_warning_sent",
+    "expired",
+    "reassigned",
+    "creator_notified_no_one_available",
+]
 
 VALID_ASSIGNEE_TYPES = frozenset({"amy", "human"})
 VALID_PRIORITIES = frozenset({"normal", "urgent"})
 VALID_STATUSES = frozenset({"todo", "in_progress", "waiting_extension", "done"})
+VALID_ESCALATION_STAGES = frozenset(
+    {
+        "none",
+        "midpoint_sent",
+        "final_warning_sent",
+        "expired",
+        "reassigned",
+        "creator_notified_no_one_available",
+    }
+)
 
 _SERVICE_ROOT = Path(__file__).resolve().parents[2]
 _DATA_DIR = _SERVICE_ROOT / "data"
 _DB_PATH = _DATA_DIR / "tasks.db"
 
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+_TASK_COLUMN_DEFAULTS: dict[str, str] = {
+    "escalation_stage": "TEXT NOT NULL DEFAULT 'none'",
+    "escalation_stage_updated_at": "REAL",
+    "acknowledged_at": "REAL",
+    "extension_total_seconds": "REAL NOT NULL DEFAULT 0",
+}
 
 
 def _connect() -> sqlite3.Connection:
@@ -39,14 +64,39 @@ def _connect() -> sqlite3.Connection:
             status TEXT NOT NULL,
             due_date TEXT,
             created_at REAL NOT NULL,
-            updated_at REAL NOT NULL
+            updated_at REAL NOT NULL,
+            escalation_stage TEXT NOT NULL DEFAULT 'none',
+            escalation_stage_updated_at REAL,
+            acknowledged_at REAL,
+            extension_total_seconds REAL NOT NULL DEFAULT 0
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS dashboard_users (
+            wp_user_id INTEGER PRIMARY KEY,
+            display_name TEXT NOT NULL DEFAULT '',
+            synced_at REAL NOT NULL
+        )
+        """
+    )
+    _migrate_tasks_columns(conn)
     return conn
 
 
+def _migrate_tasks_columns(conn: sqlite3.Connection) -> None:
+    """Add Task-2 columns safely against an existing Task-1 tasks.db."""
+    existing = {
+        row[1] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()
+    }
+    for name, decl in _TASK_COLUMN_DEFAULTS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE tasks ADD COLUMN {name} {decl}")
+
+
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    keys = set(row.keys())
     return {
         "id": row["id"],
         "title": row["title"],
@@ -59,6 +109,22 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "due_date": row["due_date"],
         "created_at": float(row["created_at"]),
         "updated_at": float(row["updated_at"]),
+        "escalation_stage": row["escalation_stage"] if "escalation_stage" in keys else "none",
+        "escalation_stage_updated_at": (
+            float(row["escalation_stage_updated_at"])
+            if "escalation_stage_updated_at" in keys and row["escalation_stage_updated_at"] is not None
+            else None
+        ),
+        "acknowledged_at": (
+            float(row["acknowledged_at"])
+            if "acknowledged_at" in keys and row["acknowledged_at"] is not None
+            else None
+        ),
+        "extension_total_seconds": float(
+            row["extension_total_seconds"]
+            if "extension_total_seconds" in keys and row["extension_total_seconds"] is not None
+            else 0
+        ),
     }
 
 
@@ -98,8 +164,10 @@ def create_task(
                 INSERT INTO tasks (
                     id, title, description, assignee_type, assignee_wp_user_id,
                     created_by_wp_user_id, priority, status, due_date,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    created_at, updated_at,
+                    escalation_stage, escalation_stage_updated_at,
+                    acknowledged_at, extension_total_seconds
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'none', NULL, NULL, 0)
                 """,
                 (
                     task_id,
@@ -136,6 +204,7 @@ def list_tasks(
     status: TaskStatus | None = None,
     priority: Priority | None = None,
     assignee_wp_user_id: int | None = None,
+    exclude_done: bool = False,
 ) -> list[dict[str, Any]]:
     """Return tasks matching optional filters, newest first."""
     clauses: list[str] = []
@@ -146,6 +215,8 @@ def list_tasks(
             raise ValueError("invalid status")
         clauses.append("status = ?")
         params.append(status)
+    if exclude_done:
+        clauses.append("status != 'done'")
     if priority is not None:
         if priority not in VALID_PRIORITIES:
             raise ValueError("invalid priority")
@@ -178,6 +249,10 @@ def update_task(task_id: str, fields: dict[str, Any]) -> dict[str, Any] | None:
         "priority",
         "status",
         "due_date",
+        "escalation_stage",
+        "escalation_stage_updated_at",
+        "acknowledged_at",
+        "extension_total_seconds",
     }
     updates = {k: v for k, v in fields.items() if k in allowed}
     if not updates:
@@ -195,6 +270,11 @@ def update_task(task_id: str, fields: dict[str, Any]) -> dict[str, Any] | None:
         raise ValueError("invalid priority")
     if "status" in updates and updates["status"] not in VALID_STATUSES:
         raise ValueError("invalid status")
+    if (
+        "escalation_stage" in updates
+        and updates["escalation_stage"] not in VALID_ESCALATION_STAGES
+    ):
+        raise ValueError("invalid escalation_stage")
 
     existing = get_task(task_id)
     if existing is None:
@@ -237,6 +317,57 @@ def delete_task(task_id: str) -> bool:
         with conn:
             cur = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
             return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def acknowledge_task(task_id: str) -> dict[str, Any] | None:
+    """Set acknowledged_at if not already set. Returns the task row."""
+    existing = get_task(task_id)
+    if existing is None:
+        return None
+    if existing.get("acknowledged_at") is not None:
+        return existing
+    return update_task(task_id, {"acknowledged_at": time.time()})
+
+
+def sync_dashboard_users(users: list[dict[str, Any]]) -> int:
+    """Replace the cached WP dashboard-user pool used for reassignment.
+
+    WordPress pushes manage_options users here because the Python service
+    has no direct WP user directory.
+    """
+    now = time.time()
+    conn = _connect()
+    try:
+        with conn:
+            conn.execute("DELETE FROM dashboard_users")
+            for user in users:
+                uid = int(user.get("wp_user_id") or 0)
+                if uid < 1:
+                    continue
+                conn.execute(
+                    """
+                    INSERT INTO dashboard_users (wp_user_id, display_name, synced_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (uid, str(user.get("display_name") or ""), now),
+                )
+        return conn.execute("SELECT COUNT(*) FROM dashboard_users").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def list_dashboard_user_ids(*, exclude: int | None = None) -> list[int]:
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            "SELECT wp_user_id FROM dashboard_users ORDER BY wp_user_id ASC"
+        ).fetchall()
+        ids = [int(r[0]) for r in rows]
+        if exclude is not None:
+            ids = [i for i in ids if i != int(exclude)]
+        return ids
     finally:
         conn.close()
 

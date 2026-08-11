@@ -2,16 +2,38 @@
 
 > Priority #6 in `roadmap-status.md`.
 
-## Status: Partial (Task 1 of 2) — core data layer + CRUD live, 2026-08-10
+## Status: Complete (Task 2 of 2), 2026-08-11
 
-**Done (Task 1):** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats
-endpoints, WordPress API client + admin-ajax proxies, real assignee list (WP users
-with `manage_options` + Amy), Task Service board/list wired to real create / edit
-(status dropdown) / delete, and My Profile **+ New Task** → Task Service modal.
+**Task 1:** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats,
+WordPress API client + admin-ajax proxies, real assignees, board/list CRUD,
+My Profile **+ New Task** entry point, My Profile per-user stat cards.
 
-**Still pending (Task 2 — separate build):** Amy's active reminder / deadline
-escalation / extension-request / auto-reassignment behavior described in §3–§5
-below. Do not treat this surface as fully complete until that lands.
+**Task 2:** Amy's active follow-up — midpoint / final reminders, deadline expiry
+notifications for creators, urgent check-ins + simplified reassignment,
+extension requests (auto-cap for normal / always-approve for urgent), dashboard
+notification bell on Task Service + My Profile, 5-minute background scheduler.
+
+## Implementation notes (scoping vs original plan)
+
+Built for Task 2 with these intentional simplifications (so future work knows
+what still differs from §3–§6 above):
+
+1. **Notifications are dashboard-only.** Telegram (and other channels in §6)
+   are not in the codebase yet (priority #4 / Admin Roles & Social Publishing).
+   No Telegram hooks or placeholders were added.
+2. **No department/section system yet.** Urgent auto-reassignment offers the
+   task to any other synced dashboard user (`manage_options` pool pushed from
+   WordPress), not department-scoped. Code comments mark where
+   `docs/05-admin-roles-and-social-publishing-plan.md` should narrow this.
+3. **No autonomous Amy task execution.** Where §3 / §5 say Amy would complete
+   the task herself, the implementation notifies the creator (and for urgent
+   exhaustion, all dashboard admins as an owner stand-in) with
+   `no_one_available` / expired actions — never fakes auto-completion. Code
+   comments mark the wire-up point for a future execution engine.
+
+Default timings live in `amy-agent-service/app/config_task_rules.py`
+(midpoint 50%, final warning 4h, urgent check-in / ack window 60m, extension
+cap 24h).
 
 ## 1. What this is
 
@@ -107,6 +129,7 @@ Reminders, warnings, and escalation messages reach the assignee through **both**
 - Exact default timing intervals for standard-task reminders (midpoint / final
   warning) and urgent-task check-in frequency — to be tuned based on real usage,
   similar to token-limit tuning in `05-admin-roles-and-social-publishing-plan.md`.
+  *(Task 2 shipped defaults in `config_task_rules.py`; still tunable.)*
 - Exact UI layout of the Task Surface (board view vs. list view vs. both).
 - Whether task history/analytics (e.g. completion rates per employee) belongs here or
   under Analytics (`07-analytics-plan.md`) — needs a decision when both are closer to

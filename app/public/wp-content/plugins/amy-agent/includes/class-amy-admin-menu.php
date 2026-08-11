@@ -190,10 +190,13 @@ class Amy_Admin_Menu {
 				AMY_AGENT_VERSION
 			);
 
+			$this->enqueue_notifications_assets();
+			$this->sync_dashboard_users_to_service();
+
 			wp_enqueue_script(
 				'amy-agent-admin-my-profile',
 				AMY_AGENT_URL . 'admin/js/admin-my-profile.js',
-				array( 'jquery' ),
+				array( 'jquery', 'amy-agent-admin-notifications' ),
 				AMY_AGENT_VERSION,
 				true
 			);
@@ -235,10 +238,13 @@ class Amy_Admin_Menu {
 				AMY_AGENT_VERSION
 			);
 
+			$this->enqueue_notifications_assets();
+			$this->sync_dashboard_users_to_service();
+
 			wp_enqueue_script(
 				'amy-agent-admin-task-service',
 				AMY_AGENT_URL . 'admin/js/admin-task-service.js',
-				array( 'jquery' ),
+				array( 'jquery', 'amy-agent-admin-notifications' ),
 				AMY_AGENT_VERSION,
 				true
 			);
@@ -254,26 +260,31 @@ class Amy_Admin_Menu {
 					'amyAvatarUrl'  => $this->settings->get_avatar_url(),
 					'openNewTask'   => isset( $_GET['amy_new_task'] ) && '1' === (string) wp_unslash( $_GET['amy_new_task'] ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only UI flag
 					'i18n'          => array(
-						'noResults'      => __( 'No tasks match your filters.', 'amy-agent' ),
-						'loadError'      => __( 'Could not load tasks. Check the Amy Agent service connection.', 'amy-agent' ),
-						'createSuccess'  => __( 'Task created.', 'amy-agent' ),
-						'updateSuccess'  => __( 'Task updated.', 'amy-agent' ),
-						'deleteSuccess'  => __( 'Task deleted.', 'amy-agent' ),
-						'deleteConfirm'  => __( 'Delete this task? This cannot be undone.', 'amy-agent' ),
-						'saving'         => __( 'Saving…', 'amy-agent' ),
-						'create'         => __( 'Create Task', 'amy-agent' ),
-						'save'           => __( 'Save changes', 'amy-agent' ),
-						'newTask'        => __( 'New Task', 'amy-agent' ),
-						'editTask'       => __( 'Edit Task', 'amy-agent' ),
-						'error'          => __( 'Something went wrong. Please try again.', 'amy-agent' ),
-						'titleRequired'  => __( 'Title is required.', 'amy-agent' ),
+						'noResults'        => __( 'No tasks match your filters.', 'amy-agent' ),
+						'loadError'        => __( 'Could not load tasks. Check the Amy Agent service connection.', 'amy-agent' ),
+						'createSuccess'    => __( 'Task created.', 'amy-agent' ),
+						'updateSuccess'    => __( 'Task updated.', 'amy-agent' ),
+						'deleteSuccess'    => __( 'Task deleted.', 'amy-agent' ),
+						'deleteConfirm'    => __( 'Delete this task? This cannot be undone.', 'amy-agent' ),
+						'saving'           => __( 'Saving…', 'amy-agent' ),
+						'create'           => __( 'Create Task', 'amy-agent' ),
+						'save'             => __( 'Save changes', 'amy-agent' ),
+						'newTask'          => __( 'New Task', 'amy-agent' ),
+						'editTask'         => __( 'Edit Task', 'amy-agent' ),
+						'error'            => __( 'Something went wrong. Please try again.', 'amy-agent' ),
+						'titleRequired'    => __( 'Title is required.', 'amy-agent' ),
 						'assigneeRequired' => __( 'Please select an assignee.', 'amy-agent' ),
-						'statusTodo'     => __( 'To Do', 'amy-agent' ),
+						'statusTodo'       => __( 'To Do', 'amy-agent' ),
 						'statusInProgress' => __( 'In Progress', 'amy-agent' ),
-						'statusWaiting'  => __( 'Waiting on Extension', 'amy-agent' ),
-						'statusDone'     => __( 'Done', 'amy-agent' ),
-						'amy'            => __( 'Amy', 'amy-agent' ),
-						'noDue'          => __( 'No due date', 'amy-agent' ),
+						'statusWaiting'    => __( 'Waiting on Extension', 'amy-agent' ),
+						'statusDone'       => __( 'Done', 'amy-agent' ),
+						'amy'              => __( 'Amy', 'amy-agent' ),
+						'noDue'            => __( 'No due date', 'amy-agent' ),
+						'extensionHours'   => __( 'Hours to request', 'amy-agent' ),
+						'extensionSubmit'  => __( 'Request Extension', 'amy-agent' ),
+						'extensionAuto'    => __( 'Extension granted automatically. Due date updated.', 'amy-agent' ),
+						'extensionPending' => __( 'Extension request sent — awaiting creator approval.', 'amy-agent' ),
+						'extensionInvalid' => __( 'Enter a positive number of hours.', 'amy-agent' ),
 					),
 				)
 			);
@@ -575,6 +586,7 @@ class Amy_Admin_Menu {
 					<span class="amy-agent-task-service__underline" aria-hidden="true"></span>
 				</div>
 				<div class="amy-agent-task-service__header-actions">
+					<?php $this->render_notifications_panel(); ?>
 					<button
 						type="button"
 						class="amy-agent-task-service__btn amy-agent-task-service__btn--accent"
@@ -774,6 +786,17 @@ class Amy_Admin_Menu {
 							<textarea id="amy-agent-task-description" name="description" rows="4" placeholder="<?php echo esc_attr__( 'Add context, links, or acceptance criteria…', 'amy-agent' ); ?>"></textarea>
 						</label>
 
+						<div class="amy-agent-task-service__extension" id="amy-agent-task-extension" hidden>
+							<label class="amy-agent-task-service__field" for="amy-agent-task-extension-hours">
+								<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Request extension (hours)', 'amy-agent' ); ?></span>
+								<input type="number" id="amy-agent-task-extension-hours" min="0.5" step="0.5" placeholder="2" />
+							</label>
+							<button type="button" class="amy-agent-task-service__btn amy-agent-task-service__btn--ghost" id="amy-agent-task-extension-submit">
+								<?php echo esc_html__( 'Request Extension', 'amy-agent' ); ?>
+							</button>
+							<p class="amy-agent-task-service__extension-result" id="amy-agent-task-extension-result" hidden role="status"></p>
+						</div>
+
 						<p class="amy-agent-task-service__form-error" id="amy-agent-task-form-error" hidden role="alert"></p>
 
 						<div class="amy-agent-task-service__modal-actions">
@@ -865,6 +888,95 @@ class Amy_Admin_Menu {
 			return $first . strtoupper( substr( $parts[ count( $parts ) - 1 ], 0, 1 ) );
 		}
 		return $first;
+	}
+
+	/**
+	 * Shared notification bell assets (Task Service + My Profile).
+	 */
+	private function enqueue_notifications_assets() {
+		wp_enqueue_style(
+			'amy-agent-admin-notifications',
+			AMY_AGENT_URL . 'admin/css/admin-notifications.css',
+			array( 'dashicons' ),
+			AMY_AGENT_VERSION
+		);
+
+		wp_enqueue_script(
+			'amy-agent-admin-notifications',
+			AMY_AGENT_URL . 'admin/js/admin-notifications.js',
+			array( 'jquery' ),
+			AMY_AGENT_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'amy-agent-admin-notifications',
+			'amyAgentNotifications',
+			array(
+				'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+				'nonce'          => wp_create_nonce( Amy_Tasks_Ajax::NONCE_ACTION ),
+				'currentUserId'  => get_current_user_id(),
+				'taskServiceUrl' => admin_url( 'admin.php?page=' . self::TASK_SERVICE_PAGE_SLUG ),
+				'i18n'           => array(
+					'approve'     => __( 'Approve', 'amy-agent' ),
+					'deny'        => __( 'Deny', 'amy-agent' ),
+					'openTask'    => __( 'Open task', 'amy-agent' ),
+					'acknowledge' => __( 'Acknowledge', 'amy-agent' ),
+					'dismiss'     => __( 'Dismiss', 'amy-agent' ),
+					'empty'       => __( 'No unread notifications.', 'amy-agent' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Push manage_options users to the Python service for urgent reassignment.
+	 */
+	private function sync_dashboard_users_to_service() {
+		if ( ! function_exists( 'amy_agent' ) ) {
+			return;
+		}
+
+		$users = get_users(
+			array(
+				'capability' => 'manage_options',
+				'orderby'    => 'ID',
+				'order'      => 'ASC',
+			)
+		);
+		$payload = array();
+		foreach ( $users as $user ) {
+			$payload[] = array(
+				'wp_user_id'   => (int) $user->ID,
+				'display_name' => $user->display_name ? $user->display_name : $user->user_login,
+			);
+		}
+		amy_agent()->api_client->sync_dashboard_users( $payload );
+	}
+
+	/**
+	 * Shared notification bell markup for Task Service + My Profile headers.
+	 */
+	private function render_notifications_panel() {
+		?>
+		<div class="amy-agent-notifications" id="amy-agent-notifications">
+			<button
+				type="button"
+				class="amy-agent-notifications__toggle"
+				aria-expanded="false"
+				aria-controls="amy-agent-notifications-panel"
+				aria-label="<?php echo esc_attr__( 'Notifications', 'amy-agent' ); ?>"
+			>
+				<span class="dashicons dashicons-bell" aria-hidden="true"></span>
+				<span class="amy-agent-notifications__badge" hidden>0</span>
+			</button>
+			<div class="amy-agent-notifications__panel" id="amy-agent-notifications-panel" hidden>
+				<p class="amy-agent-notifications__title"><?php echo esc_html__( 'Notifications', 'amy-agent' ); ?></p>
+				<ul class="amy-agent-notifications__list"></ul>
+				<p class="amy-agent-notifications__empty"><?php echo esc_html__( 'No unread notifications.', 'amy-agent' ); ?></p>
+			</div>
+		</div>
+		<?php
 	}
 
 	/**
@@ -1005,6 +1117,7 @@ class Amy_Admin_Menu {
 					<span class="amy-agent-my-profile__underline" aria-hidden="true"></span>
 				</div>
 				<div class="amy-agent-my-profile__header-actions">
+					<?php $this->render_notifications_panel(); ?>
 					<a
 						class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent"
 						href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::TASK_SERVICE_PAGE_SLUG . '&amy_new_task=1' ) ); ?>"

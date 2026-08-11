@@ -15,6 +15,10 @@ from app.schemas.tasks import (
     TaskStatsResponse,
     TaskUpdateRequest,
 )
+from app.schemas.notifications import (
+    DashboardUserSyncRequest,
+    DashboardUserSyncResponse,
+)
 
 router = APIRouter(tags=["tasks"])
 
@@ -37,6 +41,18 @@ def _to_response(row: dict) -> TaskResponse:
 )
 async def task_stats() -> TaskStatsResponse:
     return TaskStatsResponse(**tasks_db.get_stats())
+
+
+@router.post(
+    "/v1/tasks/sync-dashboard-users",
+    response_model=DashboardUserSyncResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def sync_dashboard_users(
+    body: DashboardUserSyncRequest,
+) -> DashboardUserSyncResponse:
+    count = tasks_db.sync_dashboard_users([u.model_dump() for u in body.users])
+    return DashboardUserSyncResponse(ok=True, count=count)
 
 
 @router.get(

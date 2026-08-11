@@ -44,6 +44,10 @@ class TaskResponse(BaseModel):
     due_date: str | None = None
     created_at: float
     updated_at: float
+    escalation_stage: str = "none"
+    escalation_stage_updated_at: float | None = None
+    acknowledged_at: float | None = None
+    extension_total_seconds: float = 0
 
 
 class TaskListResponse(BaseModel):

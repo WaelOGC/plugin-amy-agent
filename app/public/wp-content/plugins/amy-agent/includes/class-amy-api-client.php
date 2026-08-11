@@ -238,6 +238,105 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST /v1/tasks/sync-dashboard-users — cache manage_options user pool for reassignment.
+	 *
+	 * @param array<int, array{wp_user_id: int, display_name: string}> $users Users.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function sync_dashboard_users( array $users ) {
+		return $this->request( 'POST', '/v1/tasks/sync-dashboard-users', array( 'users' => $users ) );
+	}
+
+	/**
+	 * GET /v1/notifications.
+	 *
+	 * @param int  $wp_user_id  Recipient WP user ID.
+	 * @param bool $unread_only Only unread when true.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_notifications( $wp_user_id, $unread_only = true ) {
+		$query = array(
+			'wp_user_id'   => (int) $wp_user_id,
+			'unread_only'  => $unread_only ? 'true' : 'false',
+		);
+		return $this->request( 'GET', '/v1/notifications?' . http_build_query( $query ) );
+	}
+
+	/**
+	 * POST /v1/notifications/{id}/read.
+	 *
+	 * @param string $id Notification UUID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function mark_notification_read( $id ) {
+		return $this->request( 'POST', '/v1/notifications/' . rawurlencode( (string) $id ) . '/read', array() );
+	}
+
+	/**
+	 * POST /v1/tasks/{id}/acknowledge.
+	 *
+	 * @param string $id      Task UUID.
+	 * @param int    $user_id Acting WP user ID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function acknowledge_task( $id, $user_id ) {
+		return $this->request(
+			'POST',
+			'/v1/tasks/' . rawurlencode( (string) $id ) . '/acknowledge',
+			array( 'requester_wp_user_id' => (int) $user_id )
+		);
+	}
+
+	/**
+	 * POST /v1/tasks/{id}/extension-request.
+	 *
+	 * @param string $id                Task UUID.
+	 * @param int    $user_id           Requester WP user ID.
+	 * @param float  $requested_seconds Seconds to extend.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function request_extension( $id, $user_id, $requested_seconds ) {
+		return $this->request(
+			'POST',
+			'/v1/tasks/' . rawurlencode( (string) $id ) . '/extension-request',
+			array(
+				'requester_wp_user_id' => (int) $user_id,
+				'requested_seconds'    => (float) $requested_seconds,
+			)
+		);
+	}
+
+	/**
+	 * POST /v1/extension-requests/{id}/approve.
+	 *
+	 * @param string $id      Extension request UUID.
+	 * @param int    $user_id Actor (must be task creator).
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function approve_extension( $id, $user_id ) {
+		return $this->request(
+			'POST',
+			'/v1/extension-requests/' . rawurlencode( (string) $id ) . '/approve',
+			array( 'requester_wp_user_id' => (int) $user_id )
+		);
+	}
+
+	/**
+	 * POST /v1/extension-requests/{id}/deny.
+	 *
+	 * @param string $id      Extension request UUID.
+	 * @param int    $user_id Actor (must be task creator).
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function deny_extension( $id, $user_id ) {
+		return $this->request(
+			'POST',
+			'/v1/extension-requests/' . rawurlencode( (string) $id ) . '/deny',
+			array( 'requester_wp_user_id' => (int) $user_id )
+		);
+	}
+
+	/**
 	 * Perform an authenticated request to the Python service.
 	 *
 	 * @param string     $method  HTTP method.
