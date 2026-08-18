@@ -277,6 +277,55 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST /v1/seo-tasks/batches — start a batch run.
+	 *
+	 * @param array<string, mixed> $payload SeoBatchStartRequest body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function start_seo_batch( array $payload ) {
+		return $this->request( 'POST', '/v1/seo-tasks/batches', $payload, 120 );
+	}
+
+	/**
+	 * POST /v1/seo-tasks/batches/{id}/continue.
+	 *
+	 * @param string $id Batch run UUID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function continue_seo_batch( $id ) {
+		return $this->request(
+			'POST',
+			'/v1/seo-tasks/batches/' . rawurlencode( (string) $id ) . '/continue',
+			array(),
+			120
+		);
+	}
+
+	/**
+	 * POST /v1/seo-tasks/batches/{id}/stop.
+	 *
+	 * @param string $id Batch run UUID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function stop_seo_batch( $id ) {
+		return $this->request(
+			'POST',
+			'/v1/seo-tasks/batches/' . rawurlencode( (string) $id ) . '/stop',
+			array()
+		);
+	}
+
+	/**
+	 * GET /v1/seo-tasks/batches/{id}.
+	 *
+	 * @param string $id Batch run UUID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function get_seo_batch( $id ) {
+		return $this->request( 'GET', '/v1/seo-tasks/batches/' . rawurlencode( (string) $id ) );
+	}
+
+	/**
 	 * GET /v1/tasks — optional filters: status, priority, assignee_wp_user_id.
 	 *
 	 * @param array<string, mixed> $filters Query filters.

@@ -408,19 +408,21 @@ class Amy_Admin_Menu {
 					'metaKeys' => Amy_Seo_Meta::writable_field_map(),
 					'i18n'     => array(
 						'error'              => __( 'Something went wrong. Please try again.', 'amy-agent' ),
-						'searchError'        => __( 'Could not search posts and pages.', 'amy-agent' ),
-						'noSearchResults'    => __( 'No published posts or pages matched.', 'amy-agent' ),
 						'untitled'           => __( '(untitled)', 'amy-agent' ),
 						'post'               => __( 'Post', 'amy-agent' ),
 						'page'               => __( 'Page', 'amy-agent' ),
-						'checkSeo'           => __( 'Check SEO', 'amy-agent' ),
+						'category'           => __( 'Category', 'amy-agent' ),
+						'tag'                => __( 'Tag', 'amy-agent' ),
+						'media'              => __( 'Media', 'amy-agent' ),
 						'checking'           => __( 'Checking…', 'amy-agent' ),
 						'checkError'         => __( 'Could not run the SEO check. Check the Amy Agent service connection.', 'amy-agent' ),
 						'loadPostError'      => __( 'Could not load that post from WordPress.', 'amy-agent' ),
-						'notPublished'       => __( 'Please choose a published post or page.', 'amy-agent' ),
+						'loadListError'      => __( 'Could not load that content list from WordPress.', 'amy-agent' ),
 						'verdictRed'         => __( 'Needs work', 'amy-agent' ),
 						'verdictOrange'      => __( 'Improvements', 'amy-agent' ),
 						'verdictGreen'       => __( 'Good', 'amy-agent' ),
+						'notChecked'         => __( 'Not checked yet', 'amy-agent' ),
+						'itemError'          => __( 'Error', 'amy-agent' ),
 						'statusPending'      => __( 'Pending approval', 'amy-agent' ),
 						'statusApproved'     => __( 'Approved', 'amy-agent' ),
 						'statusRejected'     => __( 'Rejected', 'amy-agent' ),
@@ -438,6 +440,11 @@ class Amy_Admin_Menu {
 						'fieldMetaDesc'      => __( 'Meta description', 'amy-agent' ),
 						'fieldFeatured'      => __( 'Featured image', 'amy-agent' ),
 						'fieldAlt'           => __( 'Featured image alt text', 'amy-agent' ),
+						'fieldMediaAlt'      => __( 'Alt text', 'amy-agent' ),
+						'fieldMediaTitle'    => __( 'Title', 'amy-agent' ),
+						'fieldCaption'       => __( 'Caption', 'amy-agent' ),
+						'fieldDescription'   => __( 'Description', 'amy-agent' ),
+						'fieldTermDesc'      => __( 'Term description', 'amy-agent' ),
 						'fieldOg'            => __( 'Facebook / Open Graph', 'amy-agent' ),
 						'fieldTwitter'       => __( 'X / Twitter', 'amy-agent' ),
 						'fieldCategories'    => __( 'Categories', 'amy-agent' ),
@@ -454,10 +461,33 @@ class Amy_Admin_Menu {
 						'approveSuccess'     => __( 'Approved. Fields were written to WordPress.', 'amy-agent' ),
 						'approveError'       => __( 'WordPress was updated, but recording approval failed.', 'amy-agent' ),
 						'writeError'         => __( 'Could not write fields through the WordPress REST API.', 'amy-agent' ),
+						'termWriteError'     => __( 'Could not write Yoast fields for this category or tag.', 'amy-agent' ),
 						'rejectSuccess'      => __( 'Check rejected. Nothing was written to WordPress.', 'amy-agent' ),
 						'rejectError'        => __( 'Could not reject this check.', 'amy-agent' ),
 						'historyError'       => __( 'Could not load previous checks. Check the Amy Agent service connection.', 'amy-agent' ),
 						'loadCheckError'     => __( 'Could not load that check.', 'amy-agent' ),
+						'emptyState'         => __( 'Choose a content type to see every published item as a card. Nothing to type.', 'amy-agent' ),
+						'emptyList'          => __( 'Nothing published in this type yet.', 'amy-agent' ),
+						'promptLoaded'       => __( 'Here they are. Check all, 5, or 10 — or click cards to pick exactly which ones.', 'amy-agent' ),
+						'promptCount'        => __( 'Manual (one batch at a time) or automatic (everything in this run)?', 'amy-agent' ),
+						'promptHand'         => __( 'Start with the cards you picked. Amy will check just those.', 'amy-agent' ),
+						'promptWorking'      => __( 'Working through this batch…', 'amy-agent' ),
+						'promptContinue'     => __( 'That batch is done. Continue, or stop here?', 'amy-agent' ),
+						'promptStopped'      => __( 'Stopped. Already-checked cards stay as they are.', 'amy-agent' ),
+						'choiceAll'          => __( 'All', 'amy-agent' ),
+						'choice5'            => __( '5', 'amy-agent' ),
+						'choice10'           => __( '10', 'amy-agent' ),
+						'choiceManual'       => __( 'Manual', 'amy-agent' ),
+						'choiceAuto'         => __( 'Automatic', 'amy-agent' ),
+						'startSelected'      => __( 'Start (%s selected)', 'amy-agent' ),
+						'startRun'           => __( 'Start', 'amy-agent' ),
+						'continue'           => __( 'Continue', 'amy-agent' ),
+						'stop'               => __( 'Stop', 'amy-agent' ),
+						'selectedCount'      => __( '%s selected', 'amy-agent' ),
+						'summaryLine'        => __( 'Checked %1$s of %2$s. %3$s need work, %4$s have improvements, %5$s are good.', 'amy-agent' ),
+						'summaryErrors'      => __( '%s had errors.', 'amy-agent' ),
+						'buildingSnapshots'  => __( 'Gathering live fields…', 'amy-agent' ),
+						'close'              => __( 'Close', 'amy-agent' ),
 					),
 				)
 			);
@@ -1828,49 +1858,72 @@ class Amy_Admin_Menu {
 	}
 
 	/**
-	 * SEO Tasks — single published post/page check with approval before write.
+	 * SEO Tasks — type buttons, card grid, chat-style batch flow.
 	 */
 	public function render_seo_tasks_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+		$types = array(
+			'page'     => array(
+				'label' => __( 'Pages', 'amy-agent' ),
+				'icon'  => 'dashicons-admin-page',
+			),
+			'post'     => array(
+				'label' => __( 'Posts', 'amy-agent' ),
+				'icon'  => 'dashicons-admin-post',
+			),
+			'category' => array(
+				'label' => __( 'Categories', 'amy-agent' ),
+				'icon'  => 'dashicons-category',
+			),
+			'tag'      => array(
+				'label' => __( 'Tags', 'amy-agent' ),
+				'icon'  => 'dashicons-tag',
+			),
+			'media'    => array(
+				'label' => __( 'Media', 'amy-agent' ),
+				'icon'  => 'dashicons-format-image',
+			),
+		);
 		?>
 		<div class="wrap amy-agent-seo" id="amy-agent-seo">
 			<header class="amy-agent-seo__header">
 				<h1 class="amy-agent-seo__title"><?php echo esc_html__( 'SEO Tasks', 'amy-agent' ); ?></h1>
 				<p class="amy-agent-seo__intro">
-					<?php echo esc_html__( 'Point Amy at one published post or page. She reports what is missing or weak. Nothing is written until you approve.', 'amy-agent' ); ?>
+					<?php echo esc_html__( 'Pick a content type. Amy shows every published item as a card. Nothing is written until you approve.', 'amy-agent' ); ?>
 				</p>
 				<span class="amy-agent-seo__underline" aria-hidden="true"></span>
 			</header>
 
-			<p class="amy-agent-seo__scope">
-				<?php echo esc_html__( 'This version checks one target at a time. Amy does not generate suggested copy or images, and there is no full-site sweep. Fix fields below are blank for you to fill in.', 'amy-agent' ); ?>
-			</p>
-
 			<p class="amy-agent-seo__error" id="amy-agent-seo-error" hidden role="alert"></p>
 			<p class="amy-agent-seo__notice" id="amy-agent-seo-notice" hidden></p>
 
-			<section class="amy-agent-seo__panel" aria-labelledby="amy-agent-seo-target-title">
-				<h2 class="amy-agent-seo__panel-title" id="amy-agent-seo-target-title"><?php echo esc_html__( 'Target', 'amy-agent' ); ?></h2>
-				<div class="amy-agent-seo__picker">
-					<label class="screen-reader-text" for="amy-agent-seo-search"><?php echo esc_html__( 'Search published posts and pages', 'amy-agent' ); ?></label>
-					<input
-						type="search"
-						id="amy-agent-seo-search"
-						class="amy-agent-seo__search"
-						placeholder="<?php echo esc_attr__( 'Search published posts and pages…', 'amy-agent' ); ?>"
-						autocomplete="off"
-					/>
-					<ul class="amy-agent-seo__search-results" id="amy-agent-seo-search-results" hidden></ul>
-					<p class="amy-agent-seo__selected" id="amy-agent-seo-selected" hidden></p>
-					<button type="button" class="amy-agent-seo__btn amy-agent-seo__btn--accent" id="amy-agent-seo-check" disabled>
-						<?php echo esc_html__( 'Check SEO', 'amy-agent' ); ?>
+			<nav class="amy-agent-seo__types" aria-label="<?php echo esc_attr__( 'Content type', 'amy-agent' ); ?>">
+				<?php foreach ( $types as $type_key => $type ) : ?>
+					<button
+						type="button"
+						class="amy-agent-seo__type"
+						data-amy-seo-type="<?php echo esc_attr( $type_key ); ?>"
+					>
+						<span class="dashicons <?php echo esc_attr( $type['icon'] ); ?>" aria-hidden="true"></span>
+						<span class="amy-agent-seo__type-label"><?php echo esc_html( $type['label'] ); ?></span>
+						<span class="amy-agent-seo__type-count" data-amy-seo-type-count="<?php echo esc_attr( $type_key ); ?>">—</span>
 					</button>
-				</div>
-			</section>
+				<?php endforeach; ?>
+			</nav>
 
-			<section class="amy-agent-seo__panel amy-agent-seo__results" id="amy-agent-seo-results" hidden aria-live="polite"></section>
+			<p class="amy-agent-seo__empty-state" id="amy-agent-seo-empty">
+				<?php echo esc_html__( 'Choose a content type to see every published item as a card. Nothing to type.', 'amy-agent' ); ?>
+			</p>
+
+			<section class="amy-agent-seo__workspace" id="amy-agent-seo-workspace" hidden>
+				<div class="amy-agent-seo__prompt" id="amy-agent-seo-prompt">
+					<div class="amy-agent-seo__log" id="amy-agent-seo-log" aria-live="polite"></div>
+				</div>
+				<p class="amy-agent-seo__selection" id="amy-agent-seo-selection" hidden></p>
+				<div class="amy-agent-seo__grid" id="amy-agent-seo-grid"></div>
+			</section>
 
 			<section class="amy-agent-seo__panel" aria-labelledby="amy-agent-seo-history-title">
 				<h2 class="amy-agent-seo__panel-title" id="amy-agent-seo-history-title"><?php echo esc_html__( 'Previous checks', 'amy-agent' ); ?></h2>
@@ -1903,10 +1956,35 @@ class Amy_Admin_Menu {
 						<tbody id="amy-agent-seo-history-body"></tbody>
 					</table>
 					<p class="amy-agent-seo__empty" id="amy-agent-seo-history-empty" hidden>
-						<?php echo esc_html__( 'No checks yet. Search for a published post or page and run Check SEO.', 'amy-agent' ); ?>
+						<?php echo esc_html__( 'No checks yet. Pick a content type and run a check.', 'amy-agent' ); ?>
 					</p>
 				</div>
 			</section>
+
+			<div
+				class="amy-agent-seo__modal"
+				id="amy-agent-seo-modal"
+				hidden
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="amy-agent-seo-modal-title"
+			>
+				<div class="amy-agent-seo__modal-backdrop" data-amy-modal-close></div>
+				<div class="amy-agent-seo__modal-dialog">
+					<header class="amy-agent-seo__modal-header">
+						<h2 id="amy-agent-seo-modal-title" class="amy-agent-seo__modal-title"></h2>
+						<button
+							type="button"
+							class="amy-agent-seo__modal-close"
+							data-amy-modal-close
+							aria-label="<?php echo esc_attr__( 'Close', 'amy-agent' ); ?>"
+						>
+							<span class="dashicons dashicons-no-alt" aria-hidden="true"></span>
+						</button>
+					</header>
+					<div class="amy-agent-seo__modal-body" id="amy-agent-seo-modal-body"></div>
+				</div>
+			</div>
 		</div>
 		<?php
 	}

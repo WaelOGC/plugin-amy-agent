@@ -9,11 +9,11 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-08-18 (amy-agent v0.2.19 / amy-agent-service v0.1.6).
-> SEO Tasks original Task 1 (single-target) plus redesign Task 1 (batch engine +
-> category/tag/media checks) are implemented. Dokploy `data/` volume (whole
-> directory) already covers `seo_tasks.db` — no extra volume config. The existing
-> single-target admin UI is unchanged; redesign Task 2 (chat/card UI) is not built.
+> Last verified against code: 2026-08-19 (amy-agent v0.2.20 / amy-agent-service v0.1.6).
+> SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
+> category/tag/media checks) and redesign Task 2 (chat/card UI) are implemented.
+> Dokploy `data/` volume already covers `seo_tasks.db`. The old single-target
+> search UI has been replaced by the type-button / card / batch flow.
 
 ---
 
@@ -97,7 +97,7 @@
   itself has a working backend (would be fake data today). See
   `07-analytics-plan.md`.
 
-### 6. SEO Tasks — original Task 1 + redesign Task 1 (engine) complete
+### 6. SEO Tasks — original Task 1 + redesign Task 1 (engine) + redesign Task 2 (UI) complete
 - WP: `class-amy-seo-meta.php` registers Yoast post-meta keys for `post` and
   `page` with `show_in_rest`, so core REST (`/wp/v2/posts/{id}`, `/wp/v2/pages/{id}`)
   can read and write them. Scores (`_yoast_wpseo_linkdex`,
@@ -107,21 +107,29 @@
   `amy_seo_term_get` / `amy_seo_term_write` through Yoast's
   `WPSEO_Taxonomy_Meta` (`wpseo_taxonomy_meta` option; keys `title`/`desc`).
   Core term meta is not used for Yoast fields. Media still has no extra PHP.
+- WP batch proxy: `class-amy-seo-batches-ajax.php` (`amy_seo_batch_start` /
+  `continue` / `stop` / `get`) reuses the existing SEO Tasks nonce and
+  `manage_options` guard. Python service is unchanged in this UI task.
 - Backend: rule-based `check_snapshot()` (posts/pages, unchanged) plus
   `check_term_snapshot()` and `check_media_snapshot()`. FastAPI
   `/v1/seo-tasks/*` behind `X-Amy-Secret`, including the batch engine
   (`/v1/seo-tasks/batches`, continue/stop, per-item isolation, batch_size
   clamped 1–20). Persistent SQLite at `data/seo_tasks.db` (same Dokploy
-  `data/` volume — new `seo_batch_runs` table, plus `content_type` /
+  `data/` volume — `seo_batch_runs` table, plus `content_type` /
   `batch_run_id` on checks). Successful batch items land in the existing
   pending-approval pool.
-- Admin: `amy-seo-tasks` is still the original single-target page — search a
-  published post/page, Check SEO, verdict + findings, blank editable fix
-  fields, approve (WP REST write then Python record) or reject. History list
-  from stored checks. **Redesign Task 2 (chat/card UI) is not built.**
-- **Not in this task:** chat-driven card UI, AI image generation, AI-generated
-  suggested SEO copy, Telegram UI, periodic re-check scheduling, websockets /
-  live progress streaming.
+- Admin: `amy-seo-tasks` is the chat/card UI — five type buttons (Pages /
+  Posts / Categories / Tags / Media), every published item as a card (no
+  search box), All/5/10 then Manual/Automatic, or hand-pick cards then Start.
+  Manual continue/stop; auto reveals each batch's cards in turn. Checked
+  cards open a modal with findings + blank fix-fields + approve/reject.
+  Writes: posts/pages via core REST, categories/tags via `amy_seo_term_write`,
+  media via `/wp/v2/media/{id}`. History table still uses `amy_seo_checks_list`,
+  filtered by the active type.
+- **Not in this task:** AI image generation, AI-generated suggested SEO copy,
+  Telegram UI, periodic re-check scheduling, websockets / live progress
+  streaming. Auto mode is still one HTTP request; the UI just reveals
+  reports in sequence.
 
 ---
 
@@ -187,9 +195,9 @@ Given the agreed priority order and what's already live:
 Analytics Task 1 (plugin + service) shipped 2026-08-18. SEO Tasks original
 Task 1 (Yoast REST wiring + single-target approval) shipped 2026-08-18;
 redesign Task 1 (batch engine + category/tag/media checks) shipped
-2026-08-18. Redesign Task 2 (chat/card UI consuming the new endpoints) is
-not built — that is the next SEO Tasks prompt. Email Marketing (#8) stays
-after Dashboard Chat. Email Marketing still depends on Dashboard Chat +
+2026-08-18; redesign Task 2 (chat/card UI) shipped 2026-08-19. The full
+SEO Tasks flow is now live end to end in wp-admin. Email Marketing (#8)
+stays after Dashboard Chat. Email Marketing still depends on Dashboard Chat +
 Analytics; cold-outreach compliance still open before that goes live.
 Specialist `/` commands stay off until Analytics + SEO + Email Marketing all
 exist (Analytics Task 1 is the plugin/service half; theme Contact hooks are

@@ -85,6 +85,11 @@ class Amy_Plugin {
 	public $seo_taxonomy_meta;
 
 	/**
+	 * @var Amy_Seo_Batches_Ajax
+	 */
+	public $seo_batches_ajax;
+
+	/**
 	 * Returns the singleton instance.
 	 *
 	 * @return Amy_Plugin
@@ -108,6 +113,7 @@ class Amy_Plugin {
 		$this->seo_meta           = new Amy_Seo_Meta();
 		$this->seo_tasks_ajax     = new Amy_Seo_Tasks_Ajax( $this->api_client );
 		$this->seo_taxonomy_meta  = new Amy_Seo_Taxonomy_Meta();
+		$this->seo_batches_ajax   = new Amy_Seo_Batches_Ajax( $this->api_client );
 		$this->rest               = new Amy_Rest( $this->api_client, $this->settings );
 		$this->theme_bridge       = new Amy_Theme_Bridge( $this->settings );
 		$this->assets             = new Amy_Assets( $this->settings );
@@ -121,6 +127,7 @@ class Amy_Plugin {
 		$this->seo_meta->register();
 		$this->seo_tasks_ajax->register();
 		$this->seo_taxonomy_meta->register();
+		$this->seo_batches_ajax->register();
 		$this->rest->register();
 		$this->theme_bridge->register();
 		$this->assets->register();

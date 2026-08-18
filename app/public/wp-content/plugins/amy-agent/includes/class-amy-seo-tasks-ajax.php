@@ -252,8 +252,8 @@ class Amy_Seo_Tasks_Ajax {
 	 */
 	private function sanitize_approved_fields( array $raw ) {
 		$out   = array();
-		$text  = array( 'focus_keyphrase', 'seo_title', 'og_title', 'twitter_title', 'featured_image_alt' );
-		$area  = array( 'meta_description', 'og_description', 'twitter_description' );
+		$text  = array( 'focus_keyphrase', 'seo_title', 'og_title', 'twitter_title', 'featured_image_alt', 'alt_text', 'title' );
+		$area  = array( 'meta_description', 'og_description', 'twitter_description', 'caption', 'description' );
 		$urls  = array( 'og_image', 'twitter_image' );
 
 		foreach ( $text as $key ) {

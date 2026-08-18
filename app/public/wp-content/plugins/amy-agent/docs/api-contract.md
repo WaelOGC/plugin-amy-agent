@@ -271,6 +271,10 @@ Nonce action: `amy_agent_seo_tasks` (field name `nonce`). Capability for existin
 | `amy_seo_check_reject` | Proxy rejection record |
 | `amy_seo_term_get` | Read category/tag name, Yoast SEO title, Yoast meta description, and `term_description()`. Taxonomy allow-list: `category` or `tag` (`tag` maps to `post_tag`). Requires Yoast `WPSEO_Taxonomy_Meta`. |
 | `amy_seo_term_write` | Write Yoast SEO title / meta description via `WPSEO_Taxonomy_Meta::set_value()` using keys `title` and `desc`. Only non-empty present fields are written. |
+| `amy_seo_batch_start` | Proxy to Python `POST /v1/seo-tasks/batches`. Body: `content_type`, `mode`, `batch_size`, `items` (JSON array; empty rejected; capped at 500). Same nonce as the other SEO Tasks actions. |
+| `amy_seo_batch_continue` | Proxy to `POST /v1/seo-tasks/batches/{batch_run_id}/continue`. |
+| `amy_seo_batch_stop` | Proxy to `POST /v1/seo-tasks/batches/{batch_run_id}/stop`. |
+| `amy_seo_batch_get` | Proxy to `GET /v1/seo-tasks/batches/{batch_run_id}`. |
 
 Media alt/title/caption/description stay on core REST `/wp/v2/media/{id}` — no extra PHP.
 
