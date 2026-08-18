@@ -38,6 +38,8 @@ class Amy_Seo_Tasks_Ajax {
 		add_action( 'wp_ajax_amy_seo_check_get', array( $this, 'ajax_get' ) );
 		add_action( 'wp_ajax_amy_seo_check_approve', array( $this, 'ajax_approve' ) );
 		add_action( 'wp_ajax_amy_seo_check_reject', array( $this, 'ajax_reject' ) );
+		add_action( 'wp_ajax_amy_seo_generate_fields', array( $this, 'ajax_generate_fields' ) );
+		add_action( 'wp_ajax_amy_seo_generate_image', array( $this, 'ajax_generate_image' ) );
 	}
 
 	/**
@@ -289,5 +291,56 @@ class Amy_Seo_Tasks_Ajax {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * POST Python /generate — AI-suggested text fields for a check.
+	 */
+	public function ajax_generate_fields() {
+		$this->guard();
+
+		$check_id = isset( $_POST['check_id'] ) ? sanitize_text_field( wp_unslash( $_POST['check_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
+		if ( '' === $check_id ) {
+			wp_send_json_error( array( 'message' => __( 'A check ID is required.', 'amy-agent' ) ), 400 );
+		}
+
+		$fields = array();
+		if ( isset( $_POST['fields'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$decoded = json_decode( wp_unslash( $_POST['fields'] ), true ); // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			if ( is_array( $decoded ) ) {
+				$fields = array_values( array_map( 'sanitize_key', $decoded ) );
+			}
+		}
+
+		$payload = array();
+		if ( ! empty( $fields ) ) {
+			$payload['fields'] = $fields;
+		}
+
+		$result = $this->api_client->generate_seo_fields( $check_id, $payload );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
+	}
+
+	/**
+	 * POST Python /generate-image — AI-generated featured image for a check.
+	 */
+	public function ajax_generate_image() {
+		$this->guard();
+
+		$check_id = isset( $_POST['check_id'] ) ? sanitize_text_field( wp_unslash( $_POST['check_id'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
+		if ( '' === $check_id ) {
+			wp_send_json_error( array( 'message' => __( 'A check ID is required.', 'amy-agent' ) ), 400 );
+		}
+
+		$result = $this->api_client->generate_seo_image( $check_id );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
 	}
 }

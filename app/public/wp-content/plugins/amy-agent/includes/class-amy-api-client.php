@@ -287,6 +287,38 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST /v1/seo-tasks/checks/{id}/generate — AI-suggested text fields.
+	 *
+	 * @param string $check_id Check UUID.
+	 * @param array  $payload  Optional { fields: string[] }; ai is merged from settings.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function generate_seo_fields( $check_id, array $payload = array() ) {
+		$payload['ai'] = $this->settings->get_ai_config();
+		return $this->request(
+			'POST',
+			'/v1/seo-tasks/checks/' . rawurlencode( (string) $check_id ) . '/generate',
+			$payload,
+			60
+		);
+	}
+
+	/**
+	 * POST /v1/seo-tasks/checks/{id}/generate-image — AI-generated featured image.
+	 *
+	 * @param string $check_id Check UUID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function generate_seo_image( $check_id ) {
+		return $this->request(
+			'POST',
+			'/v1/seo-tasks/checks/' . rawurlencode( (string) $check_id ) . '/generate-image',
+			array( 'ai' => $this->settings->get_ai_config() ),
+			90
+		);
+	}
+
+	/**
 	 * POST /v1/seo-tasks/batches/{id}/continue.
 	 *
 	 * @param string $id Batch run UUID.
@@ -486,6 +518,35 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * Best-effort error message from a non-2xx Python response, including FastAPI's
+	 * default validation-error shape ({"detail": [...]}), which has no "message" key.
+	 *
+	 * @param int        $status  HTTP status code.
+	 * @param array|null $decoded Decoded JSON body, or null if not JSON.
+	 * @return string
+	 */
+	private function extract_error_message( $status, $decoded ) {
+		if ( is_array( $decoded ) ) {
+			if ( isset( $decoded['message'] ) ) {
+				return (string) $decoded['message'];
+			}
+			if ( isset( $decoded['detail'] ) ) {
+				$detail = $decoded['detail'];
+				if ( is_string( $detail ) ) {
+					return $detail;
+				}
+				if ( is_array( $detail ) ) {
+					$first = reset( $detail );
+					if ( is_array( $first ) && isset( $first['msg'] ) ) {
+						return (string) $first['msg'] . ( isset( $first['loc'] ) ? ' (' . wp_json_encode( $first['loc'] ) . ')' : '' );
+					}
+				}
+			}
+		}
+		return sprintf( 'Request failed (HTTP %d).', (int) $status );
+	}
+
+	/**
 	 * Perform an authenticated request to the Python service.
 	 *
 	 * @param string     $method  HTTP method.
@@ -549,7 +610,9 @@ class Amy_Api_Client {
 			'ok'          => $status >= 200 && $status < 300,
 			'status_code' => $status,
 			'body'        => is_array( $decoded ) ? $decoded : null,
-			'error'       => ( $status >= 200 && $status < 300 ) ? null : ( is_array( $decoded ) && isset( $decoded['message'] ) ? (string) $decoded['message'] : 'Request failed.' ),
+			'error'       => ( $status >= 200 && $status < 300 )
+				? null
+				: $this->extract_error_message( $status, $decoded ),
 		);
 	}
 }

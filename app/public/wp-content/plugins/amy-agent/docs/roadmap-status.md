@@ -9,11 +9,12 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-08-19 (amy-agent v0.2.20 / amy-agent-service v0.1.6).
+> Last verified against code: 2026-08-19 (amy-agent v0.2.21 / amy-agent-service v0.1.7).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
-> category/tag/media checks) and redesign Task 2 (chat/card UI) are implemented.
-> Dokploy `data/` volume already covers `seo_tasks.db`. The old single-target
-> search UI has been replaced by the type-button / card / batch flow.
+> category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
+> image generation are implemented. Dokploy `data/` volume already covers
+> `seo_tasks.db`. Generated SEO copy/images are **not** stored in SQLite;
+> WordPress holds them in the modal until Approve.
 
 ---
 
@@ -97,7 +98,7 @@
   itself has a working backend (would be fake data today). See
   `07-analytics-plan.md`.
 
-### 6. SEO Tasks — original Task 1 + redesign Task 1 (engine) + redesign Task 2 (UI) complete
+### 6. SEO Tasks — original Task 1 + redesign Task 1 (engine) + redesign Task 2 (UI) + AI generation complete
 - WP: `class-amy-seo-meta.php` registers Yoast post-meta keys for `post` and
   `page` with `show_in_rest`, so core REST (`/wp/v2/posts/{id}`, `/wp/v2/pages/{id}`)
   can read and write them. Scores (`_yoast_wpseo_linkdex`,
@@ -126,9 +127,14 @@
   Writes: posts/pages via core REST, categories/tags via `amy_seo_term_write`,
   media via `/wp/v2/media/{id}`. History table still uses `amy_seo_checks_list`,
   filtered by the active type.
-- **Not in this task:** AI image generation, AI-generated suggested SEO copy,
-  Telegram UI, periodic re-check scheduling, websockets / live progress
-  streaming. Auto mode is still one HTTP request; the UI just reveals
+- **AI generation (0.2.21 / service 0.1.7):** modal "Generate with AI" calls
+  `POST /v1/seo-tasks/checks/{id}/generate` and pre-fills missing/weak text
+  fields (still editable; still requires Approve). "Generate image" (Gemini
+  only) calls `.../generate-image`, previews the image, and uploads to the
+  Media Library on approval. Suggestions are not stored in `seo_tasks.db`.
+- **Not in this task:** full-site auto-write sweep, Telegram UI, periodic
+  re-check scheduling, websockets / live progress streaming, non-Gemini image
+  providers. Auto mode is still one HTTP request; the UI just reveals
   reports in sequence.
 
 ---
@@ -195,8 +201,10 @@ Given the agreed priority order and what's already live:
 Analytics Task 1 (plugin + service) shipped 2026-08-18. SEO Tasks original
 Task 1 (Yoast REST wiring + single-target approval) shipped 2026-08-18;
 redesign Task 1 (batch engine + category/tag/media checks) shipped
-2026-08-18; redesign Task 2 (chat/card UI) shipped 2026-08-19. The full
-SEO Tasks flow is now live end to end in wp-admin. Email Marketing (#8)
+2026-08-18; redesign Task 2 (chat/card UI) shipped 2026-08-19; AI content
++ image generation shipped 2026-08-19 (plugin 0.2.21 / service 0.1.7). The
+full SEO Tasks flow is now live end to end in wp-admin, including
+pre-filled AI suggestions before approval. Email Marketing (#8)
 stays after Dashboard Chat. Email Marketing still depends on Dashboard Chat +
 Analytics; cold-outreach compliance still open before that goes live.
 Specialist `/` commands stay off until Analytics + SEO + Email Marketing all

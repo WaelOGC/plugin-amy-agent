@@ -1,7 +1,9 @@
 /**
  * Amy Agent — SEO Tasks admin page (type buttons, cards, batch checks).
  *
- * Fix fields start empty. Amy does not generate suggested copy or images.
+ * Fix fields are pre-filled with AI-generated suggestions where possible
+ * (via /generate and /generate-image on the Python service). Nothing is
+ * written to WordPress until the user clicks Approve & write.
  */
 (function ($) {
 	'use strict';
@@ -17,6 +19,8 @@
 		var selected = {};
 		var resultsById = {};
 		var snapshotsById = {};
+		var generatedFieldsById = {};
+		var generatedImageById = {};
 		var phase = 'idle';
 		var countChoice = null;
 		var modeChoice = null;
@@ -132,6 +136,42 @@
 
 		function restPost(path, body) {
 			return restAjax(path, 'POST', body);
+		}
+
+		function generateFields(checkId, fields) {
+			var data = { check_id: checkId };
+			if (fields && fields.length) {
+				data.fields = JSON.stringify(fields);
+			}
+			return ajaxAction('amy_seo_generate_fields', data);
+		}
+
+		function generateImage(checkId) {
+			return ajaxAction('amy_seo_generate_image', { check_id: checkId });
+		}
+
+		function base64ToBlob(base64, mime) {
+			var byteChars = atob(base64);
+			var byteNumbers = new Array(byteChars.length);
+			for (var i = 0; i < byteChars.length; i++) {
+				byteNumbers[i] = byteChars.charCodeAt(i);
+			}
+			return new Blob([new Uint8Array(byteNumbers)], { type: mime || 'image/png' });
+		}
+
+		function restUpload(path, blob, filename) {
+			var formData = new FormData();
+			formData.append('file', blob, filename);
+			return $.ajax({
+				url: restUrl + path,
+				method: 'POST',
+				data: formData,
+				processData: false,
+				contentType: false,
+				beforeSend: function (xhr) {
+					xhr.setRequestHeader('X-WP-Nonce', cfg.restNonce);
+				},
+			});
 		}
 
 		function ajaxAction(action, data) {
@@ -458,17 +498,48 @@
 			);
 		}
 
-		function fixFieldsForFinding(finding, type) {
+		function fixFieldsForFinding(finding, type, itemId) {
 			var field = finding.field;
+			var generated = generatedFieldsById[itemId] || {};
+
 			if (field === 'featured_image') {
-				return (
-					'<p class="amy-agent-seo__deferred">' +
-					escapeHtml(
-						i18n.noImageGen ||
-							'Amy can report a missing featured image, but image generation is not in this version.'
-					) +
-					'</p>'
-				);
+				var img = generatedImageById[itemId];
+				var isGemini = (cfg.aiProvider || '') === 'gemini';
+				var html = '';
+				if (!isGemini) {
+					html +=
+						'<p class="amy-agent-seo__deferred">' +
+						escapeHtml(
+							i18n.noImageGen ||
+								'Image generation is only available with the Gemini provider. Switch providers in Settings, or upload an image manually.'
+						) +
+						'</p>';
+				}
+				if (img) {
+					html +=
+						'<img class="amy-agent-seo__image-preview" ' +
+						'src="data:' +
+						escapeHtml(img.mime_type || 'image/png') +
+						';base64,' +
+						img.image_base64 +
+						'" ' +
+						'alt="' +
+						escapeHtml(i18n.imagePreviewAlt || 'AI-generated preview') +
+						'" />' +
+						inputHtml(
+							'featured_image_alt',
+							i18n.fieldAlt || 'Featured image alt text',
+							img.suggested_alt_text || '',
+							false
+						);
+				}
+				if (isGemini) {
+					html +=
+						'<button type="button" class="amy-agent-seo__btn amy-agent-seo__btn--ghost" data-amy-seo-generate-image>' +
+						escapeHtml(i18n.generateImage || 'Generate image') +
+						'</button>';
+				}
+				return html;
 			}
 			if (field === 'categories') {
 				if (type === 'page') {
@@ -493,30 +564,46 @@
 			}
 			if (field === 'og_social') {
 				return (
-					inputHtml('og_title', i18n.fieldOgTitle || 'Facebook title', '', false) +
-					inputHtml('og_description', i18n.fieldOgDesc || 'Facebook description', '', true) +
-					inputHtml('og_image', i18n.fieldOgImage || 'Facebook image URL', '', false)
+					inputHtml('og_title', i18n.fieldOgTitle || 'Facebook title', generated.og_title || '', false) +
+					inputHtml(
+						'og_description',
+						i18n.fieldOgDesc || 'Facebook description',
+						generated.og_description || '',
+						true
+					) +
+					inputHtml('og_image', i18n.fieldOgImage || 'Facebook image URL', generated.og_image || '', false)
 				);
 			}
 			if (field === 'twitter_social') {
 				return (
-					inputHtml('twitter_title', i18n.fieldTwTitle || 'X title', '', false) +
-					inputHtml('twitter_description', i18n.fieldTwDesc || 'X description', '', true) +
-					inputHtml('twitter_image', i18n.fieldTwImage || 'X image URL', '', false)
+					inputHtml('twitter_title', i18n.fieldTwTitle || 'X title', generated.twitter_title || '', false) +
+					inputHtml(
+						'twitter_description',
+						i18n.fieldTwDesc || 'X description',
+						generated.twitter_description || '',
+						true
+					) +
+					inputHtml('twitter_image', i18n.fieldTwImage || 'X image URL', generated.twitter_image || '', false)
 				);
 			}
+			var value = generated[field] || '';
+			var note = value
+				? '<p class="amy-agent-seo__ai-note">' +
+				  escapeHtml(i18n.aiSuggestedNote || 'AI suggested — review before approving.') +
+				  '</p>'
+				: '';
 			if (
 				field === 'meta_description' ||
 				field === 'caption' ||
 				field === 'description' ||
 				field === 'term_description'
 			) {
-				return inputHtml(field, fieldLabel(field), '', true);
+				return note + inputHtml(field, fieldLabel(field), value, true);
 			}
-			return inputHtml(field, fieldLabel(field), '', false);
+			return note + inputHtml(field, fieldLabel(field), value, false);
 		}
 
-		function renderFindings(check, readonly, type) {
+		function renderFindings(check, readonly, type, itemId) {
 			var findings = Array.isArray(check.findings) ? check.findings : [];
 			var html = '';
 			if (!findings.length) {
@@ -546,7 +633,10 @@
 						escapeHtml(finding.message || '') +
 						'</p>';
 					if (!readonly) {
-						html += '<div class="amy-agent-seo__fix">' + fixFieldsForFinding(finding, type) + '</div>';
+						html +=
+							'<div class="amy-agent-seo__fix">' +
+							fixFieldsForFinding(finding, type, itemId) +
+							'</div>';
 					}
 					html += '</article>';
 				});
@@ -655,35 +745,56 @@
 				}
 				return restPost('wp/v2/media/' + item.id, mediaBody);
 			}
-			var writes = [];
-			var meta = {};
-			Object.keys(metaKeys).forEach(function (field) {
-				if (fields[field]) {
-					meta[metaKeys[field]] = fields[field];
-				}
-			});
-			var body = {};
-			if (Object.keys(meta).length) {
-				body.meta = meta;
-			}
-			if (fields.category_ids && type === 'post') {
-				body.categories = fields.category_ids;
-			}
-			if (Object.keys(body).length) {
-				writes.push(restPost(restCollection(type) + item.id, body));
-			}
+
+			var img = generatedImageById[item.id];
 			var snap = snapshotsById[item.id];
-			if (fields.featured_image_alt && snap && snap.featured_media_id) {
-				writes.push(
-					restPost('wp/v2/media/' + snap.featured_media_id, {
-						alt_text: fields.featured_image_alt,
-					})
+			var hasExistingImage = !!(snap && snap.featured_media_id);
+
+			function proceedWithFeaturedMedia(featuredMediaId) {
+				var writes = [];
+				var meta = {};
+				Object.keys(metaKeys).forEach(function (field) {
+					if (fields[field]) {
+						meta[metaKeys[field]] = fields[field];
+					}
+				});
+				var body = {};
+				if (Object.keys(meta).length) {
+					body.meta = meta;
+				}
+				if (fields.category_ids && type === 'post') {
+					body.categories = fields.category_ids;
+				}
+				if (featuredMediaId) {
+					body.featured_media = featuredMediaId;
+				}
+				if (Object.keys(body).length) {
+					writes.push(restPost(restCollection(type) + item.id, body));
+				}
+				if (fields.featured_image_alt && featuredMediaId) {
+					writes.push(restPost('wp/v2/media/' + featuredMediaId, { alt_text: fields.featured_image_alt }));
+				} else if (fields.featured_image_alt && snap && snap.featured_media_id) {
+					writes.push(restPost('wp/v2/media/' + snap.featured_media_id, { alt_text: fields.featured_image_alt }));
+				}
+				if (!writes.length) {
+					return $.Deferred().resolve().promise();
+				}
+				return $.when.apply($, writes);
+			}
+
+			if (img && !hasExistingImage && (type === 'post' || type === 'page')) {
+				var blob = base64ToBlob(img.image_base64, img.mime_type);
+				var filename = 'amy-seo-' + item.id + '.' + (img.mime_type === 'image/jpeg' ? 'jpg' : 'png');
+				return restUpload('wp/v2/media', blob, filename).then(
+					function (media) {
+						return proceedWithFeaturedMedia(media && media.id ? media.id : 0);
+					},
+					function () {
+						return proceedWithFeaturedMedia(0);
+					}
 				);
 			}
-			if (!writes.length) {
-				return $.Deferred().resolve().promise();
-			}
-			return $.when.apply($, writes);
+			return proceedWithFeaturedMedia(0);
 		}
 
 		function assemblePostSnapshot(post, media, type) {
@@ -1207,8 +1318,60 @@
 				});
 		}
 
+		function onGenerateFieldsClick(check, item) {
+			var $btn = $('#amy-agent-seo-generate-fields');
+			$btn.prop('disabled', true).text(i18n.generatingFields || 'Generating…');
+			appendBubble(fmt(i18n.promptGenerating || 'Generating SEO copy for %s…', [item.title || '']));
+			generateFields(check.check_id)
+				.done(function (res) {
+					$btn.prop('disabled', false).text(i18n.generateFields || 'Generate with AI');
+					if (!res || !res.success || !res.data || !res.data.generated_fields) {
+						showError(i18n.generateFieldsError || 'Amy could not generate suggestions.');
+						return;
+					}
+					generatedFieldsById[item.id] = $.extend(
+						{},
+						generatedFieldsById[item.id],
+						res.data.generated_fields
+					);
+					var count = Object.keys(res.data.generated_fields).length;
+					appendBubble(
+						fmt(i18n.promptGenerated || 'Got %1$d suggestion(s) for %2$s.', [count, item.title || ''])
+					);
+					renderModalCheck(check, item, false);
+				})
+				.fail(function (xhr) {
+					$btn.prop('disabled', false).text(i18n.generateFields || 'Generate with AI');
+					var msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message;
+					showError(msg || i18n.generateFieldsError || 'Amy could not generate suggestions.');
+				});
+		}
+
+		function onGenerateImageClick(check, item) {
+			var $btn = $('[data-amy-seo-generate-image]');
+			$btn.prop('disabled', true).text(i18n.generatingImage || 'Generating image…');
+			appendBubble(fmt(i18n.promptGeneratingImage || 'Generating an image for %s…', [item.title || '']));
+			generateImage(check.check_id)
+				.done(function (res) {
+					if (!res || !res.success || !res.data || !res.data.image_base64) {
+						$btn.prop('disabled', false).text(i18n.generateImage || 'Generate image');
+						showError(i18n.generateImageError || 'Amy could not generate an image.');
+						return;
+					}
+					generatedImageById[item.id] = res.data;
+					appendBubble(fmt(i18n.promptGeneratedImage || 'Image ready for %s.', [item.title || '']));
+					renderModalCheck(check, item, false);
+				})
+				.fail(function (xhr) {
+					$btn.prop('disabled', false).text(i18n.generateImage || 'Generate image');
+					var msg = xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message;
+					showError(msg || i18n.generateImageError || 'Amy could not generate an image.');
+				});
+		}
+
 		function renderModalCheck(check, item, readonly) {
 			var verdict = check.verdict || 'orange';
+			var canGenerate = !readonly && check.status === 'pending_approval';
 			var html =
 				'<div class="amy-agent-seo__verdict amy-agent-seo__verdict--' +
 				escapeHtml(verdict) +
@@ -1221,13 +1384,19 @@
 				'</span>' +
 				'</div>' +
 				'<p class="amy-agent-seo__suggest-note">' +
-				escapeHtml(
-					i18n.noAiCopy ||
-						'Amy is reporting what is missing. Suggested copy is not generated in this version — fill in the fields yourself before approving.'
-				) +
-				'</p>' +
+				escapeHtml(i18n.noAiCopy || 'Amy is reporting what is missing.') +
+				'</p>';
+			if (canGenerate) {
+				html +=
+					'<div class="amy-agent-seo__generate-row">' +
+					'<button type="button" class="amy-agent-seo__btn amy-agent-seo__btn--accent" id="amy-agent-seo-generate-fields">' +
+					escapeHtml(i18n.generateFields || 'Generate with AI') +
+					'</button>' +
+					'</div>';
+			}
+			html +=
 				'<div class="amy-agent-seo__findings">' +
-				renderFindings(check, readonly, item.type || currentType) +
+				renderFindings(check, readonly, item.type || currentType, item.id) +
 				'</div>';
 			if (!readonly && check.status === 'pending_approval') {
 				html +=
@@ -1249,6 +1418,14 @@
 			if (!readonly) {
 				loadCategories($modalBody.find('[data-amy-seo-categories]'));
 			}
+			if (canGenerate) {
+				$modalBody.find('#amy-agent-seo-generate-fields').on('click', function () {
+					onGenerateFieldsClick(check, item);
+				});
+			}
+			$modalBody.find('[data-amy-seo-generate-image]').on('click', function () {
+				onGenerateImageClick(check, item);
+			});
 		}
 
 		function openModal(check, item) {
@@ -1359,6 +1536,8 @@
 			selected = {};
 			resultsById = {};
 			snapshotsById = {};
+			generatedFieldsById = {};
+			generatedImageById = {};
 			batchRun = null;
 			countChoice = null;
 			modeChoice = null;

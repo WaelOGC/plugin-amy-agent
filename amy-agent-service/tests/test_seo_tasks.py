@@ -1,8 +1,11 @@
-"""SEO Tasks endpoints: check, list, detail, approve, reject."""
+"""SEO Tasks endpoints: check, list, detail, approve, reject, generate."""
 
 from __future__ import annotations
 
+import json
 import os
+from typing import Sequence
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +15,11 @@ os.environ["AMY_SHARED_SECRET"] = "test-secret-phase1"
 from app.config import get_settings  # noqa: E402
 from app.db import seo_tasks_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.providers.base import BaseProvider  # noqa: E402
+from app.providers.errors import ProviderError  # noqa: E402
+from app.providers.gemini import GeminiImageResult  # noqa: E402
+from app.schemas.messages import ChatMessage  # noqa: E402
+from app.services.seo_generate import fields_from_findings, parse_response  # noqa: E402
 
 get_settings.cache_clear()
 
@@ -207,3 +215,220 @@ def test_media_check_and_content_type_filter(client: TestClient) -> None:
     assert created.json()["check_id"] not in {
         item["check_id"] for item in posts.json()["checks"]
     }
+
+
+class _FakeProvider(BaseProvider):
+    provider_id = "openai"
+    default_model = "gpt-4o-mini"
+
+    def __init__(self, reply: str = "{}") -> None:
+        self._reply = reply
+
+    async def complete(
+        self,
+        messages: Sequence[ChatMessage],
+        api_key: str,
+        model: str | None = None,
+    ) -> str:
+        assert api_key
+        assert messages
+        return self._reply
+
+
+class _FailingProvider(BaseProvider):
+    provider_id = "openai"
+    default_model = "gpt-4o-mini"
+
+    async def complete(
+        self,
+        messages: Sequence[ChatMessage],
+        api_key: str,
+        model: str | None = None,
+    ) -> str:
+        raise ProviderError("auth failed", code="auth_error")
+
+
+def _ai_body(**overrides):
+    body = {"provider": "openai", "api_key": "sk-test", "model": None}
+    body.update(overrides)
+    return {"ai": body}
+
+
+def test_generate_fields_success(client: TestClient) -> None:
+    created = client.post("/v1/seo-tasks/check", headers=AUTH, json=RED_SNAPSHOT).json()
+    reply = json.dumps(
+        {
+            "seo_title": "Brand strategy for agencies",
+            "meta_description": "A practical brand strategy guide for growing agencies.",
+            "focus_keyphrase": "brand strategy",
+        }
+    )
+    with patch("app.routes.seo_tasks.get_provider", return_value=_FakeProvider(reply)):
+        response = client.post(
+            f"/v1/seo-tasks/checks/{created['check_id']}/generate",
+            headers=AUTH,
+            json=_ai_body(),
+        )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    generated = data["generated_fields"]
+    assert "seo_title" in generated
+    assert "meta_description" in generated
+    assert len(generated["seo_title"]) <= 60
+    assert len(generated["meta_description"]) <= 155
+    assert data["provider"] == "openai"
+    assert data["model"] == "gpt-4o-mini"
+
+
+def test_generate_fields_non_json_is_502(client: TestClient) -> None:
+    created = client.post("/v1/seo-tasks/check", headers=AUTH, json=RED_SNAPSHOT).json()
+    with patch(
+        "app.routes.seo_tasks.get_provider",
+        return_value=_FakeProvider("Sorry, I cannot do that."),
+    ):
+        response = client.post(
+            f"/v1/seo-tasks/checks/{created['check_id']}/generate",
+            headers=AUTH,
+            json=_ai_body(),
+        )
+    assert response.status_code == 502
+    assert response.json()["error"] == "generation_parse_error"
+
+
+def test_generate_fields_provider_error_is_502(client: TestClient) -> None:
+    created = client.post("/v1/seo-tasks/check", headers=AUTH, json=RED_SNAPSHOT).json()
+    with patch("app.routes.seo_tasks.get_provider", return_value=_FailingProvider()):
+        response = client.post(
+            f"/v1/seo-tasks/checks/{created['check_id']}/generate",
+            headers=AUTH,
+            json=_ai_body(),
+        )
+    assert response.status_code == 502
+    assert response.json()["error"] == "auth_error"
+
+
+def test_generate_fields_unknown_check_404(client: TestClient) -> None:
+    response = client.post(
+        "/v1/seo-tasks/checks/not-a-real-id/generate",
+        headers=AUTH,
+        json=_ai_body(),
+    )
+    assert response.status_code == 404
+    assert response.json()["error"] == "not_found"
+
+
+def test_generate_fields_green_check_nothing_to_generate(client: TestClient) -> None:
+    created = client.post("/v1/seo-tasks/check", headers=AUTH, json=GREEN_SNAPSHOT).json()
+    response = client.post(
+        f"/v1/seo-tasks/checks/{created['check_id']}/generate",
+        headers=AUTH,
+        json=_ai_body(),
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "nothing_to_generate"
+
+
+def test_generate_image_rejects_non_gemini(client: TestClient) -> None:
+    created = client.post("/v1/seo-tasks/check", headers=AUTH, json=RED_SNAPSHOT).json()
+    response = client.post(
+        f"/v1/seo-tasks/checks/{created['check_id']}/generate-image",
+        headers=AUTH,
+        json=_ai_body(provider="openai"),
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "unsupported_provider"
+
+
+def test_generate_image_gemini_mocked(client: TestClient) -> None:
+    created = client.post("/v1/seo-tasks/check", headers=AUTH, json=RED_SNAPSHOT).json()
+
+    async def _fake_generate_image(self, prompt: str, api_key: str) -> GeminiImageResult:
+        assert api_key
+        assert "OGC NewFinity" in prompt
+        return GeminiImageResult(data_base64="dGVzdA==", mime_type="image/png")
+
+    async def _fake_complete(
+        self,
+        messages: Sequence[ChatMessage],
+        api_key: str,
+        model: str | None = None,
+    ) -> str:
+        return "Studio photo of a brand strategy workshop"
+
+    with (
+        patch(
+            "app.routes.seo_tasks.GeminiProvider.generate_image",
+            _fake_generate_image,
+        ),
+        patch("app.routes.seo_tasks.GeminiProvider.complete", _fake_complete),
+    ):
+        response = client.post(
+            f"/v1/seo-tasks/checks/{created['check_id']}/generate-image",
+            headers=AUTH,
+            json=_ai_body(provider="gemini"),
+        )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["image_base64"] == "dGVzdA=="
+    assert data["mime_type"] == "image/png"
+    assert data["suggested_alt_text"]
+
+
+def test_parse_response_valid_json() -> None:
+    parsed = parse_response(
+        '{"seo_title": "Brand strategy", "meta_description": "A guide."}',
+        ["seo_title", "meta_description"],
+    )
+    assert parsed == {
+        "seo_title": "Brand strategy",
+        "meta_description": "A guide.",
+    }
+
+
+def test_parse_response_fenced_json() -> None:
+    raw = "```json\n{\"seo_title\": \"Brand strategy\"}\n```"
+    parsed = parse_response(raw, ["seo_title"])
+    assert parsed["seo_title"] == "Brand strategy"
+
+
+def test_parse_response_ignores_extra_keys() -> None:
+    parsed = parse_response(
+        '{"seo_title": "Brand strategy", "extra": "nope"}',
+        ["seo_title"],
+    )
+    assert parsed == {"seo_title": "Brand strategy"}
+    assert "extra" not in parsed
+
+
+def test_parse_response_clamps_at_word_boundary() -> None:
+    long_title = "Brand " * 20  # well over 60 chars
+    parsed = parse_response(json.dumps({"seo_title": long_title}), ["seo_title"])
+    assert "seo_title" in parsed
+    assert len(parsed["seo_title"]) <= 60
+    assert not parsed["seo_title"].endswith(" ")
+
+
+def test_parse_response_invalid_json_raises() -> None:
+    with pytest.raises(ValueError, match="valid JSON"):
+        parse_response("not json at all", ["seo_title"])
+
+
+def test_fields_from_findings_expands_og_social() -> None:
+    fields = fields_from_findings(
+        [{"field": "og_social", "severity": "missing", "message": "missing"}]
+    )
+    assert fields == ["og_title", "og_description"]
+
+
+def test_fields_from_findings_skips_image_and_categories() -> None:
+    fields = fields_from_findings(
+        [
+            {"field": "featured_image", "severity": "missing", "message": "no image"},
+            {"field": "categories", "severity": "missing", "message": "no cats"},
+        ]
+    )
+    assert fields == []
+
+
+def test_fields_from_findings_empty() -> None:
+    assert fields_from_findings([]) == []

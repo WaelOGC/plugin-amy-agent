@@ -3,7 +3,7 @@
 > Priority #7 in `roadmap-status.md` (labeled "SEO Service" there — correct name is
 > **SEO Tasks**; a follow-up fix to that file is included at the end of this prompt).
 
-## Status: Task 1 implemented 2026-08-18 (Yoast REST wiring + single-target approval). Task 2 (full sweep + image generation) is not built.
+## Status: Task 1 implemented 2026-08-18 (Yoast REST wiring + single-target approval). Redesign Task 1 (batch engine) and Task 2 (chat/card UI) implemented 2026-08-19. AI generation of suggested copy + Gemini featured images implemented 2026-08-19 (plugin 0.2.21 / service 0.1.7). Full-site auto-write sweep is still not built.
 
 ## 1. What this is
 
@@ -68,6 +68,26 @@ lower-priority than another when Amy evaluates a piece of content:
 - Whether Amy should re-check previously "good" content periodically/automatically,
   or only on explicit request (currently: only on request, per this plan — automatic
   re-checks are not in scope unless decided otherwise later).
+
+## 6. AI generation (deferred, then shipped 2026-08-19)
+
+Earlier versions of this plan (and the 0.2.20 UI) only *reported* missing fields;
+fix inputs started empty and Amy did not write suggested copy or images. That
+was an explicit deferral, not the intended end state.
+
+As of plugin **0.2.21** / service **0.1.7**:
+
+- `POST /v1/seo-tasks/checks/{id}/generate` fills missing/weak text fields
+  (keyphrase, SEO title, meta description, OG/Twitter title+description, term
+  description) via the AI provider already configured in Settings.
+- `POST /v1/seo-tasks/checks/{id}/generate-image` generates a featured image
+  (Gemini only). The modal previews it; WordPress uploads it to the Media
+  Library only on **Approve & write**.
+- Approval is unchanged: nothing is written until a human clicks Approve.
+  Generated values are not persisted in `seo_tasks.db`.
+
+Still not built: full-site auto-write sweep (mode 3.2), periodic re-check
+scheduling, non-Gemini image providers.
 
 ---
 *The Hague, Netherlands — OGC NewFinity*

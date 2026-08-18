@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.messages import AiConfig
+
 SeoVerdict = Literal["red", "orange", "green"]
 SeoSeverity = Literal["missing", "weak"]
 SeoCheckStatus = Literal["pending_approval", "approved", "rejected"]
@@ -67,3 +69,26 @@ class SeoApproveRequest(BaseModel):
 
 class SeoRejectRequest(BaseModel):
     reason: str | None = None
+
+
+class SeoGenerateRequest(BaseModel):
+    ai: AiConfig
+    fields: list[str] | None = None  # None = auto-derive from stored findings
+
+
+class SeoGenerateResponse(BaseModel):
+    check_id: str
+    generated_fields: dict[str, str]
+    provider: str
+    model: str
+
+
+class SeoGenerateImageRequest(BaseModel):
+    ai: AiConfig
+
+
+class SeoGenerateImageResponse(BaseModel):
+    check_id: str
+    image_base64: str
+    mime_type: str
+    suggested_alt_text: str

@@ -74,6 +74,8 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | GET | `/v1/seo-tasks/checks/{id}` | Fetch one check |
 | POST | `/v1/seo-tasks/checks/{id}/approve` | Record approval (`approved_fields`); does not write to WordPress |
 | POST | `/v1/seo-tasks/checks/{id}/reject` | Record rejection (optional `reason`) |
+| POST | `/v1/seo-tasks/checks/{id}/generate` | AI-suggested SEO copy for missing/weak text fields. Not persisted; WordPress holds suggestions until Approve. |
+| POST | `/v1/seo-tasks/checks/{id}/generate-image` | Gemini-only featured image (`image_base64` + `mime_type` + `suggested_alt_text`). Not persisted. |
 | POST | `/v1/seo-tasks/batches` | Start a batch run (`manual` = first slice only; `auto` = remaining slices in this request) |
 | POST | `/v1/seo-tasks/batches/{id}/continue` | Process the next slice (manual mode only) |
 | POST | `/v1/seo-tasks/batches/{id}/stop` | Mark a run as stopped |
@@ -82,6 +84,10 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | GET | `/uploads/submit-idea/{session_id}/{file}` | Public static files (no auth); scoped to upload dir |
 
 ## Changelog
+
+### 0.1.7
+
+SEO Tasks AI generation: `POST /v1/seo-tasks/checks/{id}/generate` (text fields via the configured provider) and `POST /v1/seo-tasks/checks/{id}/generate-image` (Gemini featured images). Suggestions are not stored server-side.
 
 ### 0.1.6
 

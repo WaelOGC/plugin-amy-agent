@@ -70,7 +70,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Amy Agent Service",
-    version="0.1.6",
+    version="0.1.7",
     description="Intelligence layer for the Amy Agent WordPress plugin (Phase 1 scaffold).",
     lifespan=lifespan,
 )

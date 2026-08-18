@@ -231,6 +231,14 @@ Body: `{ "approved_fields": { … } }` — the values WordPress actually wrote (
 
 Optional `{ "reason": "…" }`. Marks `status = "rejected"`. No WordPress write. Not pending → `409`.
 
+### `POST /v1/seo-tasks/checks/{check_id}/generate`
+
+AI-suggested SEO copy for missing/weak text fields. Body: `{ "ai": { provider, api_key, model }, "fields": string[] | omit }`. When `fields` is omitted, the service derives keys from stored findings (`og_social` → `og_title`/`og_description`, `twitter_social` → `twitter_title`/`twitter_description`; `featured_image` and `categories` are skipped). Returns `{ check_id, generated_fields, provider, model }`. Suggestions are **not persisted**; WordPress holds them in the modal until Approve. Unknown check → `404`. Nothing to generate → `400 nothing_to_generate`. Unparseable model output → `502 generation_parse_error`. Provider failures → `502`.
+
+### `POST /v1/seo-tasks/checks/{check_id}/generate-image`
+
+Gemini-only featured image. Body: `{ "ai": { provider, api_key, model } }`. Non-Gemini → `400 unsupported_provider`. Returns `{ check_id, image_base64, mime_type, suggested_alt_text }`. Not persisted. Unknown check → `404`. Provider failures → `502`.
+
 ### `POST /v1/seo-tasks/batches`
 
 Start a batch run. Body: `content_type`, `mode` (`manual` | `auto`), `batch_size` (default `5`, clamped server-side to `1`–`20`), `items` (non-empty list of `{ item_id, title, snapshot }`). `snapshot` is the same field shape as a check request minus `content_type` / `wp_post_id`.
@@ -269,6 +277,8 @@ Nonce action: `amy_agent_seo_tasks` (field name `nonce`). Capability for existin
 | `amy_seo_check_get` | Proxy one stored check |
 | `amy_seo_check_approve` | Proxy approval record (WordPress write happens separately via core REST) |
 | `amy_seo_check_reject` | Proxy rejection record |
+| `amy_seo_generate_fields` | Proxy `POST /v1/seo-tasks/checks/{id}/generate`. AI config is injected from Settings. Optional `fields` JSON array. |
+| `amy_seo_generate_image` | Proxy `POST /v1/seo-tasks/checks/{id}/generate-image`. Gemini only; AI config from Settings. |
 | `amy_seo_term_get` | Read category/tag name, Yoast SEO title, Yoast meta description, and `term_description()`. Taxonomy allow-list: `category` or `tag` (`tag` maps to `post_tag`). Requires Yoast `WPSEO_Taxonomy_Meta`. |
 | `amy_seo_term_write` | Write Yoast SEO title / meta description via `WPSEO_Taxonomy_Meta::set_value()` using keys `title` and `desc`. Only non-empty present fields are written. |
 | `amy_seo_batch_start` | Proxy to Python `POST /v1/seo-tasks/batches`. Body: `content_type`, `mode`, `batch_size`, `items` (JSON array; empty rejected; capped at 500). Same nonce as the other SEO Tasks actions. |
