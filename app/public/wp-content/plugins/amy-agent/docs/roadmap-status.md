@@ -9,9 +9,11 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-08-18 (amy-agent v0.2.18 / amy-agent-service v0.1.5).
-> SEO Tasks Task 1 is implemented in plugin + service. Dokploy `data/` volume (whole
-> directory) already covers the new `seo_tasks.db` — no extra volume config.
+> Last verified against code: 2026-08-18 (amy-agent v0.2.19 / amy-agent-service v0.1.6).
+> SEO Tasks original Task 1 (single-target) plus redesign Task 1 (batch engine +
+> category/tag/media checks) are implemented. Dokploy `data/` volume (whole
+> directory) already covers `seo_tasks.db` — no extra volume config. The existing
+> single-target admin UI is unchanged; redesign Task 2 (chat/card UI) is not built.
 
 ---
 
@@ -95,22 +97,31 @@
   itself has a working backend (would be fake data today). See
   `07-analytics-plan.md`.
 
-### 6. SEO Tasks — Task 1 complete (Yoast wiring + single-target approval)
+### 6. SEO Tasks — original Task 1 + redesign Task 1 (engine) complete
 - WP: `class-amy-seo-meta.php` registers Yoast post-meta keys for `post` and
   `page` with `show_in_rest`, so core REST (`/wp/v2/posts/{id}`, `/wp/v2/pages/{id}`)
   can read and write them. Scores (`_yoast_wpseo_linkdex`,
   `_yoast_wpseo_content_score`) are read-only. Featured-image alt is **not**
   re-registered — core already exposes `alt_text` on `/wp/v2/media/{id}`.
-- Backend: rule-based `app/services/seo_check.py` (no AI call). FastAPI
-  `/v1/seo-tasks/*` behind `X-Amy-Secret`. Persistent SQLite at
-  `data/seo_tasks.db` (same Dokploy `data/` volume as `tasks.db` /
-  `analytics.db` — no extra volume config).
-- Admin: `amy-seo-tasks` is a real page — search a published post/page,
-  Check SEO, verdict + findings, blank editable fix fields, approve (WP REST
-  write then Python record) or reject. History list from stored checks.
-- **Not in this task (do not treat the UI as if they exist):** full-site
-  sweep / batching, AI image generation, AI-generated suggested SEO copy,
-  Telegram UI, periodic re-check scheduling.
+- WP taxonomy bridge: `class-amy-seo-taxonomy-meta.php` exposes
+  `amy_seo_term_get` / `amy_seo_term_write` through Yoast's
+  `WPSEO_Taxonomy_Meta` (`wpseo_taxonomy_meta` option; keys `title`/`desc`).
+  Core term meta is not used for Yoast fields. Media still has no extra PHP.
+- Backend: rule-based `check_snapshot()` (posts/pages, unchanged) plus
+  `check_term_snapshot()` and `check_media_snapshot()`. FastAPI
+  `/v1/seo-tasks/*` behind `X-Amy-Secret`, including the batch engine
+  (`/v1/seo-tasks/batches`, continue/stop, per-item isolation, batch_size
+  clamped 1–20). Persistent SQLite at `data/seo_tasks.db` (same Dokploy
+  `data/` volume — new `seo_batch_runs` table, plus `content_type` /
+  `batch_run_id` on checks). Successful batch items land in the existing
+  pending-approval pool.
+- Admin: `amy-seo-tasks` is still the original single-target page — search a
+  published post/page, Check SEO, verdict + findings, blank editable fix
+  fields, approve (WP REST write then Python record) or reject. History list
+  from stored checks. **Redesign Task 2 (chat/card UI) is not built.**
+- **Not in this task:** chat-driven card UI, AI image generation, AI-generated
+  suggested SEO copy, Telegram UI, periodic re-check scheduling, websockets /
+  live progress streaming.
 
 ---
 
@@ -173,10 +184,12 @@ Given the agreed priority order and what's already live:
   Discord) automated publishing via the pluggable
   notification layer — distinct from the Admin Bot chat surface in #3.
 
-Analytics Task 1 (plugin + service) shipped 2026-08-18. SEO Tasks Task 1
-(Yoast REST wiring + single-target approval) shipped 2026-08-18; Task 2
-(full-site sweep + AI image generation) is not built. Email Marketing (#8)
-stays after Dashboard Chat. Email Marketing still depends on Dashboard Chat +
+Analytics Task 1 (plugin + service) shipped 2026-08-18. SEO Tasks original
+Task 1 (Yoast REST wiring + single-target approval) shipped 2026-08-18;
+redesign Task 1 (batch engine + category/tag/media checks) shipped
+2026-08-18. Redesign Task 2 (chat/card UI consuming the new endpoints) is
+not built — that is the next SEO Tasks prompt. Email Marketing (#8) stays
+after Dashboard Chat. Email Marketing still depends on Dashboard Chat +
 Analytics; cold-outreach compliance still open before that goes live.
 Specialist `/` commands stay off until Analytics + SEO + Email Marketing all
 exist (Analytics Task 1 is the plugin/service half; theme Contact hooks are

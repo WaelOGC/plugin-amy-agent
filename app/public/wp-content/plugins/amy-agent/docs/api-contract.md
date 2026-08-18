@@ -205,17 +205,19 @@ Full event timeline for one session (`404` if unknown).
 
 ## SEO Tasks (Python)
 
-All require `X-Amy-Secret`. The Python service never calls WordPress. WordPress fetches live field values via core REST, posts the snapshot here, and writes approved values back through `/wp/v2/posts/{id}` or `/wp/v2/pages/{id}` (Yoast meta registered with `show_in_rest`) plus `/wp/v2/media/{id}` for featured-image `alt_text`.
+All require `X-Amy-Secret`. The Python service never calls WordPress. WordPress fetches live field values via core REST (posts/pages/media) or the category/tag AJAX bridge below, posts the snapshot here, and writes approved values back through `/wp/v2/posts/{id}` or `/wp/v2/pages/{id}` (Yoast meta registered with `show_in_rest`), `/wp/v2/media/{id}` for attachment fields, or `amy_seo_term_write` for Yoast taxonomy title/description.
+
+`content_type` is `post` | `page` | `category` | `tag` | `media` (default `post` on check requests so existing callers stay valid). Post/page checks still use `check_snapshot()`. Categories/tags use `check_term_snapshot()` (`seo_title` and `meta_description` drive red; missing `term_description` is orange). Media uses `check_media_snapshot()` (only missing `alt_text` drives red).
 
 ### `POST /v1/seo-tasks/check`
 
-Body: `wp_post_id`, `post_type`, `title`, `content_excerpt`, `focus_keyphrase`, `seo_title`, `meta_description`, `has_featured_image`, `featured_image_alt`, `og_title`, `og_description`, `og_image`, `twitter_title`, `twitter_description`, `twitter_image`, `category_count`.
+Body: `wp_post_id`, `post_type`, `content_type` (optional, default `post`), `title`, `content_excerpt`, `focus_keyphrase`, `seo_title`, `meta_description`, `has_featured_image`, `featured_image_alt`, `og_title`, `og_description`, `og_image`, `twitter_title`, `twitter_description`, `twitter_image`, `category_count`, plus type-specific optionals `term_description`, `filename`, `alt_text`, `caption`, `description`.
 
-Runs rule-based checks (not an AI call). Stores a row with `status: "pending_approval"` and returns `check_id`, `verdict` (`red` / `orange` / `green`), and `findings` (`field`, `severity` `missing`|`weak`, `message`).
+Runs the type-aware rule-based check (not an AI call). Stores a row with `status: "pending_approval"` and returns `check_id`, `content_type`, `verdict` (`red` / `orange` / `green`), `findings` (`field`, `severity` `missing`|`weak`, `message`), and optional `batch_run_id` (null for single-target checks).
 
 ### `GET /v1/seo-tasks/checks`
 
-Optional query `status=pending_approval|approved|rejected` and `verdict=red|orange|green`. Newest first. Invalid filter → `400`.
+Optional query `status=pending_approval|approved|rejected`, `verdict=red|orange|green`, and `content_type=post|page|category|tag|media`. Newest first. Invalid filter → `400`.
 
 ### `GET /v1/seo-tasks/checks/{check_id}`
 
@@ -223,11 +225,54 @@ Single check (`404` if unknown).
 
 ### `POST /v1/seo-tasks/checks/{check_id}/approve`
 
-Body: `{ "approved_fields": { … } }` — the values WordPress actually wrote (may differ from empty Task-1 suggestion fields). Marks `status = "approved"`. Not pending → `409`.
+Body: `{ "approved_fields": { … } }` — the values WordPress actually wrote (may differ from empty Task-1 suggestion fields). Marks `status = "approved"`. Not pending → `409`. Batch-originated checks use this same endpoint.
 
 ### `POST /v1/seo-tasks/checks/{check_id}/reject`
 
 Optional `{ "reason": "…" }`. Marks `status = "rejected"`. No WordPress write. Not pending → `409`.
+
+### `POST /v1/seo-tasks/batches`
+
+Start a batch run. Body: `content_type`, `mode` (`manual` | `auto`), `batch_size` (default `5`, clamped server-side to `1`–`20`), `items` (non-empty list of `{ item_id, title, snapshot }`). `snapshot` is the same field shape as a check request minus `content_type` / `wp_post_id`.
+
+- `manual`: process the first slice only. Status is `in_progress`, or `completed` if that slice finished the list.
+- `auto`: loop remaining slices inside this one HTTP request and return every batch report together. Status is `completed`.
+
+Each successful item creates a pending-approval row in the existing checks table (`check_id` on the item result). A malformed item is recorded as `{ error, check_id: null, verdict: null, findings: [] }` and does not abort the rest of the slice.
+
+### `POST /v1/seo-tasks/batches/{batch_run_id}/continue`
+
+Manual mode only. Process the next slice and return the updated run (all reports so far). `409` if the run is auto, already `completed`, or `stopped`. `404` if unknown.
+
+### `POST /v1/seo-tasks/batches/{batch_run_id}/stop`
+
+Mark `status = "stopped"`. `409` if already `completed` or `stopped`. `404` if unknown.
+
+### `GET /v1/seo-tasks/batches/{batch_run_id}`
+
+Full current state, including every report produced so far. `404` if unknown.
+
+### `GET /v1/seo-tasks/batches`
+
+List recent runs as summaries (no item/report payloads). Optional query `content_type` and `status=in_progress|stopped|completed`. Invalid filter → `400`.
+
+---
+
+## SEO Tasks (WordPress admin-ajax)
+
+Nonce action: `amy_agent_seo_tasks` (field name `nonce`). Capability for existing check proxies and `amy_seo_term_get`: `manage_options`. `amy_seo_term_write` requires `manage_categories`.
+
+| Action | Purpose |
+| --- | --- |
+| `amy_seo_check` | Proxy snapshot to Python `POST /v1/seo-tasks/check` (posts/pages; existing UI) |
+| `amy_seo_checks_list` | Proxy `GET /v1/seo-tasks/checks` (optional `status`, `verdict`, `content_type`) |
+| `amy_seo_check_get` | Proxy one stored check |
+| `amy_seo_check_approve` | Proxy approval record (WordPress write happens separately via core REST) |
+| `amy_seo_check_reject` | Proxy rejection record |
+| `amy_seo_term_get` | Read category/tag name, Yoast SEO title, Yoast meta description, and `term_description()`. Taxonomy allow-list: `category` or `tag` (`tag` maps to `post_tag`). Requires Yoast `WPSEO_Taxonomy_Meta`. |
+| `amy_seo_term_write` | Write Yoast SEO title / meta description via `WPSEO_Taxonomy_Meta::set_value()` using keys `title` and `desc`. Only non-empty present fields are written. |
+
+Media alt/title/caption/description stay on core REST `/wp/v2/media/{id}` — no extra PHP.
 
 ---
 

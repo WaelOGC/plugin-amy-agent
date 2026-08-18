@@ -123,7 +123,15 @@ class Amy_Seo_Tasks_Ajax {
 			}
 		}
 
-		$result = $this->api_client->list_seo_checks( $status, $verdict );
+		$content_type = null;
+		if ( isset( $_REQUEST['content_type'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$content_type = sanitize_key( wp_unslash( $_REQUEST['content_type'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( ! in_array( $content_type, array( 'post', 'page', 'category', 'tag', 'media' ), true ) ) {
+				$content_type = null;
+			}
+		}
+
+		$result = $this->api_client->list_seo_checks( $status, $verdict, $content_type );
 		if ( ! $result['ok'] ) {
 			$this->send_api_error( $result );
 		}

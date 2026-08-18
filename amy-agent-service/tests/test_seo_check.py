@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.services.seo_check import check_snapshot
+from app.services.seo_check import check_snapshot, check_term_snapshot, check_media_snapshot
 
 COMPLETE = {
     "focus_keyphrase": "brand strategy",
@@ -189,3 +189,123 @@ def test_keyphrase_not_required_in_title_when_keyphrase_missing() -> None:
     seo_title_findings = [item for item in result["findings"] if item["field"] == "seo_title"]
     assert seo_title_findings == []
     assert result["verdict"] == "red"
+
+
+TERM_COMPLETE = {
+    "seo_title": "Brand strategy category",
+    "meta_description": "Articles about brand strategy for agencies.",
+    "term_description": "Everything we publish on brand strategy.",
+}
+
+MEDIA_COMPLETE = {
+    "alt_text": "Team reviewing a brand strategy board",
+    "title": "Brand strategy workshop",
+    "caption": "Workshop photo from The Hague studio.",
+    "description": "Used as the featured image on the brand strategy guide.",
+    "filename": "brand-strategy-workshop.jpg",
+}
+
+
+def test_term_green_when_all_present() -> None:
+    result = check_term_snapshot(**TERM_COMPLETE)
+    assert result["findings"] == []
+    assert result["verdict"] == "green"
+
+
+def test_term_missing_seo_title_is_red() -> None:
+    result = check_term_snapshot(**{**TERM_COMPLETE, "seo_title": ""})
+    match = next(item for item in result["findings"] if item["field"] == "seo_title")
+    assert match["severity"] == "missing"
+    assert result["verdict"] == "red"
+
+
+def test_term_missing_meta_description_is_red() -> None:
+    result = check_term_snapshot(**{**TERM_COMPLETE, "meta_description": ""})
+    match = next(item for item in result["findings"] if item["field"] == "meta_description")
+    assert match["severity"] == "missing"
+    assert result["verdict"] == "red"
+
+
+def test_term_missing_description_is_orange() -> None:
+    result = check_term_snapshot(**{**TERM_COMPLETE, "term_description": ""})
+    match = next(item for item in result["findings"] if item["field"] == "term_description")
+    assert match["severity"] == "missing"
+    assert result["verdict"] == "orange"
+
+
+def test_term_core_missing_alongside_description_is_red() -> None:
+    result = check_term_snapshot(seo_title="", meta_description="", term_description="")
+    fields = _fields(result["findings"])
+    assert "seo_title" in fields
+    assert "meta_description" in fields
+    assert "term_description" in fields
+    assert result["verdict"] == "red"
+
+
+def test_media_green_when_all_present() -> None:
+    result = check_media_snapshot(**MEDIA_COMPLETE)
+    assert result["findings"] == []
+    assert result["verdict"] == "green"
+
+
+def test_media_missing_alt_text_is_red() -> None:
+    result = check_media_snapshot(**{**MEDIA_COMPLETE, "alt_text": ""})
+    match = next(item for item in result["findings"] if item["field"] == "alt_text")
+    assert match["severity"] == "missing"
+    assert result["verdict"] == "red"
+
+
+def test_media_missing_title_is_weak_orange() -> None:
+    result = check_media_snapshot(**{**MEDIA_COMPLETE, "title": ""})
+    match = next(item for item in result["findings"] if item["field"] == "title")
+    assert match["severity"] == "weak"
+    assert result["verdict"] == "orange"
+
+
+def test_media_title_matching_filename_stem_is_weak() -> None:
+    result = check_media_snapshot(
+        **{**MEDIA_COMPLETE, "title": "IMG_1234", "filename": "IMG_1234.jpg"}
+    )
+    match = next(item for item in result["findings"] if item["field"] == "title")
+    assert match["severity"] == "weak"
+    assert "filename" in match["message"].lower()
+    assert result["verdict"] == "orange"
+
+
+def test_media_camera_and_uuid_titles_are_weak() -> None:
+    for title in ("dsc_0001", "screenshot_12", "12345", "550e8400-e29b-41d4-a716-446655440000"):
+        result = check_media_snapshot(**{**MEDIA_COMPLETE, "title": title})
+        match = next(item for item in result["findings"] if item["field"] == "title")
+        assert match["severity"] == "weak", title
+        assert result["verdict"] == "orange", title
+
+
+def test_media_missing_caption_is_orange() -> None:
+    result = check_media_snapshot(**{**MEDIA_COMPLETE, "caption": ""})
+    match = next(item for item in result["findings"] if item["field"] == "caption")
+    assert match["severity"] == "missing"
+    assert result["verdict"] == "orange"
+
+
+def test_media_missing_description_is_orange() -> None:
+    result = check_media_snapshot(**{**MEDIA_COMPLETE, "description": ""})
+    match = next(item for item in result["findings"] if item["field"] == "description")
+    assert match["severity"] == "missing"
+    assert result["verdict"] == "orange"
+
+
+def test_media_alt_missing_alongside_other_gaps_is_red() -> None:
+    result = check_media_snapshot(
+        alt_text="",
+        title="IMG_99",
+        caption="",
+        description="",
+        filename="IMG_99.png",
+    )
+    fields = _fields(result["findings"])
+    assert "alt_text" in fields
+    assert "title" in fields
+    assert "caption" in fields
+    assert "description" in fields
+    assert result["verdict"] == "red"
+

@@ -158,3 +158,52 @@ def test_reject_with_reason(client: TestClient) -> None:
     data = response.json()
     assert data["status"] == "rejected"
     assert data["reject_reason"] == "Will fix in the editor instead."
+
+
+def test_category_check_uses_term_rules(client: TestClient) -> None:
+    payload = {
+        "wp_post_id": 11,
+        "post_type": "category",
+        "content_type": "category",
+        "title": "Brand strategy",
+        "seo_title": "Brand strategy category",
+        "meta_description": "Articles about brand strategy.",
+        "term_description": "Everything we publish on brand strategy.",
+    }
+    response = client.post("/v1/seo-tasks/check", headers=AUTH, json=payload)
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["content_type"] == "category"
+    assert data["verdict"] == "green"
+    assert data["findings"] == []
+
+
+def test_media_check_and_content_type_filter(client: TestClient) -> None:
+    payload = {
+        "wp_post_id": 88,
+        "post_type": "attachment",
+        "content_type": "media",
+            "title": "Studio hero",
+        "alt_text": "Studio hero image",
+        "caption": "Front of house",
+        "description": "Homepage banner.",
+        "filename": "hero.jpg",
+    }
+    created = client.post("/v1/seo-tasks/check", headers=AUTH, json=payload)
+    assert created.status_code == 200, created.text
+    assert created.json()["content_type"] == "media"
+    assert created.json()["verdict"] == "green"
+
+    filtered = client.get(
+        "/v1/seo-tasks/checks", headers=AUTH, params={"content_type": "media"}
+    )
+    assert filtered.status_code == 200
+    ids = {item["check_id"] for item in filtered.json()["checks"]}
+    assert created.json()["check_id"] in ids
+
+    posts = client.get(
+        "/v1/seo-tasks/checks", headers=AUTH, params={"content_type": "post"}
+    )
+    assert created.json()["check_id"] not in {
+        item["check_id"] for item in posts.json()["checks"]
+    }

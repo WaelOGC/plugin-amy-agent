@@ -16,7 +16,7 @@ from app.schemas.seo_tasks import (
     SeoFinding,
     SeoRejectRequest,
 )
-from app.services.seo_check import check_snapshot
+from app.services.seo_check import run_check_for_type
 
 router = APIRouter(tags=["seo-tasks"])
 
@@ -37,6 +37,7 @@ def _to_response(row: dict) -> SeoCheckResponse:
         check_id=row["check_id"],
         wp_post_id=row["wp_post_id"],
         post_type=row["post_type"],
+        content_type=row.get("content_type") or "post",
         title=row.get("title") or "",
         verdict=row["verdict"],
         findings=findings,
@@ -45,6 +46,7 @@ def _to_response(row: dict) -> SeoCheckResponse:
         updated_at=row["updated_at"],
         approved_fields=row.get("approved_fields"),
         reject_reason=row.get("reject_reason"),
+        batch_run_id=row.get("batch_run_id"),
     )
 
 
@@ -55,10 +57,11 @@ def _to_response(row: dict) -> SeoCheckResponse:
 )
 async def run_check(body: SeoCheckRequest) -> SeoCheckResponse | JSONResponse:
     snapshot = body.model_dump()
-    result = check_snapshot(**snapshot)
+    result = run_check_for_type(body.content_type, snapshot)
     row = seo_tasks_db.create_check(
         wp_post_id=body.wp_post_id,
         post_type=body.post_type,
+        content_type=body.content_type,
         title=body.title,
         verdict=result["verdict"],
         findings=result["findings"],
@@ -75,11 +78,13 @@ async def run_check(body: SeoCheckRequest) -> SeoCheckResponse | JSONResponse:
 async def list_checks(
     status_filter: str | None = Query(default=None, alias="status"),
     verdict: str | None = None,
+    content_type: str | None = None,
 ) -> SeoCheckListResponse | JSONResponse:
     try:
         rows = seo_tasks_db.list_checks(
             status=status_filter,  # type: ignore[arg-type]
             verdict=verdict,  # type: ignore[arg-type]
+            content_type=content_type,
         )
     except ValueError as exc:
         return _error("invalid_filter", str(exc), status.HTTP_400_BAD_REQUEST)

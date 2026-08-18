@@ -211,19 +211,23 @@ class Amy_Api_Client {
 	}
 
 	/**
-	 * GET /v1/seo-tasks/checks — optional status and verdict filters.
+	 * GET /v1/seo-tasks/checks — optional status, verdict, and content_type filters.
 	 *
-	 * @param string|null $status  pending_approval|approved|rejected.
-	 * @param string|null $verdict red|orange|green.
+	 * @param string|null $status       pending_approval|approved|rejected.
+	 * @param string|null $verdict      red|orange|green.
+	 * @param string|null $content_type post|page|category|tag|media.
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
 	 */
-	public function list_seo_checks( $status = null, $verdict = null ) {
+	public function list_seo_checks( $status = null, $verdict = null, $content_type = null ) {
 		$query = array();
 		if ( null !== $status && '' !== $status ) {
 			$query['status'] = $status;
 		}
 		if ( null !== $verdict && '' !== $verdict ) {
 			$query['verdict'] = $verdict;
+		}
+		if ( null !== $content_type && '' !== $content_type ) {
+			$query['content_type'] = $content_type;
 		}
 		$path = '/v1/seo-tasks/checks';
 		if ( ! empty( $query ) ) {

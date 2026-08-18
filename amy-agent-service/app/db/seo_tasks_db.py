@@ -14,6 +14,7 @@ SeoCheckStatus = Literal["pending_approval", "approved", "rejected"]
 
 VALID_VERDICTS = frozenset({"red", "orange", "green"})
 VALID_STATUSES = frozenset({"pending_approval", "approved", "rejected"})
+VALID_CONTENT_TYPES = frozenset({"post", "page", "category", "tag", "media"})
 
 _SERVICE_ROOT = Path(__file__).resolve().parents[2]
 _DATA_DIR = _SERVICE_ROOT / "data"
@@ -21,9 +22,11 @@ _DB_PATH = _DATA_DIR / "seo_tasks.db"
 
 _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Guarded-ALTER registry — empty in v1; add column name → SQL type/default
-# here when a future migration needs a new column on an existing seo_tasks.db.
-_CHECK_COLUMN_DEFAULTS: dict[str, str] = {}
+# Guarded-ALTER registry — applied against an existing seo_tasks.db.
+_CHECK_COLUMN_DEFAULTS: dict[str, str] = {
+    "content_type": "TEXT NOT NULL DEFAULT 'post'",
+    "batch_run_id": "TEXT",
+}
 
 
 def _connect() -> sqlite3.Connection:
@@ -43,7 +46,9 @@ def _connect() -> sqlite3.Connection:
             approved_fields TEXT,
             reject_reason TEXT,
             checked_at REAL NOT NULL,
-            updated_at REAL NOT NULL
+            updated_at REAL NOT NULL,
+            content_type TEXT NOT NULL DEFAULT 'post',
+            batch_run_id TEXT
         )
         """
     )
@@ -95,10 +100,15 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     approved = _decode_json(row["approved_fields"])
     if approved is not None and not isinstance(approved, dict):
         approved = None
+    keys = set(row.keys())
+    content_type = "post"
+    if "content_type" in keys and row["content_type"] in VALID_CONTENT_TYPES:
+        content_type = row["content_type"]
     return {
         "check_id": row["id"],
         "wp_post_id": int(row["wp_post_id"]),
         "post_type": row["post_type"],
+        "content_type": content_type,
         "title": row["title"] or "",
         "verdict": row["verdict"] if row["verdict"] in VALID_VERDICTS else "orange",
         "findings": findings,
@@ -107,6 +117,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "updated_at": float(row["updated_at"]),
         "approved_fields": approved,
         "reject_reason": row["reject_reason"],
+        "batch_run_id": row["batch_run_id"] if "batch_run_id" in keys else None,
     }
 
 
@@ -118,10 +129,14 @@ def create_check(
     verdict: SeoVerdict,
     findings: list[dict[str, Any]],
     snapshot: dict[str, Any] | None = None,
+    content_type: str = "post",
+    batch_run_id: str | None = None,
     now: float | None = None,
 ) -> dict[str, Any]:
     if verdict not in VALID_VERDICTS:
         raise ValueError("invalid verdict")
+    if content_type not in VALID_CONTENT_TYPES:
+        raise ValueError("invalid content_type")
     ts = time.time() if now is None else now
     check_id = str(uuid.uuid4())
     conn = _connect()
@@ -132,8 +147,8 @@ def create_check(
                 INSERT INTO seo_checks (
                     id, wp_post_id, post_type, title, verdict, findings,
                     snapshot, status, approved_fields, reject_reason,
-                    checked_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_approval', NULL, NULL, ?, ?)
+                    checked_at, updated_at, content_type, batch_run_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending_approval', NULL, NULL, ?, ?, ?, ?)
                 """,
                 (
                     check_id,
@@ -145,6 +160,8 @@ def create_check(
                     json.dumps(snapshot) if snapshot is not None else None,
                     ts,
                     ts,
+                    content_type,
+                    batch_run_id,
                 ),
             )
         row = conn.execute("SELECT * FROM seo_checks WHERE id = ?", (check_id,)).fetchone()
@@ -167,6 +184,7 @@ def list_checks(
     *,
     status: SeoCheckStatus | None = None,
     verdict: SeoVerdict | None = None,
+    content_type: str | None = None,
 ) -> list[dict[str, Any]]:
     clauses: list[str] = []
     params: list[Any] = []
@@ -181,6 +199,11 @@ def list_checks(
             raise ValueError("invalid verdict")
         clauses.append("verdict = ?")
         params.append(verdict)
+    if content_type is not None:
+        if content_type not in VALID_CONTENT_TYPES:
+            raise ValueError("invalid content_type")
+        clauses.append("content_type = ?")
+        params.append(content_type)
 
     sql = "SELECT * FROM seo_checks"
     if clauses:

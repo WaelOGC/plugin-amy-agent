@@ -69,12 +69,23 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set) |
 | GET | `/v1/analytics/leads` | Lead list for the admin page (optional `status`) |
 | GET | `/v1/analytics/leads/{session_id}/events` | Event timeline for one session |
-| POST | `/v1/seo-tasks/check` | Rule-based SEO snapshot check; stores a pending-approval row |
-| GET | `/v1/seo-tasks/checks` | List stored checks (optional `status`, `verdict`) |
+| POST | `/v1/seo-tasks/check` | Rule-based SEO snapshot check; stores a pending-approval row. `content_type` defaults to `post`; category/tag/media use type-specific rules. |
+| GET | `/v1/seo-tasks/checks` | List stored checks (optional `status`, `verdict`, `content_type`) |
 | GET | `/v1/seo-tasks/checks/{id}` | Fetch one check |
 | POST | `/v1/seo-tasks/checks/{id}/approve` | Record approval (`approved_fields`); does not write to WordPress |
 | POST | `/v1/seo-tasks/checks/{id}/reject` | Record rejection (optional `reason`) |
+| POST | `/v1/seo-tasks/batches` | Start a batch run (`manual` = first slice only; `auto` = remaining slices in this request) |
+| POST | `/v1/seo-tasks/batches/{id}/continue` | Process the next slice (manual mode only) |
+| POST | `/v1/seo-tasks/batches/{id}/stop` | Mark a run as stopped |
+| GET | `/v1/seo-tasks/batches/{id}` | Full run state including reports so far |
+| GET | `/v1/seo-tasks/batches` | List recent runs (summary only; optional `content_type`, `status`) |
 | GET | `/uploads/submit-idea/{session_id}/{file}` | Public static files (no auth); scoped to upload dir |
+
+## Changelog
+
+### 0.1.6
+
+SEO Tasks batch engine (manual/auto continuation, per-item error isolation) and type-aware checks for categories, tags, and media. Batch-originated checks land in the existing pending-approval pool.
 
 ## Tests
 

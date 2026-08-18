@@ -107,8 +107,9 @@
 	background: var(--amy-panel);
 }
 
-.amy-agent-seo__panel-title {
+.amy-agent-seo h2.amy-agent-seo__panel-title {
 	margin: 0 0 0.85rem;
+	color: var(--amy-text);
 	font-family: var(--amy-font-heading);
 	font-size: 1.05rem;
 	font-weight: 700;

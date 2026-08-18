@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 SeoVerdict = Literal["red", "orange", "green"]
 SeoSeverity = Literal["missing", "weak"]
 SeoCheckStatus = Literal["pending_approval", "approved", "rejected"]
+SeoContentType = Literal["post", "page", "category", "tag", "media"]
 
 
 class SeoFinding(BaseModel):
@@ -18,6 +19,7 @@ class SeoFinding(BaseModel):
 class SeoCheckRequest(BaseModel):
     wp_post_id: int = Field(ge=1)
     post_type: str = Field(min_length=1, max_length=32)
+    content_type: SeoContentType = "post"
     title: str = ""
     content_excerpt: str = ""
     focus_keyphrase: str = ""
@@ -32,12 +34,18 @@ class SeoCheckRequest(BaseModel):
     twitter_description: str = ""
     twitter_image: str = ""
     category_count: int = Field(default=0, ge=0)
+    term_description: str = ""
+    filename: str = ""
+    alt_text: str = ""
+    caption: str = ""
+    description: str = ""
 
 
 class SeoCheckResponse(BaseModel):
     check_id: str
     wp_post_id: int
     post_type: str
+    content_type: SeoContentType = "post"
     title: str = ""
     verdict: SeoVerdict
     findings: list[SeoFinding]
@@ -46,6 +54,7 @@ class SeoCheckResponse(BaseModel):
     updated_at: float
     approved_fields: dict[str, Any] | None = None
     reject_reason: str | None = None
+    batch_run_id: str | None = None
 
 
 class SeoCheckListResponse(BaseModel):
