@@ -1,3 +1,4 @@
+<?php
 /**
  * Admin-AJAX handlers for Analytics (proxies to Python service).
  *
