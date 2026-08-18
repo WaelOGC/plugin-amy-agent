@@ -25,6 +25,22 @@ class Amy_Rest {
 	const RATE_LIMIT_WINDOW = 60;
 
 	/**
+	 * Allowed tracking event types (must match the Python service set).
+	 */
+	const TRACK_EVENT_TYPES = array(
+		'page_view',
+		'widget_opened',
+		'widget_message_sent',
+		'submit_idea_started',
+		'submit_idea_step_reached',
+		'submit_idea_abandoned',
+		'submit_idea_completed',
+		'contact_form_started',
+		'contact_form_abandoned',
+		'contact_form_submitted',
+	);
+
+	/**
 	 * @var Amy_Api_Client
 	 */
 	private $api_client;
@@ -100,6 +116,37 @@ class Amy_Rest {
 		);
 
 		$this->register_submit_idea_routes();
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/track',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_track' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'session_id' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+					'event_type' => array(
+						'required'          => true,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_key',
+					),
+					'event_data' => array(
+						'required' => false,
+						'type'     => 'object',
+					),
+					'page_path'  => array(
+						'required'          => false,
+						'type'              => 'string',
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -431,6 +478,84 @@ class Amy_Rest {
 	}
 
 	/**
+	 * POST /track — public beacon; forwards to Python /v1/analytics/event.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_track( $request ) {
+		if ( $this->is_track_rate_limited() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'rate_limited',
+					'message' => __( 'Too many requests. Please wait a moment and try again.', 'amy-agent' ),
+				),
+				429
+			);
+		}
+
+		if ( ! $this->settings->is_service_configured() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$session_id = sanitize_text_field( (string) $request->get_param( 'session_id' ) );
+		$event_type = sanitize_key( (string) $request->get_param( 'event_type' ) );
+		$page_path  = sanitize_text_field( (string) $request->get_param( 'page_path' ) );
+		$event_data = $this->sanitize_event_data( $request->get_param( 'event_data' ) );
+
+		if ( '' === $session_id || strlen( $session_id ) > 64 ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A valid session_id is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		if ( ! in_array( $event_type, self::TRACK_EVENT_TYPES, true ) ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_event_type',
+					'message' => __( 'Unknown event type.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		if ( strlen( $page_path ) > 500 ) {
+			$page_path = substr( $page_path, 0, 500 );
+		}
+
+		$payload = array(
+			'session_id' => $session_id,
+			'event_type' => $event_type,
+			'page_path'  => '' !== $page_path ? $page_path : null,
+			'ip'         => $this->get_client_ip(),
+		);
+		if ( is_array( $event_data ) && ! empty( $event_data ) ) {
+			$payload['event_data'] = $event_data;
+		}
+
+		$result = $this->api_client->track_event( $payload );
+		if ( ! $result['ok'] ) {
+			$status = (int) $result['status_code'];
+			if ( $status < 100 ) {
+				$status = 502;
+			}
+			return new WP_REST_Response( array( 'ok' => false ), $status );
+		}
+
+		return new WP_REST_Response( array( 'ok' => true ), 200 );
+	}
+
+	/**
 	 * Proxy a Submit Idea JSON call to Python.
 	 *
 	 * @param string $path    Python path.
@@ -551,13 +676,66 @@ class Amy_Rest {
 	}
 
 	/**
+	 * Sanitize optional event_data object from the beacon.
+	 *
+	 * @param mixed $data Raw event_data.
+	 * @param int   $depth Recursion depth.
+	 * @return array<string, mixed>|null
+	 */
+	private function sanitize_event_data( $data, $depth = 0 ) {
+		if ( ! is_array( $data ) || $depth > 3 ) {
+			return null;
+		}
+
+		$clean = array();
+		foreach ( $data as $key => $value ) {
+			$k = sanitize_key( (string) $key );
+			if ( '' === $k ) {
+				continue;
+			}
+			if ( is_array( $value ) ) {
+				$nested = $this->sanitize_event_data( $value, $depth + 1 );
+				if ( null !== $nested ) {
+					$clean[ $k ] = $nested;
+				}
+			} elseif ( 'email' === $k ) {
+				$email = sanitize_email( (string) $value );
+				if ( '' !== $email ) {
+					$clean[ $k ] = $email;
+				}
+			} else {
+				$clean[ $k ] = sanitize_text_field( (string) $value );
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * Transient-based per-IP rate limit.
 	 *
 	 * @return bool True when the caller should be blocked.
 	 */
 	private function is_rate_limited() {
-		$ip = $this->get_client_ip();
-		$key = 'amy_rl_' . md5( $ip );
+		return $this->is_ip_rate_limited( 'amy_rl_' );
+	}
+
+	/**
+	 * Independent per-IP rate limit for the public tracking beacon.
+	 *
+	 * @return bool True when the caller should be blocked.
+	 */
+	private function is_track_rate_limited() {
+		return $this->is_ip_rate_limited( 'amy_track_rl_' );
+	}
+
+	/**
+	 * @param string $prefix Transient key prefix.
+	 * @return bool
+	 */
+	private function is_ip_rate_limited( $prefix ) {
+		$ip    = $this->get_client_ip();
+		$key   = $prefix . md5( $ip );
 		$count = (int) get_transient( $key );
 
 		if ( $count >= self::RATE_LIMIT_MAX ) {

@@ -8,7 +8,8 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Loads widget CSS/JS only when Amy is ready.
+ * Loads the site-wide tracking beacon on every front-end page, and the
+ * floating widget only when Amy is ready.
  */
 class Amy_Assets {
 
@@ -33,6 +34,28 @@ class Amy_Assets {
 	}
 
 	/**
+	 * Tracking beacon loads on every front-end page, independent of the widget.
+	 */
+	private function enqueue_tracking_beacon() {
+		wp_enqueue_script(
+			'amy-agent-tracking',
+			AMY_AGENT_URL . 'public/js/tracking-beacon.js',
+			array(),
+			AMY_AGENT_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'amy-agent-tracking',
+			'amyAgentTracking',
+			array(
+				'restUrl' => esc_url_raw( rest_url( 'amy-agent/v1/track' ) ),
+				'nonce'   => wp_create_nonce( 'wp_rest' ),
+			)
+		);
+	}
+
+	/**
 	 * Whether the floating widget should load on this request.
 	 *
 	 * @return bool
@@ -45,9 +68,15 @@ class Amy_Assets {
 	}
 
 	/**
-	 * Enqueue widget assets when Amy is active.
+	 * Enqueue site-wide tracking beacon (always) and widget assets (when Amy is active).
 	 */
 	public function enqueue() {
+		if ( is_admin() ) {
+			return;
+		}
+
+		$this->enqueue_tracking_beacon();
+
 		if ( ! $this->should_load() ) {
 			return;
 		}
@@ -62,7 +91,7 @@ class Amy_Assets {
 		wp_enqueue_script(
 			'amy-agent-widget',
 			AMY_AGENT_URL . 'public/js/widget.js',
-			array(),
+			array( 'amy-agent-tracking' ),
 			AMY_AGENT_VERSION,
 			true
 		);

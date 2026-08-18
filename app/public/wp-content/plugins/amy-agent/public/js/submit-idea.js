@@ -50,6 +50,30 @@
 		var contactForm = null;
 		var contactError = null;
 		var COMPOSER_MAX_HEIGHT_PX = 7.5 * 16;
+		var siStarted = false;
+		var siAbandoned = false;
+		var siCompleted = false;
+
+		function trackAmy(eventType, data) {
+			if (typeof window.amyTrack === 'function') {
+				window.amyTrack(eventType, data);
+			}
+		}
+
+		function maybeAbandonSubmitIdea() {
+			if (siAbandoned || siCompleted || !siStarted) {
+				return;
+			}
+			siAbandoned = true;
+			trackAmy('submit_idea_abandoned', { last_step: chatPhase || 'services' });
+		}
+
+		document.addEventListener('visibilitychange', function () {
+			if (document.visibilityState === 'hidden') {
+				maybeAbandonSubmitIdea();
+			}
+		});
+		window.addEventListener('pagehide', maybeAbandonSubmitIdea);
 
 		root.innerHTML =
 			'<section class="amy-si-section is-active" data-si-step="avatar-landing">' +
@@ -520,6 +544,11 @@
 		function beginChat() {
 			showStep('chat');
 			chatPhase = 'services';
+			if (!siStarted) {
+				siStarted = true;
+				trackAmy('submit_idea_started');
+				trackAmy('submit_idea_step_reached', { step: 'services' });
+			}
 			if (trayEl) {
 				trayEl.hidden = false;
 				trayEl.classList.remove('is-success');
@@ -601,6 +630,7 @@
 					renderFileChips();
 					questionIndex = 0;
 					chatPhase = 'questions';
+					trackAmy('submit_idea_step_reached', { step: 'questions' });
 					askCurrentQuestion();
 				})
 				.catch(function () {
@@ -765,6 +795,7 @@
 			var collected = collectAnswers();
 			answers = collected;
 			chatPhase = 'summary';
+			trackAmy('submit_idea_step_reached', { step: 'summary' });
 			setComposerMode('disabled');
 			setBusy(true);
 
@@ -840,6 +871,7 @@
 						renderContactBubble();
 					} else {
 						chatPhase = 'deep-dive';
+						trackAmy('submit_idea_step_reached', { step: 'deep-dive' });
 						appendBubble(result.data.message || '', 'assistant');
 						setComposerMode('text');
 						composerInput.focus();
@@ -1203,6 +1235,7 @@
 
 		function renderContactBubble() {
 			chatPhase = 'contact';
+			trackAmy('submit_idea_step_reached', { step: 'contact' });
 			setComposerMode('disabled');
 
 			var form = document.createElement('form');
@@ -1284,6 +1317,7 @@
 
 		function showConfirmation() {
 			chatPhase = 'done';
+			siCompleted = true;
 			setComposerMode('disabled');
 			attachBtn.disabled = true;
 			contactForm = null;
@@ -1537,6 +1571,7 @@
 						return null;
 					}
 					return notifyWordPress(result.data.brief).then(function () {
+						trackAmy('submit_idea_completed', { email: email });
 						showConfirmation();
 					});
 				})

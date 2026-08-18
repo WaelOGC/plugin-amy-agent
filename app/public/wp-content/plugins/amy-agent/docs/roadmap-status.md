@@ -9,9 +9,9 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-08-11 (amy-agent v0.2.16 / amy-agent-service v0.1.3,
-> live Python service confirmed running on Dokploy — repo `plugin-amy-agent`, path
-> `/amy-agent-service`, branch `main`).
+> Last verified against code: 2026-08-18 (amy-agent v0.2.17 / amy-agent-service v0.1.4).
+> Analytics Task 1 is implemented in plugin + service. Dokploy `data/` volume (whole
+> directory) already covers the new `analytics.db` — no extra volume config.
 
 ---
 
@@ -69,6 +69,32 @@
   assignee open, Request Extension in edit modal, AJAX proxies for notifications /
   extensions / ack; dashboard user sync for reassignment pool
 
+### 5. Analytics — complete (Task 1: plugin + service)
+- Backend: persistent SQLite at `data/analytics.db` (90-day retention, purged by
+  a second APScheduler job alongside task escalation). Lives in the existing
+  Dokploy `data/` volume — no extra volume config needed.
+- Event ingestion: `POST /v1/analytics/event` with a fixed event-type allowlist
+  (`page_view`, widget, Submit Idea funnel, `contact_form_*`). Unknown types
+  rejected with 400. IP geolocation via ip-api.com on first event of a session
+  (country/city only; raw IP is not stored). Failures never drop the event.
+- Lead scoring: `cold` / `warm` / `hot` computed on ingest and stored on the
+  session row. Admin list is ranked hot → warm → cold, then last seen.
+- WP: public `POST /wp-json/amy-agent/v1/track` (rate-limited independently of
+  chat) forwards via `Amy_Api_Client`. Site-wide `tracking-beacon.js` always
+  loads on the front end (not gated by the widget). Public contract:
+  `window.amyTrack(eventType, data)`. Widget + Submit Idea fire real events.
+- Admin: `amy-analytics` is a real lead list (Visitor / Location / Last seen /
+  Signal / Status) with All / Hot / Warm / Cold filter. No charts, no fake
+  numbers. Empty state is a genuine empty table when no sessions exist.
+- **Theme-side Contact form hooks are NOT in this task.** The backend accepts
+  `contact_form_*` events, but nothing fires them until the separate theme
+  task lands. The admin page will show real data for page views, widget, and
+  Submit Idea immediately; Contact-form-based leads will not populate until
+  then.
+- **Newsletter tracking is excluded** until the newsletter subscribe feature
+  itself has a working backend (would be fake data today). See
+  `07-analytics-plan.md`.
+
 ---
 
 ## 🚧 STUB ONLY — menu item exists, page says "Coming soon.", zero logic behind it
@@ -79,8 +105,6 @@ array) — these are **not partially built**, they are literally one hardcoded s
 - **Chat** (`amy-chat`) — priority #3 Dashboard Chat. Nothing built. Plan locked:
   `docs/03-dashboard-chat-plan.md` (WP admin + Telegram Admin Bot as Amy the
   Leader with conversation memory; specialists/`/` deferred until tools exist).
-- **Analytics** (`amy-analytics`) — priority #5. Nothing built. Plan approved:
-  `docs/07-analytics-plan.md` (decisions locked 2026-08-10; no code yet).
 - **SEO Tasks** (`amy-seo-tasks`) — priority #7. Nothing built. Plan locked:
   `docs/06-seo-tasks-plan.md`.
 - **Email Marketing** (`amy-email-marketing`) — priority #8 stub page; plan locked:
@@ -122,21 +146,24 @@ Given the agreed priority order and what's already live:
   Spec: `docs/03-dashboard-chat-plan.md`. Still open before a Cursor prompt:
   BotFather setup + admin User ID whitelist storage, conversation schema,
   website→Telegram link-code expiry. No working `/` specialists in this phase.
+- **Theme-side Analytics Task 2** (does not block the plugin/service pipeline):
+  Clarity script tag + Contact form `window.amyTrack(...)` hooks so
+  `contact_form_*` events actually fire. Cookie-policy copy update
+  (`legal-cookie-policy.md`) is also still outstanding from `07-analytics-plan.md` §5.
 - **Submit Your Idea 4.2 improvements** (still priority #1 territory): autosave draft,
   follow-up if visitor abandons page — lead scoring now lives under Analytics
-  (`07-analytics-plan.md`), not as a separate SI-only feature.
+  (`07-analytics-plan.md`) and is implemented for Task 1.
 - **Admin Roles, Permissions & Social Publishing** (#4): admin roles,
   invitations, usage limits, and multi-platform (Telegram/X/LinkedIn/
   Discord) automated publishing via the pluggable
   notification layer — distinct from the Admin Bot chat surface in #3.
 
-**Do not jump to Analytics/SEO/Email Marketing (#5–#8) implementation yet** —
-Analytics plan is approved (`07-analytics-plan.md`) but stays after #3 ships
-(then Analytics is the first real tool, per `03-dashboard-chat-plan.md` §5).
-Email Marketing plan is locked (`04-email-marketing-plan.md`) but depends on
-Dashboard Chat + Analytics; cold-outreach compliance still open before that
+Analytics Task 1 (plugin + service) shipped 2026-08-18. SEO Tasks (#7) and
+Email Marketing (#8) stay after Dashboard Chat. Email Marketing still depends
+on Dashboard Chat + Analytics; cold-outreach compliance still open before that
 goes live. Specialist `/` commands stay off until Analytics + SEO + Email
-Marketing all exist.
+Marketing all exist (Analytics Task 1 is the plugin/service half; theme Contact
+hooks are the remaining Analytics gap).
 
 ---
 

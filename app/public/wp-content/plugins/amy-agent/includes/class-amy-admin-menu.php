@@ -8,13 +8,14 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers Amy → Overview / My Profile / Task Service / Settings / Brand & Avatar / placeholders in wp-admin.
+ * Registers Amy → Overview / My Profile / Task Service / Analytics / Settings / Brand & Avatar / placeholders in wp-admin.
  */
 class Amy_Admin_Menu {
 
 	const PARENT_SLUG             = 'amy-overview';
 	const MY_PROFILE_PAGE_SLUG    = 'amy-my-profile';
 	const TASK_SERVICE_PAGE_SLUG  = 'amy-task-service';
+	const ANALYTICS_PAGE_SLUG     = 'amy-analytics';
 	const BRAND_PAGE_SLUG         = 'amy-brand-avatar';
 	const USER_AVATAR_META        = 'amy_agent_user_avatar_url';
 
@@ -37,6 +38,11 @@ class Amy_Admin_Menu {
 	 * @var string|false|null
 	 */
 	private $hook_task_service;
+
+	/**
+	 * @var string|false|null
+	 */
+	private $hook_analytics;
 
 	/**
 	 * @var string|false|null
@@ -129,9 +135,27 @@ class Amy_Admin_Menu {
 			array( $this, 'render_brand_page' )
 		);
 
+		$this->hook_placeholders['amy-chat'] = add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Chat', 'amy-agent' ),
+			__( 'Chat', 'amy-agent' ),
+			'manage_options',
+			'amy-chat',
+			function () {
+				$this->render_placeholder( __( 'Chat', 'amy-agent' ) );
+			}
+		);
+
+		$this->hook_analytics = add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Analytics', 'amy-agent' ),
+			__( 'Analytics', 'amy-agent' ),
+			'manage_options',
+			self::ANALYTICS_PAGE_SLUG,
+			array( $this, 'render_analytics_page' )
+		);
+
 		$placeholders = array(
-			'amy-chat'            => __( 'Chat', 'amy-agent' ),
-			'amy-analytics'       => __( 'Analytics', 'amy-agent' ),
 			'amy-seo-tasks'       => __( 'SEO Tasks', 'amy-agent' ),
 			'amy-email-marketing' => __( 'Email Marketing', 'amy-agent' ),
 		);
@@ -285,6 +309,51 @@ class Amy_Admin_Menu {
 						'extensionAuto'    => __( 'Extension granted automatically. Due date updated.', 'amy-agent' ),
 						'extensionPending' => __( 'Extension request sent — awaiting creator approval.', 'amy-agent' ),
 						'extensionInvalid' => __( 'Enter a positive number of hours.', 'amy-agent' ),
+					),
+				)
+			);
+			return;
+		}
+
+		if ( $this->hook_analytics === $hook_suffix ) {
+			wp_enqueue_style(
+				'amy-agent-admin-analytics-fonts',
+				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+				array(),
+				null
+			);
+
+			wp_enqueue_style(
+				'amy-agent-admin-analytics',
+				AMY_AGENT_URL . 'admin/css/admin-analytics.css',
+				array( 'amy-agent-admin-analytics-fonts', 'dashicons' ),
+				AMY_AGENT_VERSION
+			);
+
+			wp_enqueue_script(
+				'amy-agent-admin-analytics',
+				AMY_AGENT_URL . 'admin/js/admin-analytics.js',
+				array( 'jquery' ),
+				AMY_AGENT_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'amy-agent-admin-analytics',
+				'amyAgentAnalytics',
+				array(
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( Amy_Analytics_Ajax::NONCE_ACTION ),
+					'i18n'    => array(
+						'loadError'  => __( 'Could not load leads. Check the Amy Agent service connection.', 'amy-agent' ),
+						'empty'      => __( 'No visitors yet.', 'amy-agent' ),
+						'justNow'    => __( 'just now', 'amy-agent' ),
+						'minutesAgo' => __( 'm ago', 'amy-agent' ),
+						'hoursAgo'   => __( 'h ago', 'amy-agent' ),
+						'daysAgo'    => __( 'd ago', 'amy-agent' ),
+						'statusHot'  => __( 'Hot', 'amy-agent' ),
+						'statusWarm' => __( 'Warm', 'amy-agent' ),
+						'statusCold' => __( 'Cold', 'amy-agent' ),
 					),
 				)
 			);
@@ -1587,6 +1656,69 @@ class Amy_Admin_Menu {
 					<?php echo esc_html( $default ); ?>
 				</p>
 			</form>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Analytics — ranked visitor / lead list backed by the Python analytics API.
+	 */
+	public function render_analytics_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?>
+		<div class="wrap amy-agent-analytics" id="amy-agent-analytics">
+			<header class="amy-agent-analytics__header">
+				<h1 class="amy-agent-analytics__title"><?php echo esc_html__( 'Analytics', 'amy-agent' ); ?></h1>
+				<p class="amy-agent-analytics__intro">
+					<?php echo esc_html__( 'Who visited, what they did, and who almost became a client.', 'amy-agent' ); ?>
+				</p>
+				<span class="amy-agent-analytics__underline" aria-hidden="true"></span>
+			</header>
+
+			<p class="amy-agent-analytics__error" id="amy-agent-analytics-error" hidden role="alert"></p>
+
+			<div class="amy-agent-analytics__toolbar">
+				<div class="amy-agent-analytics__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter by lead status', 'amy-agent' ); ?>">
+					<button
+						type="button"
+						class="amy-agent-analytics__filter is-active"
+						role="tab"
+						aria-selected="true"
+						data-amy-analytics-status=""
+					>
+						<?php echo esc_html__( 'All', 'amy-agent' ); ?>
+					</button>
+					<button type="button" class="amy-agent-analytics__filter" role="tab" aria-selected="false" data-amy-analytics-status="hot">
+						<?php echo esc_html__( 'Hot', 'amy-agent' ); ?>
+					</button>
+					<button type="button" class="amy-agent-analytics__filter" role="tab" aria-selected="false" data-amy-analytics-status="warm">
+						<?php echo esc_html__( 'Warm', 'amy-agent' ); ?>
+					</button>
+					<button type="button" class="amy-agent-analytics__filter" role="tab" aria-selected="false" data-amy-analytics-status="cold">
+						<?php echo esc_html__( 'Cold', 'amy-agent' ); ?>
+					</button>
+				</div>
+			</div>
+
+			<div class="amy-agent-analytics__list">
+				<table class="amy-agent-analytics__table">
+					<thead>
+						<tr>
+							<th><?php echo esc_html__( 'Visitor', 'amy-agent' ); ?></th>
+							<th><?php echo esc_html__( 'Location', 'amy-agent' ); ?></th>
+							<th><?php echo esc_html__( 'Last seen', 'amy-agent' ); ?></th>
+							<th><?php echo esc_html__( 'Signal', 'amy-agent' ); ?></th>
+							<th><?php echo esc_html__( 'Status', 'amy-agent' ); ?></th>
+						</tr>
+					</thead>
+					<tbody id="amy-agent-analytics-body"></tbody>
+				</table>
+				<p class="amy-agent-analytics__empty" id="amy-agent-analytics-empty" hidden>
+					<?php echo esc_html__( 'No visitors yet.', 'amy-agent' ); ?>
+				</p>
+			</div>
 		</div>
 		<?php
 	}

@@ -65,6 +65,11 @@ class Amy_Plugin {
 	public $tasks_ajax;
 
 	/**
+	 * @var Amy_Analytics_Ajax
+	 */
+	public $analytics_ajax;
+
+	/**
 	 * Returns the singleton instance.
 	 *
 	 * @return Amy_Plugin
@@ -84,6 +89,7 @@ class Amy_Plugin {
 		$this->admin_menu       = new Amy_Admin_Menu( $this->settings );
 		$this->api_client       = new Amy_Api_Client( $this->settings );
 		$this->tasks_ajax       = new Amy_Tasks_Ajax( $this->api_client );
+		$this->analytics_ajax   = new Amy_Analytics_Ajax( $this->api_client );
 		$this->rest             = new Amy_Rest( $this->api_client, $this->settings );
 		$this->theme_bridge     = new Amy_Theme_Bridge( $this->settings );
 		$this->assets           = new Amy_Assets( $this->settings );
@@ -93,6 +99,7 @@ class Amy_Plugin {
 		$this->settings->register();
 		$this->admin_menu->register();
 		$this->tasks_ajax->register();
+		$this->analytics_ajax->register();
 		$this->rest->register();
 		$this->theme_bridge->register();
 		$this->assets->register();

@@ -81,7 +81,7 @@ class Amy_Submit_Idea {
 		wp_enqueue_script(
 			'amy-submit-idea',
 			AMY_AGENT_URL . 'public/js/submit-idea.js',
-			array(),
+			array( 'amy-agent-tracking' ),
 			AMY_AGENT_VERSION,
 			true
 		);

@@ -177,6 +177,30 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST /v1/analytics/event — ingest one visitor event.
+	 *
+	 * @param array<string, mixed> $payload Event body (session_id, event_type, …).
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function track_event( array $payload ) {
+		return $this->request( 'POST', '/v1/analytics/event', $payload );
+	}
+
+	/**
+	 * GET /v1/analytics/leads — optional status filter (cold/warm/hot).
+	 *
+	 * @param string|null $status Lead status filter.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_leads( $status = null ) {
+		$path = '/v1/analytics/leads';
+		if ( null !== $status && '' !== $status ) {
+			$path .= '?' . http_build_query( array( 'status' => $status ) );
+		}
+		return $this->request( 'GET', $path );
+	}
+
+	/**
 	 * GET /v1/tasks — optional filters: status, priority, assignee_wp_user_id.
 	 *
 	 * @param array<string, mixed> $filters Query filters.

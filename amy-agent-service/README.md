@@ -51,7 +51,7 @@ PHP may need a different host than the browser:
 
 Submit Your Idea sessions are stored in SQLite at `data/submit_idea_sessions.db` (created automatically). This survives **process restarts** on the same filesystem. A **Dokploy redeploy** that starts a fresh container will still wipe sessions unless `data/` (or the app directory) is mounted as a persistent volume in the Dokploy service config (Application → Volumes).
 
-Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (created automatically, no TTL). It has the **exact same volume-mounting requirement** as `submit_idea_sessions.db`: a Dokploy redeploy will wipe tasks unless `data/` is mounted as a persistent volume in the Dokploy service configuration. Do not mount only one of the two DB files — mount the whole `data/` directory.
+Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (created automatically, no TTL). Analytics events live in `data/analytics.db` (90-day retention). All three files have the **exact same volume-mounting requirement**: a Dokploy redeploy will wipe them unless `data/` is mounted as a persistent volume in the Dokploy service configuration. Do not mount individual DB files — mount the whole `data/` directory.
 
 ## Endpoints (see plugin `docs/api-contract.md`)
 
@@ -66,6 +66,9 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | GET | `/v1/tasks/{id}` | Fetch one task |
 | PATCH | `/v1/tasks/{id}` | Partial update |
 | DELETE | `/v1/tasks/{id}` | Delete task |
+| POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set) |
+| GET | `/v1/analytics/leads` | Lead list for the admin page (optional `status`) |
+| GET | `/v1/analytics/leads/{session_id}/events` | Event timeline for one session |
 | GET | `/uploads/submit-idea/{session_id}/{file}` | Public static files (no auth); scoped to upload dir |
 
 ## Tests

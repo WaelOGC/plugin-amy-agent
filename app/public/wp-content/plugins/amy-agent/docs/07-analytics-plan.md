@@ -1,8 +1,22 @@
 # Amy Agent — Analytics Tool Plan
 
 > Location: `amy-agent/docs/07-analytics-plan.md`
-> Status: **Decisions confirmed (2026-08-10) — planning finalized, no code yet.**
-> Do not write an implementation prompt until Wael explicitly asks to build this.
+
+## Status: Complete — Task 1 (plugin + service), 2026-08-18
+
+Tracking pipeline, lead scoring, and the admin lead list are built and real
+(no placeholder data). Theme-side hooks (Clarity script tag, Contact form
+event hook via `window.amyTrack`) are a **separate task** and were not part
+of this build.
+
+**Follow-up — newsletter tracking:** intentionally excluded. The site
+newsletter form has no working backend yet, so a newsletter event type would
+be fake data. Add it when the newsletter subscribe feature itself is built.
+
+**Follow-up — cookie policy:** §5 still requires updating
+`legal-cookie-policy.md` (theme/legal content, out of scope for Task 1).
+
+> Original planning note (kept for history): decisions confirmed 2026-08-10.
 
 ---
 

@@ -169,6 +169,40 @@ Routes messages to the selected provider adapter and returns the assistant reply
 
 ---
 
+## Analytics (Python)
+
+All require `X-Amy-Secret`. Unknown `event_type` values are rejected (`400`); the allowlist is:
+
+`page_view`, `widget_opened`, `widget_message_sent`, `submit_idea_started`, `submit_idea_step_reached`, `submit_idea_abandoned`, `submit_idea_completed`, `contact_form_started`, `contact_form_abandoned`, `contact_form_submitted`.
+
+There is no newsletter event type (the newsletter form has no working backend yet).
+
+### `POST /v1/analytics/event`
+
+```json
+{
+  "session_id": "uuid",
+  "event_type": "page_view",
+  "event_data": { "step": "contact" },
+  "page_path": "/blog/example",
+  "ip": "203.0.113.10"
+}
+```
+
+`event_data` and `page_path` are optional. `ip` is injected by WordPress (never stored long-term; used once per new session for country/city lookup).
+
+**Response `200`:** `{ "ok": true, "session_id": "…", "lead_status": "cold"|"warm"|"hot" }`
+
+### `GET /v1/analytics/leads`
+
+Optional query `status=cold|warm|hot`. Ranked hot → warm → cold, then `last_seen_at` descending. Each item includes truncated session id, location, last seen, lead email if captured, and a server-built `signal` string.
+
+### `GET /v1/analytics/leads/{session_id}/events`
+
+Full event timeline for one session (`404` if unknown).
+
+---
+
 ## WordPress REST (browser-facing)
 
 Namespace: `amy-agent/v1`
@@ -177,6 +211,14 @@ Namespace: `amy-agent/v1`
 | --- | --- | --- | --- |
 | `GET` | `/wp-json/amy-agent/v1/health` | `manage_options` | Settings presence + Python `/v1/health` reachability |
 | `POST` | `/wp-json/amy-agent/v1/chat` | Valid `X-WP-Nonce` (`wp_rest`) | Public widget chat; proxies to Python |
+| `POST` | `/wp-json/amy-agent/v1/track` | Public (unauthenticated); REST nonce still sent so logged-in visitors are not blocked by cookie CSRF | Tracking beacon; proxies to Python `/v1/analytics/event` |
+
+### Public tracking notes
+
+- Independent rate limit: **20 requests per IP per 60 seconds** (transient prefix `amy_track_rl_`). Exceeded → `429`.
+- `event_type` must be one of the fixed allowlist; unknown types → `400`. PHP injects the client IP; the beacon never sends it.
+- Returns `200 {"ok": true}` on success. Requires service URL + shared secret (`is_service_configured`); does **not** require the widget to be enabled.
+- Public JS contract: `window.amyTrack(eventType, data)`. Abandon events use `navigator.sendBeacon()`.
 
 ### Public chat notes
 

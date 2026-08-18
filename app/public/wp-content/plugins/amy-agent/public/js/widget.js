@@ -233,6 +233,9 @@
 			launcher.setAttribute('title', open ? cfg.i18n.close : cfg.i18n.open);
 			if (open) {
 				input.focus();
+				if (window.amyTrack) {
+					window.amyTrack('widget_opened');
+				}
 			}
 		}
 
@@ -277,6 +280,9 @@
 			input.value = '';
 			appendBubble(text, 'user');
 			messages.push({ role: 'user', content: text });
+			if (window.amyTrack) {
+				window.amyTrack('widget_message_sent');
+			}
 
 			var thinking = appendBubble(cfg.i18n.thinking, 'status');
 			setBusy(true);
