@@ -201,6 +201,78 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST /v1/seo-tasks/check — rule-based snapshot check.
+	 *
+	 * @param array<string, mixed> $payload SeoCheckRequest body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function seo_check( array $payload ) {
+		return $this->request( 'POST', '/v1/seo-tasks/check', $payload );
+	}
+
+	/**
+	 * GET /v1/seo-tasks/checks — optional status and verdict filters.
+	 *
+	 * @param string|null $status  pending_approval|approved|rejected.
+	 * @param string|null $verdict red|orange|green.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_seo_checks( $status = null, $verdict = null ) {
+		$query = array();
+		if ( null !== $status && '' !== $status ) {
+			$query['status'] = $status;
+		}
+		if ( null !== $verdict && '' !== $verdict ) {
+			$query['verdict'] = $verdict;
+		}
+		$path = '/v1/seo-tasks/checks';
+		if ( ! empty( $query ) ) {
+			$path .= '?' . http_build_query( $query );
+		}
+		return $this->request( 'GET', $path );
+	}
+
+	/**
+	 * GET /v1/seo-tasks/checks/{id}.
+	 *
+	 * @param string $id Check UUID.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function get_seo_check( $id ) {
+		return $this->request( 'GET', '/v1/seo-tasks/checks/' . rawurlencode( (string) $id ) );
+	}
+
+	/**
+	 * POST /v1/seo-tasks/checks/{id}/approve — records approval; does not write to WordPress.
+	 *
+	 * @param string               $id      Check UUID.
+	 * @param array<string, mixed> $fields  Approved field values.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function approve_seo_check( $id, array $fields ) {
+		return $this->request(
+			'POST',
+			'/v1/seo-tasks/checks/' . rawurlencode( (string) $id ) . '/approve',
+			array( 'approved_fields' => $fields )
+		);
+	}
+
+	/**
+	 * POST /v1/seo-tasks/checks/{id}/reject.
+	 *
+	 * @param string      $id     Check UUID.
+	 * @param string|null $reason Optional reason.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function reject_seo_check( $id, $reason = null ) {
+		return $this->request(
+			'POST',
+			'/v1/seo-tasks/checks/' . rawurlencode( (string) $id ) . '/reject',
+			array( 'reason' => $reason )
+		);
+	}
+
+	/**
 	 * GET /v1/tasks — optional filters: status, priority, assignee_wp_user_id.
 	 *
 	 * @param array<string, mixed> $filters Query filters.

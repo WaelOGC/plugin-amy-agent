@@ -9,9 +9,9 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-08-18 (amy-agent v0.2.17 / amy-agent-service v0.1.4).
-> Analytics Task 1 is implemented in plugin + service. Dokploy `data/` volume (whole
-> directory) already covers the new `analytics.db` — no extra volume config.
+> Last verified against code: 2026-08-18 (amy-agent v0.2.18 / amy-agent-service v0.1.5).
+> SEO Tasks Task 1 is implemented in plugin + service. Dokploy `data/` volume (whole
+> directory) already covers the new `seo_tasks.db` — no extra volume config.
 
 ---
 
@@ -95,6 +95,23 @@
   itself has a working backend (would be fake data today). See
   `07-analytics-plan.md`.
 
+### 6. SEO Tasks — Task 1 complete (Yoast wiring + single-target approval)
+- WP: `class-amy-seo-meta.php` registers Yoast post-meta keys for `post` and
+  `page` with `show_in_rest`, so core REST (`/wp/v2/posts/{id}`, `/wp/v2/pages/{id}`)
+  can read and write them. Scores (`_yoast_wpseo_linkdex`,
+  `_yoast_wpseo_content_score`) are read-only. Featured-image alt is **not**
+  re-registered — core already exposes `alt_text` on `/wp/v2/media/{id}`.
+- Backend: rule-based `app/services/seo_check.py` (no AI call). FastAPI
+  `/v1/seo-tasks/*` behind `X-Amy-Secret`. Persistent SQLite at
+  `data/seo_tasks.db` (same Dokploy `data/` volume as `tasks.db` /
+  `analytics.db` — no extra volume config).
+- Admin: `amy-seo-tasks` is a real page — search a published post/page,
+  Check SEO, verdict + findings, blank editable fix fields, approve (WP REST
+  write then Python record) or reject. History list from stored checks.
+- **Not in this task (do not treat the UI as if they exist):** full-site
+  sweep / batching, AI image generation, AI-generated suggested SEO copy,
+  Telegram UI, periodic re-check scheduling.
+
 ---
 
 ## 🚧 STUB ONLY — menu item exists, page says "Coming soon.", zero logic behind it
@@ -105,8 +122,6 @@ array) — these are **not partially built**, they are literally one hardcoded s
 - **Chat** (`amy-chat`) — priority #3 Dashboard Chat. Nothing built. Plan locked:
   `docs/03-dashboard-chat-plan.md` (WP admin + Telegram Admin Bot as Amy the
   Leader with conversation memory; specialists/`/` deferred until tools exist).
-- **SEO Tasks** (`amy-seo-tasks`) — priority #7. Nothing built. Plan locked:
-  `docs/06-seo-tasks-plan.md`.
 - **Email Marketing** (`amy-email-marketing`) — priority #8 stub page; plan locked:
   `docs/04-email-marketing-plan.md`. Not a newsletter tool — Amy-triggered
   1-to-1 sends via Hostinger Agentic Mail REST + `message.received` webhook.
@@ -158,12 +173,14 @@ Given the agreed priority order and what's already live:
   Discord) automated publishing via the pluggable
   notification layer — distinct from the Admin Bot chat surface in #3.
 
-Analytics Task 1 (plugin + service) shipped 2026-08-18. SEO Tasks (#7) and
-Email Marketing (#8) stay after Dashboard Chat. Email Marketing still depends
-on Dashboard Chat + Analytics; cold-outreach compliance still open before that
-goes live. Specialist `/` commands stay off until Analytics + SEO + Email
-Marketing all exist (Analytics Task 1 is the plugin/service half; theme Contact
-hooks are the remaining Analytics gap).
+Analytics Task 1 (plugin + service) shipped 2026-08-18. SEO Tasks Task 1
+(Yoast REST wiring + single-target approval) shipped 2026-08-18; Task 2
+(full-site sweep + AI image generation) is not built. Email Marketing (#8)
+stays after Dashboard Chat. Email Marketing still depends on Dashboard Chat +
+Analytics; cold-outreach compliance still open before that goes live.
+Specialist `/` commands stay off until Analytics + SEO + Email Marketing all
+exist (Analytics Task 1 is the plugin/service half; theme Contact hooks are
+the remaining Analytics gap).
 
 ---
 

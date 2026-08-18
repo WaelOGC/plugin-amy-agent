@@ -203,6 +203,34 @@ Full event timeline for one session (`404` if unknown).
 
 ---
 
+## SEO Tasks (Python)
+
+All require `X-Amy-Secret`. The Python service never calls WordPress. WordPress fetches live field values via core REST, posts the snapshot here, and writes approved values back through `/wp/v2/posts/{id}` or `/wp/v2/pages/{id}` (Yoast meta registered with `show_in_rest`) plus `/wp/v2/media/{id}` for featured-image `alt_text`.
+
+### `POST /v1/seo-tasks/check`
+
+Body: `wp_post_id`, `post_type`, `title`, `content_excerpt`, `focus_keyphrase`, `seo_title`, `meta_description`, `has_featured_image`, `featured_image_alt`, `og_title`, `og_description`, `og_image`, `twitter_title`, `twitter_description`, `twitter_image`, `category_count`.
+
+Runs rule-based checks (not an AI call). Stores a row with `status: "pending_approval"` and returns `check_id`, `verdict` (`red` / `orange` / `green`), and `findings` (`field`, `severity` `missing`|`weak`, `message`).
+
+### `GET /v1/seo-tasks/checks`
+
+Optional query `status=pending_approval|approved|rejected` and `verdict=red|orange|green`. Newest first. Invalid filter → `400`.
+
+### `GET /v1/seo-tasks/checks/{check_id}`
+
+Single check (`404` if unknown).
+
+### `POST /v1/seo-tasks/checks/{check_id}/approve`
+
+Body: `{ "approved_fields": { … } }` — the values WordPress actually wrote (may differ from empty Task-1 suggestion fields). Marks `status = "approved"`. Not pending → `409`.
+
+### `POST /v1/seo-tasks/checks/{check_id}/reject`
+
+Optional `{ "reason": "…" }`. Marks `status = "rejected"`. No WordPress write. Not pending → `409`.
+
+---
+
 ## WordPress REST (browser-facing)
 
 Namespace: `amy-agent/v1`

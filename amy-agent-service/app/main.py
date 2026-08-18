@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import config_task_rules as rules
 from app.db import analytics_db
-from app.routes import analytics, chat, config_sync, health, notifications, submit_idea, tasks
+from app.routes import analytics, chat, config_sync, health, notifications, seo_tasks, submit_idea, tasks
 from app.routes.submit_idea import UPLOAD_ROOT
 from app.services.task_escalation import run_escalation_pass
 
@@ -70,7 +70,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Amy Agent Service",
-    version="0.1.4",
+    version="0.1.5",
     description="Intelligence layer for the Amy Agent WordPress plugin (Phase 1 scaffold).",
     lifespan=lifespan,
 )
@@ -82,6 +82,7 @@ app.include_router(submit_idea.router)
 app.include_router(tasks.router)
 app.include_router(notifications.router)
 app.include_router(analytics.router)
+app.include_router(seo_tasks.router)
 
 # Public, unauthenticated file serving for Submit Idea attachments (email links).
 # Scoped to uploads/submit-idea only; Starlette StaticFiles blocks path traversal

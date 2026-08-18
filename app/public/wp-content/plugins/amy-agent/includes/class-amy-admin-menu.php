@@ -8,7 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers Amy → Overview / My Profile / Task Service / Analytics / Settings / Brand & Avatar / placeholders in wp-admin.
+ * Registers Amy → Overview / My Profile / Task Service / Analytics / SEO Tasks / Settings / Brand & Avatar / placeholders in wp-admin.
  */
 class Amy_Admin_Menu {
 
@@ -16,6 +16,7 @@ class Amy_Admin_Menu {
 	const MY_PROFILE_PAGE_SLUG    = 'amy-my-profile';
 	const TASK_SERVICE_PAGE_SLUG  = 'amy-task-service';
 	const ANALYTICS_PAGE_SLUG     = 'amy-analytics';
+	const SEO_TASKS_PAGE_SLUG     = 'amy-seo-tasks';
 	const BRAND_PAGE_SLUG         = 'amy-brand-avatar';
 	const USER_AVATAR_META        = 'amy_agent_user_avatar_url';
 
@@ -43,6 +44,11 @@ class Amy_Admin_Menu {
 	 * @var string|false|null
 	 */
 	private $hook_analytics;
+
+	/**
+	 * @var string|false|null
+	 */
+	private $hook_seo_tasks;
 
 	/**
 	 * @var string|false|null
@@ -155,8 +161,16 @@ class Amy_Admin_Menu {
 			array( $this, 'render_analytics_page' )
 		);
 
+		$this->hook_seo_tasks = add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'SEO Tasks', 'amy-agent' ),
+			__( 'SEO Tasks', 'amy-agent' ),
+			'manage_options',
+			self::SEO_TASKS_PAGE_SLUG,
+			array( $this, 'render_seo_tasks_page' )
+		);
+
 		$placeholders = array(
-			'amy-seo-tasks'       => __( 'SEO Tasks', 'amy-agent' ),
 			'amy-email-marketing' => __( 'Email Marketing', 'amy-agent' ),
 		);
 
@@ -354,6 +368,96 @@ class Amy_Admin_Menu {
 						'statusHot'  => __( 'Hot', 'amy-agent' ),
 						'statusWarm' => __( 'Warm', 'amy-agent' ),
 						'statusCold' => __( 'Cold', 'amy-agent' ),
+					),
+				)
+			);
+			return;
+		}
+
+		if ( $this->hook_seo_tasks === $hook_suffix ) {
+			wp_enqueue_style(
+				'amy-agent-admin-seo-tasks-fonts',
+				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+				array(),
+				null
+			);
+
+			wp_enqueue_style(
+				'amy-agent-admin-seo-tasks',
+				AMY_AGENT_URL . 'admin/css/admin-seo-tasks.css',
+				array( 'amy-agent-admin-seo-tasks-fonts', 'dashicons' ),
+				AMY_AGENT_VERSION
+			);
+
+			wp_enqueue_script(
+				'amy-agent-admin-seo-tasks',
+				AMY_AGENT_URL . 'admin/js/admin-seo-tasks.js',
+				array( 'jquery' ),
+				AMY_AGENT_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'amy-agent-admin-seo-tasks',
+				'amyAgentSeoTasks',
+				array(
+					'ajaxUrl'  => admin_url( 'admin-ajax.php' ),
+					'nonce'    => wp_create_nonce( Amy_Seo_Tasks_Ajax::NONCE_ACTION ),
+					'restUrl'  => esc_url_raw( rest_url() ),
+					'restNonce' => wp_create_nonce( 'wp_rest' ),
+					'metaKeys' => Amy_Seo_Meta::writable_field_map(),
+					'i18n'     => array(
+						'error'              => __( 'Something went wrong. Please try again.', 'amy-agent' ),
+						'searchError'        => __( 'Could not search posts and pages.', 'amy-agent' ),
+						'noSearchResults'    => __( 'No published posts or pages matched.', 'amy-agent' ),
+						'untitled'           => __( '(untitled)', 'amy-agent' ),
+						'post'               => __( 'Post', 'amy-agent' ),
+						'page'               => __( 'Page', 'amy-agent' ),
+						'checkSeo'           => __( 'Check SEO', 'amy-agent' ),
+						'checking'           => __( 'Checking…', 'amy-agent' ),
+						'checkError'         => __( 'Could not run the SEO check. Check the Amy Agent service connection.', 'amy-agent' ),
+						'loadPostError'      => __( 'Could not load that post from WordPress.', 'amy-agent' ),
+						'notPublished'       => __( 'Please choose a published post or page.', 'amy-agent' ),
+						'verdictRed'         => __( 'Needs work', 'amy-agent' ),
+						'verdictOrange'      => __( 'Improvements', 'amy-agent' ),
+						'verdictGreen'       => __( 'Good', 'amy-agent' ),
+						'statusPending'      => __( 'Pending approval', 'amy-agent' ),
+						'statusApproved'     => __( 'Approved', 'amy-agent' ),
+						'statusRejected'     => __( 'Rejected', 'amy-agent' ),
+						'severityMissing'    => __( 'Missing', 'amy-agent' ),
+						'severityWeak'       => __( 'Weak', 'amy-agent' ),
+						'noFindings'         => __( 'No issues found on the fields Amy checks in this version.', 'amy-agent' ),
+						'noAiCopy'           => __( 'Amy is reporting what is missing. Suggested copy is not generated in this version — fill in the fields yourself before approving.', 'amy-agent' ),
+						'noImageGen'         => __( 'Amy can report a missing featured image, but image generation is not in this version.', 'amy-agent' ),
+						'pageCategories'     => __( 'Pages do not use categories in WordPress. This finding is informational.', 'amy-agent' ),
+						'categoriesHint'     => __( 'Assign categories below, or in the post editor.', 'amy-agent' ),
+						'noCategories'       => __( 'No categories exist on this site yet.', 'amy-agent' ),
+						'categoriesLoadError' => __( 'Could not load categories.', 'amy-agent' ),
+						'fieldKeyphrase'     => __( 'Focus keyphrase', 'amy-agent' ),
+						'fieldSeoTitle'      => __( 'SEO title', 'amy-agent' ),
+						'fieldMetaDesc'      => __( 'Meta description', 'amy-agent' ),
+						'fieldFeatured'      => __( 'Featured image', 'amy-agent' ),
+						'fieldAlt'           => __( 'Featured image alt text', 'amy-agent' ),
+						'fieldOg'            => __( 'Facebook / Open Graph', 'amy-agent' ),
+						'fieldTwitter'       => __( 'X / Twitter', 'amy-agent' ),
+						'fieldCategories'    => __( 'Categories', 'amy-agent' ),
+						'fieldOgTitle'       => __( 'Facebook title', 'amy-agent' ),
+						'fieldOgDesc'        => __( 'Facebook description', 'amy-agent' ),
+						'fieldOgImage'       => __( 'Facebook image URL', 'amy-agent' ),
+						'fieldTwTitle'       => __( 'X title', 'amy-agent' ),
+						'fieldTwDesc'        => __( 'X description', 'amy-agent' ),
+						'fieldTwImage'       => __( 'X image URL', 'amy-agent' ),
+						'approve'            => __( 'Approve & write', 'amy-agent' ),
+						'reject'             => __( 'Reject', 'amy-agent' ),
+						'rejectReason'       => __( 'Reject reason (optional)', 'amy-agent' ),
+						'saving'             => __( 'Saving…', 'amy-agent' ),
+						'approveSuccess'     => __( 'Approved. Fields were written to WordPress.', 'amy-agent' ),
+						'approveError'       => __( 'WordPress was updated, but recording approval failed.', 'amy-agent' ),
+						'writeError'         => __( 'Could not write fields through the WordPress REST API.', 'amy-agent' ),
+						'rejectSuccess'      => __( 'Check rejected. Nothing was written to WordPress.', 'amy-agent' ),
+						'rejectError'        => __( 'Could not reject this check.', 'amy-agent' ),
+						'historyError'       => __( 'Could not load previous checks. Check the Amy Agent service connection.', 'amy-agent' ),
+						'loadCheckError'     => __( 'Could not load that check.', 'amy-agent' ),
 					),
 				)
 			);
@@ -1719,6 +1823,90 @@ class Amy_Admin_Menu {
 					<?php echo esc_html__( 'No visitors yet.', 'amy-agent' ); ?>
 				</p>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * SEO Tasks — single published post/page check with approval before write.
+	 */
+	public function render_seo_tasks_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?>
+		<div class="wrap amy-agent-seo" id="amy-agent-seo">
+			<header class="amy-agent-seo__header">
+				<h1 class="amy-agent-seo__title"><?php echo esc_html__( 'SEO Tasks', 'amy-agent' ); ?></h1>
+				<p class="amy-agent-seo__intro">
+					<?php echo esc_html__( 'Point Amy at one published post or page. She reports what is missing or weak. Nothing is written until you approve.', 'amy-agent' ); ?>
+				</p>
+				<span class="amy-agent-seo__underline" aria-hidden="true"></span>
+			</header>
+
+			<p class="amy-agent-seo__scope">
+				<?php echo esc_html__( 'This version checks one target at a time. Amy does not generate suggested copy or images, and there is no full-site sweep. Fix fields below are blank for you to fill in.', 'amy-agent' ); ?>
+			</p>
+
+			<p class="amy-agent-seo__error" id="amy-agent-seo-error" hidden role="alert"></p>
+			<p class="amy-agent-seo__notice" id="amy-agent-seo-notice" hidden></p>
+
+			<section class="amy-agent-seo__panel" aria-labelledby="amy-agent-seo-target-title">
+				<h2 class="amy-agent-seo__panel-title" id="amy-agent-seo-target-title"><?php echo esc_html__( 'Target', 'amy-agent' ); ?></h2>
+				<div class="amy-agent-seo__picker">
+					<label class="screen-reader-text" for="amy-agent-seo-search"><?php echo esc_html__( 'Search published posts and pages', 'amy-agent' ); ?></label>
+					<input
+						type="search"
+						id="amy-agent-seo-search"
+						class="amy-agent-seo__search"
+						placeholder="<?php echo esc_attr__( 'Search published posts and pages…', 'amy-agent' ); ?>"
+						autocomplete="off"
+					/>
+					<ul class="amy-agent-seo__search-results" id="amy-agent-seo-search-results" hidden></ul>
+					<p class="amy-agent-seo__selected" id="amy-agent-seo-selected" hidden></p>
+					<button type="button" class="amy-agent-seo__btn amy-agent-seo__btn--accent" id="amy-agent-seo-check" disabled>
+						<?php echo esc_html__( 'Check SEO', 'amy-agent' ); ?>
+					</button>
+				</div>
+			</section>
+
+			<section class="amy-agent-seo__panel amy-agent-seo__results" id="amy-agent-seo-results" hidden aria-live="polite"></section>
+
+			<section class="amy-agent-seo__panel" aria-labelledby="amy-agent-seo-history-title">
+				<h2 class="amy-agent-seo__panel-title" id="amy-agent-seo-history-title"><?php echo esc_html__( 'Previous checks', 'amy-agent' ); ?></h2>
+				<div class="amy-agent-seo__toolbar">
+					<div class="amy-agent-seo__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter by status', 'amy-agent' ); ?>">
+						<button type="button" class="amy-agent-seo__filter is-active" role="tab" aria-selected="true" data-amy-seo-history-status=""><?php echo esc_html__( 'All statuses', 'amy-agent' ); ?></button>
+						<button type="button" class="amy-agent-seo__filter" role="tab" aria-selected="false" data-amy-seo-history-status="pending_approval"><?php echo esc_html__( 'Pending', 'amy-agent' ); ?></button>
+						<button type="button" class="amy-agent-seo__filter" role="tab" aria-selected="false" data-amy-seo-history-status="approved"><?php echo esc_html__( 'Approved', 'amy-agent' ); ?></button>
+						<button type="button" class="amy-agent-seo__filter" role="tab" aria-selected="false" data-amy-seo-history-status="rejected"><?php echo esc_html__( 'Rejected', 'amy-agent' ); ?></button>
+					</div>
+					<div class="amy-agent-seo__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter by verdict', 'amy-agent' ); ?>">
+						<button type="button" class="amy-agent-seo__filter is-active" role="tab" aria-selected="true" data-amy-seo-history-verdict=""><?php echo esc_html__( 'All verdicts', 'amy-agent' ); ?></button>
+						<button type="button" class="amy-agent-seo__filter" role="tab" aria-selected="false" data-amy-seo-history-verdict="red"><?php echo esc_html__( 'Needs work', 'amy-agent' ); ?></button>
+						<button type="button" class="amy-agent-seo__filter" role="tab" aria-selected="false" data-amy-seo-history-verdict="orange"><?php echo esc_html__( 'Improvements', 'amy-agent' ); ?></button>
+						<button type="button" class="amy-agent-seo__filter" role="tab" aria-selected="false" data-amy-seo-history-verdict="green"><?php echo esc_html__( 'Good', 'amy-agent' ); ?></button>
+					</div>
+				</div>
+				<p class="amy-agent-seo__error" id="amy-agent-seo-history-error" hidden role="alert"></p>
+				<div class="amy-agent-seo__list">
+					<table class="amy-agent-seo__table">
+						<thead>
+							<tr>
+								<th><?php echo esc_html__( 'Title', 'amy-agent' ); ?></th>
+								<th><?php echo esc_html__( 'Target', 'amy-agent' ); ?></th>
+								<th><?php echo esc_html__( 'Verdict', 'amy-agent' ); ?></th>
+								<th><?php echo esc_html__( 'Status', 'amy-agent' ); ?></th>
+								<th><?php echo esc_html__( 'Checked', 'amy-agent' ); ?></th>
+							</tr>
+						</thead>
+						<tbody id="amy-agent-seo-history-body"></tbody>
+					</table>
+					<p class="amy-agent-seo__empty" id="amy-agent-seo-history-empty" hidden>
+						<?php echo esc_html__( 'No checks yet. Search for a published post or page and run Check SEO.', 'amy-agent' ); ?>
+					</p>
+				</div>
+			</section>
 		</div>
 		<?php
 	}

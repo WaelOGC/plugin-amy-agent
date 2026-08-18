@@ -3,7 +3,7 @@
 > Priority #7 in `roadmap-status.md` (labeled "SEO Service" there — correct name is
 > **SEO Tasks**; a follow-up fix to that file is included at the end of this prompt).
 
-## Status: Locked (planning decisions), 2026-08-10 — no code yet
+## Status: Task 1 implemented 2026-08-18 (Yoast REST wiring + single-target approval). Task 2 (full sweep + image generation) is not built.
 
 ## 1. What this is
 
