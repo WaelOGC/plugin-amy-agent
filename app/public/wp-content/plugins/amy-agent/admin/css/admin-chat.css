@@ -66,6 +66,7 @@
 .amy-agent-chat__list {
 	flex: 1;
 	overflow-y: auto;
+	overflow-x: hidden;
 	padding: 0.5rem;
 }
 
@@ -88,6 +89,7 @@
 	border-radius: 10px;
 	border: 1px solid transparent;
 	background: transparent;
+	min-width: 0;
 }
 
 .amy-agent-chat__item.is-active {
@@ -97,6 +99,7 @@
 
 .amy-agent-chat__item-main {
 	flex: 1;
+	min-width: 0;
 	appearance: none;
 	display: flex;
 	flex-direction: column;
@@ -143,6 +146,7 @@
 	gap: 0.15rem;
 	padding: 0.25rem 0.25rem 0.25rem 0;
 	opacity: 0.55;
+	flex-shrink: 0;
 }
 
 .amy-agent-chat__item:hover .amy-agent-chat__item-actions,
