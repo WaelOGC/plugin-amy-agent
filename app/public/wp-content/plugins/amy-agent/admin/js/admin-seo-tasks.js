@@ -1100,6 +1100,37 @@
 			results.forEach(applyResult);
 		}
 
+		function recheckItemAfterApproval(item) {
+			if (!item) {
+				return;
+			}
+			appendBubble(i18n.buildingSnapshots || 'Gathering live fields…');
+			buildBatchItems([item]).done(function (payload) {
+				appendBubble(i18n.promptWorking || 'Working through this batch…');
+				ajaxAction('amy_seo_batch_start', {
+					content_type: item.type || currentType,
+					mode: 'auto',
+					batch_size: 1,
+					items: JSON.stringify(payload),
+				}).done(function (res) {
+					if (!res || !res.success || !res.data) {
+						return; // best-effort — the approval itself already succeeded either way
+					}
+					var run = res.data;
+					(run.reports || []).forEach(function (report) {
+						applyReport(report);
+					});
+					if (activeItem && activeItem.id === item.id) {
+						var fresh = resultsById[item.id];
+						if (fresh) {
+							renderModalCheck(fresh, item, true);
+						}
+					}
+					summarize(run);
+				});
+			});
+		}
+
 		function summarize(run) {
 			var reports = run.reports || [];
 			var red = 0;
@@ -1336,7 +1367,7 @@
 					);
 					var count = Object.keys(res.data.generated_fields).length;
 					appendBubble(
-						fmt(i18n.promptGenerated || 'Got %1$d suggestion(s) for %2$s.', [count, item.title || ''])
+						fmt(i18n.promptGenerated || 'Got %1$s suggestion(s) for %2$s.', [count, item.title || ''])
 					);
 					renderModalCheck(check, item, false);
 				})
@@ -1746,6 +1777,7 @@
 							}
 							showNotice(i18n.approveSuccess || 'Approved. Fields were written to WordPress.');
 							renderModalCheck(res.data || {}, activeItem, true);
+							recheckItemAfterApproval(activeItem);
 							loadHistory();
 						})
 						.fail(function (xhr) {

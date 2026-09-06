@@ -441,7 +441,7 @@ class Amy_Admin_Menu {
 						'generateImageError' => __( 'Amy could not generate an image.', 'amy-agent' ),
 						'imagePreviewAlt'    => __( 'AI-generated preview', 'amy-agent' ),
 						'promptGenerating'   => __( 'Generating SEO copy for %s…', 'amy-agent' ),
-						'promptGenerated'    => __( 'Got %1$d suggestion(s) for %2$s.', 'amy-agent' ),
+						'promptGenerated'    => __( 'Got %1$s suggestion(s) for %2$s.', 'amy-agent' ),
 						'promptGeneratingImage' => __( 'Generating an image for %s…', 'amy-agent' ),
 						'promptGeneratedImage' => __( 'Image ready for %s.', 'amy-agent' ),
 						'pageCategories'     => __( 'Pages do not use categories in WordPress. This finding is informational.', 'amy-agent' ),

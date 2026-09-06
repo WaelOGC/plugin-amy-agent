@@ -31,6 +31,8 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
   to the Media Library on approval.
 * Fixed a generic "Request failed." error that hid the real cause of failed
   Amy Agent service requests.
+* SEO Tasks: fix "Got %1$d suggestion(s)…" log placeholder; after Approve &
+  write, re-check the item so the card/history show the fresh verdict.
 
 = 0.2.20 =
 * SEO Tasks redesign Task 2: chat-driven card UI for pages, posts, categories, tags, and media, with batch start/continue/stop.
