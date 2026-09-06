@@ -55,6 +55,8 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = None
     wp_user_id: int | None = None
     is_full_admin: bool = False
+    wp_user_name: str | None = None
+    wp_user_email: str | None = None
 
 
 class HealthResponse(BaseModel):

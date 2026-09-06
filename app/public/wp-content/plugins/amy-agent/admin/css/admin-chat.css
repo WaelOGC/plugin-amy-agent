@@ -82,7 +82,7 @@
 
 .amy-agent-chat__item {
 	display: flex;
-	align-items: stretch;
+	align-items: center;
 	gap: 0.15rem;
 	margin-bottom: 0.35rem;
 	border-radius: 10px;
@@ -137,15 +137,29 @@
 
 .amy-agent-chat__item-actions {
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
+	align-items: center;
 	justify-content: center;
-	padding: 0.25rem 0.2rem 0.25rem 0;
+	gap: 0.15rem;
+	padding: 0.25rem 0.25rem 0.25rem 0;
 	opacity: 0.55;
 }
 
 .amy-agent-chat__item:hover .amy-agent-chat__item-actions,
 .amy-agent-chat__item.is-active .amy-agent-chat__item-actions {
 	opacity: 1;
+}
+
+.amy-agent-chat__item-actions .amy-agent-chat__icon-btn {
+	width: 1.65rem;
+	height: 1.65rem;
+}
+
+.amy-agent-chat__item-actions .amy-agent-chat__icon-btn .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+	line-height: 14px;
 }
 
 .amy-agent-chat__rename-input {
@@ -182,6 +196,7 @@
 	font-family: var(--amy-font-heading);
 	font-size: 1.05rem;
 	font-weight: 600;
+	color: var(--amy-text);
 }
 
 .amy-agent-chat__thread {
@@ -264,8 +279,21 @@
 .amy-agent-chat__bubble-text {
 	font-size: 0.9375rem;
 	line-height: 1.45;
-	white-space: pre-wrap;
+	color: var(--amy-text);
 	word-break: break-word;
+}
+
+.amy-agent-chat__msg--user .amy-agent-chat__bubble-text {
+	white-space: pre-wrap;
+}
+
+.amy-agent-chat__bubble-text a {
+	color: var(--amy-border);
+	text-decoration: underline;
+}
+
+.amy-agent-chat__bubble-text strong {
+	font-weight: 600;
 }
 
 .amy-agent-chat__msg-atts {
@@ -361,7 +389,8 @@
 	flex: 1;
 	min-height: 2.75rem;
 	max-height: 8rem;
-	resize: vertical;
+	resize: none;
+	overflow-y: auto;
 	margin: 0;
 	padding: 0.7rem 0.85rem;
 	border-radius: 10px;

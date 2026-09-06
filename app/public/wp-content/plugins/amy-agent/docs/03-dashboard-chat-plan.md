@@ -108,6 +108,17 @@ one orchestrator.
   would mean guessing at a shape we don't actually know yet — this plan is
   written so today's build doesn't block that later step, not so it jumps
   ahead of it.
+- **No attachment-source picker yet.** The attach control is a single
+  "upload from your device" path only — not a menu to choose upload vs.
+  screenshot vs. import from GitHub/Drive/etc. the way some AI chat products
+  offer behind their attach button.
+- **No live connection to internal tools yet.** Amy cannot actually check or
+  report real current data from SEO Tasks, Analytics, or Task Service when
+  asked — she has no such connection today and should say so rather than
+  guessing.
+- **No live internet search/browsing yet.** Amy only has her own general
+  knowledge, not live search, so she cannot look up competitor pricing or
+  current market info on demand.
 
 ## 5. Build order implication
 

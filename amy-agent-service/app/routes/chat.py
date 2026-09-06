@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 
 from app.auth import require_amy_secret
 from app.db import conversations_db
-from app.prompts import AMY_SYSTEM_PROMPT
+from app.prompts import AMY_ADMIN_SYSTEM_PROMPT, AMY_SYSTEM_PROMPT
 from app.providers import get_provider, is_known_provider
 from app.providers.errors import ProviderError
 from app.schemas.messages import (
@@ -20,10 +20,51 @@ from app.schemas.messages import (
 router = APIRouter(tags=["chat"])
 
 
-def _messages_with_system(messages: list[ChatMessage]) -> list[ChatMessage]:
+def _admin_identity_message(
+    wp_user_name: str | None,
+    wp_user_email: str | None,
+) -> ChatMessage | None:
+    name = (wp_user_name or "").strip()
+    email = (wp_user_email or "").strip()
+    if not name and not email:
+        return None
+    if name and email:
+        who = f"{name} ({email})"
+    elif name:
+        who = name
+    else:
+        who = email
+    return ChatMessage(
+        role="system",
+        content=(
+            f"You are currently talking with {who}. Address them by name naturally "
+            "in conversation, the way a colleague would — you don't need to repeat "
+            "their name every message, just use it when it reads naturally "
+            "(e.g. a greeting, or when it adds clarity)."
+        ),
+    )
+
+
+def _messages_with_system(
+    messages: list[ChatMessage],
+    *,
+    mode: str = "general",
+    wp_user_name: str | None = None,
+    wp_user_email: str | None = None,
+) -> list[ChatMessage]:
     """Prepend Amy's persona prompt unless a system message is already first."""
     if messages and messages[0].role == "system":
         return messages
+
+    if mode == "admin":
+        system_msgs: list[ChatMessage] = [
+            ChatMessage(role="system", content=AMY_ADMIN_SYSTEM_PROMPT)
+        ]
+        identity = _admin_identity_message(wp_user_name, wp_user_email)
+        if identity is not None:
+            system_msgs.append(identity)
+        return [*system_msgs, *messages]
+
     return [ChatMessage(role="system", content=AMY_SYSTEM_PROMPT), *messages]
 
 
@@ -110,7 +151,14 @@ async def chat(body: ChatRequest) -> JSONResponse:
 
     provider = get_provider(provider_slug)
     resolved_model = provider.resolve_model(body.ai.model)
-    messages = _messages_for_provider(_messages_with_system(history_for_completion))
+    messages = _messages_for_provider(
+        _messages_with_system(
+            history_for_completion,
+            mode=body.mode,
+            wp_user_name=body.wp_user_name,
+            wp_user_email=body.wp_user_email,
+        )
+    )
 
     try:
         text = await provider.complete(

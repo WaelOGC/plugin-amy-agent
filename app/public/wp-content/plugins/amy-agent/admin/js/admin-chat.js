@@ -13,6 +13,7 @@
 		var pendingAttachments = [];
 		var sending = false;
 		var uploading = false;
+		var creatingPromise = null;
 
 		var $root = $('#amy-agent-chat-root');
 		if (!$root.length) {
@@ -90,6 +91,30 @@
 				.replace(/'/g, '&#39;');
 		}
 
+		function renderMarkdown(raw) {
+			var html = escapeHtml(raw || '');
+			html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+			html = html.replace(
+				/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+				'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+			);
+			html = html.replace(/\n/g, '<br>');
+			return html;
+		}
+
+		function resizeComposer() {
+			var el = $input[0];
+			if (!el) {
+				return;
+			}
+			el.style.height = 'auto';
+			var maxPx = parseFloat(window.getComputedStyle(el).maxHeight);
+			if (!maxPx || isNaN(maxPx)) {
+				maxPx = Infinity;
+			}
+			el.style.height = Math.min(el.scrollHeight, maxPx) + 'px';
+		}
+
 		function api(path, options) {
 			var opts = options || {};
 			var headers = $.extend(
@@ -149,9 +174,9 @@
 
 		function setSending(on) {
 			sending = !!on;
-			$send.prop('disabled', sending || uploading || !activeId);
-			$attach.prop('disabled', sending || uploading || !activeId);
-			$input.prop('disabled', sending || !activeId);
+			$send.prop('disabled', sending || uploading);
+			$attach.prop('disabled', sending || uploading);
+			$input.prop('disabled', sending);
 			$send.text(
 				sending ? i18n.sending || 'Sending…' : i18n.send || 'Send'
 			);
@@ -291,7 +316,13 @@
 					'</div>' +
 					'</div>'
 			);
-			$bubble.find('.amy-agent-chat__bubble-text').text(content || '');
+			$bubble.find('.amy-agent-chat__bubble-text').each(function () {
+				if (isUser) {
+					$(this).text(content || '');
+				} else {
+					$(this).html(renderMarkdown(content || ''));
+				}
+			});
 			$thread.append($bubble);
 			$thread.scrollTop($thread[0].scrollHeight);
 		}
@@ -331,16 +362,56 @@
 			$input.focus();
 		}
 
-		function showEmptyPane() {
+		function showDraftPane() {
 			activeId = null;
 			pendingAttachments = [];
 			renderChips();
 			$thread.empty();
-			$composer.prop('hidden', true);
-			$paneHead.prop('hidden', true);
-			$empty.prop('hidden', false);
+			$empty.prop('hidden', true);
+			$composer.prop('hidden', false);
+			$paneHead.prop('hidden', false);
+			$paneTitle.text(i18n.newChat || 'New chat');
 			clearError();
 			renderList();
+			setSending(false);
+			$input.val('');
+			resizeComposer();
+			$input.trigger('focus');
+		}
+
+		function ensureActiveConversation() {
+			if (activeId) {
+				return Promise.resolve(activeId);
+			}
+			if (creatingPromise) {
+				return creatingPromise;
+			}
+			clearError();
+			creatingPromise = api('/admin-chat/conversations', {
+				method: 'POST',
+				body: {},
+			})
+				.then(function (res) {
+					creatingPromise = null;
+					if (!res.ok || !res.data || !res.data.id) {
+						showError(
+							(res.data && res.data.message) || i18n.error || 'Error'
+						);
+						return Promise.reject(new Error('create_failed'));
+					}
+					conversations.unshift(res.data);
+					activeId = res.data.id;
+					$paneHead.prop('hidden', false);
+					$paneTitle.text(conversationTitle(res.data));
+					$empty.prop('hidden', true);
+					renderList();
+					return activeId;
+				})
+				.catch(function (err) {
+					creatingPromise = null;
+					return Promise.reject(err);
+				});
+			return creatingPromise;
 		}
 
 		function loadList() {
@@ -382,22 +453,6 @@
 			);
 		}
 
-		function createConversation() {
-			clearError();
-			return api('/admin-chat/conversations', {
-				method: 'POST',
-				body: {},
-			}).then(function (res) {
-				if (!res.ok || !res.data || !res.data.id) {
-					showError((res.data && res.data.message) || i18n.error || 'Error');
-					return;
-				}
-				conversations.unshift(res.data);
-				renderList();
-				return openConversation(res.data.id);
-			});
-		}
-
 		function deleteConversation(id) {
 			if (!window.confirm(i18n.deleteConfirm || 'Delete this conversation?')) {
 				return;
@@ -413,7 +468,7 @@
 					return c.id !== id;
 				});
 				if (activeId === id) {
-					showEmptyPane();
+					showDraftPane();
 				} else {
 					renderList();
 				}
@@ -526,7 +581,7 @@
 		}
 
 		function sendMessage() {
-			if (!activeId || sending) {
+			if (sending) {
 				return;
 			}
 			var typed = $.trim($input.val());
@@ -536,83 +591,110 @@
 			var content = typed || '(attachment)';
 			clearError();
 			var attachments = pendingAttachments.slice();
-			appendBubble('user', typed || content, attachments);
-			$input.val('');
-			pendingAttachments = [];
-			renderChips();
-			setSending(true);
-			showThinking(true);
 
-			api('/admin-chat/conversations/' + encodeURIComponent(activeId) + '/messages', {
-				method: 'POST',
-				body: {
-					content: content,
-					attachments: attachments,
-				},
-			})
-				.then(function (res) {
-					showThinking(false);
-					setSending(false);
-					if (!res.ok) {
+			function doSend(conversationId) {
+				appendBubble('user', typed || content, attachments);
+				$input.val('');
+				resizeComposer();
+				pendingAttachments = [];
+				renderChips();
+				setSending(true);
+				showThinking(true);
+
+				api(
+					'/admin-chat/conversations/' +
+						encodeURIComponent(conversationId) +
+						'/messages',
+					{
+						method: 'POST',
+						body: {
+							content: content,
+							attachments: attachments,
+						},
+					}
+				)
+					.then(function (res) {
+						showThinking(false);
+						setSending(false);
+						if (!res.ok) {
+							$input.val(typed);
+							resizeComposer();
+							pendingAttachments = attachments.slice();
+							renderChips();
+							$thread.children('.amy-agent-chat__msg--user').last().remove();
+							showError(
+								(res.data && res.data.message) || i18n.error || 'Error'
+							);
+							return;
+						}
+						var reply =
+							res.data &&
+							res.data.reply &&
+							res.data.reply.content
+								? res.data.reply.content
+								: '';
+						appendBubble('assistant', reply);
+						var idx = conversations.findIndex(function (c) {
+							return c.id === conversationId;
+						});
+						if (idx >= 0) {
+							conversations[idx].updated_at = Date.now() / 1000;
+							if (!conversations[idx].title && typed) {
+								conversations[idx].title = typed.slice(0, 60);
+								$paneTitle.text(conversationTitle(conversations[idx]));
+							}
+							var moved = conversations.splice(idx, 1)[0];
+							conversations.unshift(moved);
+							renderList();
+						}
+					})
+					.catch(function () {
+						showThinking(false);
+						setSending(false);
 						$input.val(typed);
+						resizeComposer();
 						pendingAttachments = attachments.slice();
 						renderChips();
 						$thread.children('.amy-agent-chat__msg--user').last().remove();
-						showError(
-							(res.data && res.data.message) || i18n.error || 'Error'
-						);
-						return;
-					}
-					var reply =
-						res.data &&
-						res.data.reply &&
-						res.data.reply.content
-							? res.data.reply.content
-							: '';
-					appendBubble('assistant', reply);
-					var idx = conversations.findIndex(function (c) {
-						return c.id === activeId;
+						showError(i18n.error || 'Something went wrong.');
 					});
-					if (idx >= 0) {
-						conversations[idx].updated_at = Date.now() / 1000;
-						if (!conversations[idx].title && typed) {
-							conversations[idx].title = typed.slice(0, 60);
-							$paneTitle.text(conversationTitle(conversations[idx]));
-						}
-						var moved = conversations.splice(idx, 1)[0];
-						conversations.unshift(moved);
-						renderList();
-					}
+			}
+
+			ensureActiveConversation()
+				.then(function (conversationId) {
+					doSend(conversationId);
 				})
 				.catch(function () {
-					showThinking(false);
 					setSending(false);
-					$input.val(typed);
-					pendingAttachments = attachments.slice();
-					renderChips();
-					$thread.children('.amy-agent-chat__msg--user').last().remove();
-					showError(i18n.error || 'Something went wrong.');
 				});
 		}
 
 		function uploadFile(file) {
-			if (!activeId || !file || uploading) {
+			if (!file || uploading) {
 				return;
 			}
-			uploading = true;
-			setSending(sending);
-			var fd = new FormData();
-			fd.append('file', file);
-			api('/admin-chat/conversations/' + encodeURIComponent(activeId) + '/upload', {
-				method: 'POST',
-				body: fd,
-			})
+			ensureActiveConversation()
+				.then(function (conversationId) {
+					uploading = true;
+					setSending(sending);
+					var fd = new FormData();
+					fd.append('file', file);
+					return api(
+						'/admin-chat/conversations/' +
+							encodeURIComponent(conversationId) +
+							'/upload',
+						{
+							method: 'POST',
+							body: fd,
+						}
+					);
+				})
 				.then(function (res) {
 					uploading = false;
 					setSending(sending);
-					if (!res.ok || !res.data || !res.data.url) {
+					if (!res || !res.ok || !res.data || !res.data.url) {
 						showError(
-							(res.data && res.data.message) ||
+							(res && res.data && res.data.message) ||
 								i18n.uploadError ||
 								'Upload failed'
 						);
@@ -633,7 +715,7 @@
 		}
 
 		$('#amy-chat-new').on('click', function () {
-			createConversation();
+			showDraftPane();
 		});
 
 		$list.on('click', '[data-amy-open]', function () {
@@ -684,7 +766,9 @@
 			}
 		});
 
-		showEmptyPane();
+		$input.on('input', resizeComposer);
+
+		showDraftPane();
 		loadList();
 	});
 })(jQuery);

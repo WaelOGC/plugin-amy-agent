@@ -11,8 +11,10 @@ os.environ["AMY_SHARED_SECRET"] = "test-secret-phase1"
 
 from app.config import get_settings  # noqa: E402
 from app.main import app  # noqa: E402
+from app.prompts import AMY_ADMIN_SYSTEM_PROMPT, AMY_SYSTEM_PROMPT  # noqa: E402
 from app.providers.base import BaseProvider  # noqa: E402
 from app.providers.errors import ProviderError  # noqa: E402
+from app.routes.chat import _messages_with_system  # noqa: E402
 from app.schemas.messages import ChatMessage  # noqa: E402
 
 get_settings.cache_clear()
@@ -196,3 +198,103 @@ def test_chat_rejects_empty_key_cleanly(client: TestClient) -> None:
     )
     assert response.status_code == 400
     assert response.json()["error"] == "invalid_config"
+
+
+def test_general_mode_system_prompt_unchanged() -> None:
+    messages = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="general",
+    )
+    assert messages[0].role == "system"
+    assert messages[0].content == AMY_SYSTEM_PROMPT
+    assert messages[0].content != AMY_ADMIN_SYSTEM_PROMPT
+
+
+def test_support_mode_uses_public_prompt_not_admin() -> None:
+    messages = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="support",
+        wp_user_name="Should Be Ignored",
+        wp_user_email="ignore@example.com",
+    )
+    assert messages[0].content == AMY_SYSTEM_PROMPT
+    assert len([m for m in messages if m.role == "system"]) == 1
+
+
+def test_admin_mode_uses_admin_prompt() -> None:
+    messages = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="admin",
+    )
+    assert messages[0].role == "system"
+    assert messages[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    assert messages[0].content != AMY_SYSTEM_PROMPT
+    assert len([m for m in messages if m.role == "system"]) == 1
+
+
+def test_admin_mode_appends_identity_when_name_or_email_present() -> None:
+    messages = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="admin",
+        wp_user_name="Wael",
+        wp_user_email="wael@example.com",
+    )
+    system_msgs = [m for m in messages if m.role == "system"]
+    assert len(system_msgs) == 2
+    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    assert "Wael" in system_msgs[1].content
+    assert "wael@example.com" in system_msgs[1].content
+
+
+def test_admin_mode_without_identity_has_no_extra_system_message() -> None:
+    messages = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="admin",
+        wp_user_name=None,
+        wp_user_email=None,
+    )
+    assert [m.role for m in messages if m.role == "system"] == ["system"]
+    assert messages[0].content == AMY_ADMIN_SYSTEM_PROMPT
+
+
+def test_chat_admin_mode_sends_admin_prompt_to_provider(client: TestClient) -> None:
+    captured: list = []
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
+    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                mode="admin",
+                wp_user_name="Wael",
+                wp_user_email="wael@example.com",
+            ),
+        )
+
+    assert response.status_code == 200
+    system_msgs = [m for m in captured if m.role == "system"]
+    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    assert "Wael" in system_msgs[1].content
+    assert system_msgs[0].content != AMY_SYSTEM_PROMPT
+
+
+def test_chat_general_mode_sends_public_prompt_to_provider(client: TestClient) -> None:
+    captured: list = []
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
+    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")):
+        response = client.post("/v1/chat", headers=HEADERS, json=_chat_body(mode="general"))
+
+    assert response.status_code == 200
+    system_msgs = [m for m in captured if m.role == "system"]
+    assert len(system_msgs) == 1
+    assert system_msgs[0].content == AMY_SYSTEM_PROMPT

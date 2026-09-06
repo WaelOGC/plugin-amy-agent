@@ -312,6 +312,28 @@ class Amy_Rest {
 	}
 
 	/**
+	 * Display name for the logged-in dashboard user (for Amy's admin identity line).
+	 *
+	 * @return string|null
+	 */
+	private function admin_chat_wp_user_name() {
+		$user = wp_get_current_user();
+		$name = isset( $user->display_name ) ? sanitize_text_field( (string) $user->display_name ) : '';
+		return '' !== $name ? $name : null;
+	}
+
+	/**
+	 * Email for the logged-in dashboard user (for Amy's admin identity line).
+	 *
+	 * @return string|null
+	 */
+	private function admin_chat_wp_user_email() {
+		$user  = wp_get_current_user();
+		$email = isset( $user->user_email ) ? sanitize_email( (string) $user->user_email ) : '';
+		return '' !== $email ? $email : null;
+	}
+
+	/**
 	 * Sanitize attachment refs for admin chat messages.
 	 *
 	 * @param mixed $attachments Raw attachments array.
@@ -513,6 +535,8 @@ class Amy_Rest {
 			'conversation_id' => $id,
 			'wp_user_id'      => $this->admin_chat_wp_user_id(),
 			'is_full_admin'   => $this->admin_chat_is_full_admin(),
+			'wp_user_name'    => $this->admin_chat_wp_user_name(),
+			'wp_user_email'   => $this->admin_chat_wp_user_email(),
 			'messages'        => array(
 				array(
 					'role'        => 'user',
