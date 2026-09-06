@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 import uuid
@@ -17,7 +18,9 @@ _DATA_DIR.mkdir(parents=True, exist_ok=True)
 # Guarded-ALTER registry — empty in v1; add column name → SQL type/default
 # here when a future migration needs a new column on an existing conversations.db.
 _CONVERSATION_COLUMN_DEFAULTS: dict[str, str] = {}
-_MESSAGE_COLUMN_DEFAULTS: dict[str, str] = {}
+_MESSAGE_COLUMN_DEFAULTS: dict[str, str] = {
+    "attachments": "TEXT",
+}
 
 _TITLE_MAX_LEN = 60
 _ARCHIVE_AGE_DAYS = 90
@@ -106,12 +109,29 @@ def _conversation_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def _decode_attachments(raw: Any) -> list[dict[str, Any]]:
+    if raw is None or raw == "":
+        return []
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [item for item in parsed if isinstance(item, dict)]
+
+
 def _message_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    keys = set(row.keys())
+    attachments_raw = row["attachments"] if "attachments" in keys else None
     return {
         "id": int(row["id"]),
         "conversation_id": row["conversation_id"],
         "role": row["role"],
         "content": row["content"],
+        "attachments": _decode_attachments(attachments_raw),
         "created_at": float(row["created_at"]),
     }
 
@@ -198,8 +218,14 @@ def list_conversations(
         conn.close()
 
 
-def append_message(conversation_id: str, role: str, content: str) -> None:
+def append_message(
+    conversation_id: str,
+    role: str,
+    content: str,
+    attachments: list[dict] | None = None,
+) -> None:
     now = time.time()
+    attachments_json = json.dumps(attachments) if attachments else None
     conn = _connect()
     try:
         with conn:
@@ -224,10 +250,10 @@ def append_message(conversation_id: str, role: str, content: str) -> None:
             conn.execute(
                 """
                 INSERT INTO conversation_messages (
-                    conversation_id, role, content, created_at
-                ) VALUES (?, ?, ?, ?)
+                    conversation_id, role, content, created_at, attachments
+                ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (conversation_id, role, content, now),
+                (conversation_id, role, content, now, attachments_json),
             )
 
             if (

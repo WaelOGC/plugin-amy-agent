@@ -40,6 +40,12 @@ from app.schemas.submit_idea import (
     SubmitIdeaUploadResponse,
 )
 from app.services import submit_idea_state as state
+from app.services.upload_rules import (
+    ALLOWED_UPLOAD_CONTENT_TYPES,
+    ALLOWED_UPLOAD_EXTENSIONS,
+    MAX_UPLOAD_BYTES,
+    SAFE_STORED_NAME_RE,
+)
 
 router = APIRouter(tags=["submit-idea"])
 
@@ -47,30 +53,7 @@ router = APIRouter(tags=["submit-idea"])
 _SERVICE_ROOT = Path(__file__).resolve().parents[2]
 UPLOAD_ROOT = _SERVICE_ROOT / "uploads" / "submit-idea"
 
-ALLOWED_UPLOAD_EXTENSIONS = {
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".gif",
-    ".webp",
-    ".pdf",
-    ".doc",
-    ".docx",
-}
-ALLOWED_UPLOAD_CONTENT_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-}
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
-
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-# Stored filenames are "{safe_stem}-{8 hex}{ext}" — reject anything with path chars.
-_SAFE_STORED_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
 def public_upload_url(session_id: str, stored_name: str) -> str:
@@ -606,7 +589,7 @@ async def submit_idea_upload(
 
     safe_stem = re.sub(r"[^a-zA-Z0-9._-]+", "_", Path(original_name).stem)[:80] or "file"
     stored_name = f"{safe_stem}-{uuid.uuid4().hex[:8]}{ext or ''}"
-    if not _SAFE_STORED_NAME_RE.fullmatch(stored_name):
+    if not SAFE_STORED_NAME_RE.fullmatch(stored_name):
         return _error(
             status.HTTP_400_BAD_REQUEST,
             "invalid_filename",

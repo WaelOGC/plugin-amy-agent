@@ -27,6 +27,20 @@ def _messages_with_system(messages: list[ChatMessage]) -> list[ChatMessage]:
     return [ChatMessage(role="system", content=AMY_SYSTEM_PROMPT), *messages]
 
 
+def _content_for_provider(msg: ChatMessage) -> str:
+    """Provider-bound text only — does not mutate stored message content."""
+    if not msg.attachments:
+        return msg.content
+    names = ", ".join(a.filename for a in msg.attachments)
+    return f"{msg.content}\n\n[Attached: {names}]"
+
+
+def _messages_for_provider(messages: list[ChatMessage]) -> list[ChatMessage]:
+    return [
+        ChatMessage(role=m.role, content=_content_for_provider(m)) for m in messages
+    ]
+
+
 def _error(code: str, message: str, http_status: int) -> JSONResponse:
     return JSONResponse(
         status_code=http_status,
@@ -83,7 +97,12 @@ async def chat(body: ChatRequest) -> JSONResponse:
 
         stored = conversations_db.get_messages(conversation_id)
         history_for_completion = [
-            ChatMessage(role=m["role"], content=m["content"]) for m in stored
+            ChatMessage(
+                role=m["role"],
+                content=m["content"],
+                attachments=m.get("attachments") or [],
+            )
+            for m in stored
         ]
         history_for_completion.append(new_user_message)
     else:
@@ -91,7 +110,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
 
     provider = get_provider(provider_slug)
     resolved_model = provider.resolve_model(body.ai.model)
-    messages = _messages_with_system(history_for_completion)
+    messages = _messages_for_provider(_messages_with_system(history_for_completion))
 
     try:
         text = await provider.complete(
@@ -114,7 +133,10 @@ async def chat(body: ChatRequest) -> JSONResponse:
 
     if conversation_id is not None and new_user_message is not None:
         conversations_db.append_message(
-            conversation_id, "user", new_user_message.content
+            conversation_id,
+            "user",
+            new_user_message.content,
+            attachments=[a.model_dump() for a in new_user_message.attachments] or None,
         )
         conversations_db.append_message(conversation_id, "assistant", text)
 

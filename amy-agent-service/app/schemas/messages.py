@@ -33,9 +33,16 @@ class PageContext(BaseModel):
     slug: str | None = None
 
 
+class AttachmentRef(BaseModel):
+    url: str
+    filename: str
+    content_type: str | None = None
+
+
 class ChatMessage(BaseModel):
     role: MessageRole
     content: str
+    attachments: list[AttachmentRef] = Field(default_factory=list)
 
 
 class ChatRequest(BaseModel):

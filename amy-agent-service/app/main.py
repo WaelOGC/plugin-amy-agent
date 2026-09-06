@@ -23,6 +23,7 @@ from app.routes import (
     submit_idea,
     tasks,
 )
+from app.routes.conversations import CONVERSATION_UPLOAD_ROOT
 from app.routes.submit_idea import UPLOAD_ROOT
 from app.services.task_escalation import run_escalation_pass
 
@@ -131,7 +132,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Amy Agent Service",
-    version="0.1.8",
+    version="0.1.9",
     description="Intelligence layer for the Amy Agent WordPress plugin (Phase 1 scaffold).",
     lifespan=lifespan,
 )
@@ -155,4 +156,12 @@ app.mount(
     "/uploads/submit-idea",
     StaticFiles(directory=str(UPLOAD_ROOT), html=False),
     name="submit_idea_uploads",
+)
+
+# Public, unauthenticated file serving for conversation chat attachments.
+CONVERSATION_UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/uploads/conversations",
+    StaticFiles(directory=str(CONVERSATION_UPLOAD_ROOT), html=False),
+    name="conversation_uploads",
 )

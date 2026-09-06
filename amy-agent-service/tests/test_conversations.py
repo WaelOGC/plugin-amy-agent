@@ -2,21 +2,33 @@
 
 from __future__ import annotations
 
+import io
 import os
 import time
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 os.environ["AMY_SHARED_SECRET"] = "test-secret-phase1"
+os.environ.setdefault("PUBLIC_BASE_URL", "https://amy-api.example.com")
 
 from app.config import get_settings  # noqa: E402
 from app.db import conversations_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.providers.base import BaseProvider  # noqa: E402
+from app.schemas.messages import ChatMessage  # noqa: E402
+from app.services.upload_rules import MAX_UPLOAD_BYTES  # noqa: E402
 
 get_settings.cache_clear()
 
 AUTH = {"X-Amy-Secret": "test-secret-phase1"}
+
+_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00"
+    b"\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+)
 
 
 @pytest.fixture
@@ -286,3 +298,153 @@ def test_api_create_list_get_rename_delete_export(client: TestClient) -> None:
         params={"wp_user_id": 7, "is_full_admin": False},
     )
     assert missing.status_code == 404
+
+
+def test_append_message_attachments_round_trip(client: TestClient) -> None:
+    conv = conversations_db.create_conversation(wp_user_id=1, mode="admin")
+    attachments = [
+        {
+            "url": "https://amy-api.example.com/uploads/conversations/abc/shot.png",
+            "filename": "shot.png",
+            "content_type": "image/png",
+        }
+    ]
+    conversations_db.append_message(
+        conv["id"], "user", "See this", attachments=attachments
+    )
+    conversations_db.append_message(conv["id"], "assistant", "Got it")
+
+    messages = conversations_db.get_messages(conv["id"])
+    assert messages[0]["content"] == "See this"
+    assert messages[0]["attachments"] == attachments
+    assert messages[1]["attachments"] == []
+    assert messages[1]["attachments"] is not None
+
+
+def test_upload_image_returns_public_url_and_serves_file(client: TestClient) -> None:
+    get_settings.cache_clear()
+    conv = conversations_db.create_conversation(wp_user_id=7, mode="admin")
+
+    response = client.post(
+        f"/v1/conversations/{conv['id']}/upload",
+        headers=AUTH,
+        data={"wp_user_id": "7", "is_full_admin": "false"},
+        files={"file": ("shot.png", io.BytesIO(_PNG), "image/png")},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["filename"] == "shot.png"
+    assert body["content_type"] == "image/png"
+    url = body["url"]
+    assert "/uploads/conversations/" in url
+    assert conv["id"] in url
+    assert url.endswith(".png")
+
+    path = url.replace("https://amy-api.example.com", "")
+    if not path.startswith("/"):
+        # Fallback if public_base_url wasn't applied (localhost default).
+        from urllib.parse import urlparse
+
+        path = urlparse(url).path
+    get_resp = client.get(path)
+    assert get_resp.status_code == 200
+    assert get_resp.content == _PNG
+
+
+def test_upload_forbidden_for_other_user(client: TestClient) -> None:
+    conv = conversations_db.create_conversation(wp_user_id=7, mode="admin")
+    response = client.post(
+        f"/v1/conversations/{conv['id']}/upload",
+        headers=AUTH,
+        data={"wp_user_id": "99", "is_full_admin": "false"},
+        files={"file": ("shot.png", io.BytesIO(_PNG), "image/png")},
+    )
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+
+
+def test_upload_missing_conversation_404(client: TestClient) -> None:
+    response = client.post(
+        "/v1/conversations/missingconv123/upload",
+        headers=AUTH,
+        data={"wp_user_id": "7", "is_full_admin": "false"},
+        files={"file": ("shot.png", io.BytesIO(_PNG), "image/png")},
+    )
+    assert response.status_code == 404
+    assert response.json()["error"] == "conversation_not_found"
+
+
+def test_upload_rejects_disallowed_type(client: TestClient) -> None:
+    conv = conversations_db.create_conversation(wp_user_id=7, mode="admin")
+    response = client.post(
+        f"/v1/conversations/{conv['id']}/upload",
+        headers=AUTH,
+        data={"wp_user_id": "7", "is_full_admin": "false"},
+        files={"file": ("evil.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "invalid_file_type"
+
+
+def test_upload_rejects_oversized_file(client: TestClient) -> None:
+    conv = conversations_db.create_conversation(wp_user_id=7, mode="admin")
+    oversized = b"x" * (MAX_UPLOAD_BYTES + 1)
+    response = client.post(
+        f"/v1/conversations/{conv['id']}/upload",
+        headers=AUTH,
+        data={"wp_user_id": "7", "is_full_admin": "false"},
+        files={"file": ("big.pdf", io.BytesIO(oversized), "application/pdf")},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"] == "file_too_large"
+
+
+def test_chat_persists_attachments_without_provider_note(client: TestClient) -> None:
+    conv = conversations_db.create_conversation(wp_user_id=5, mode="admin")
+    captured: list = []
+
+    class _CaptureProvider(BaseProvider):
+        provider_id = "openai"
+        default_model = "gpt-4o-mini"
+
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return "Noted"
+
+    attachment = {
+        "url": "https://amy-api.example.com/uploads/conversations/x/doc.pdf",
+        "filename": "doc.pdf",
+        "content_type": "application/pdf",
+    }
+    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider()):
+        response = client.post(
+            "/v1/chat",
+            headers=AUTH,
+            json={
+                "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                "mode": "admin",
+                "conversation_id": conv["id"],
+                "wp_user_id": 5,
+                "is_full_admin": False,
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Please review",
+                        "attachments": [attachment],
+                    }
+                ],
+                "ai": {"provider": "openai", "api_key": "sk-test", "model": None},
+                "context": {},
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    stored = conversations_db.get_messages(conv["id"])
+    assert stored[0]["content"] == "Please review"
+    assert "[Attached:" not in stored[0]["content"]
+    assert stored[0]["attachments"] == [attachment]
+
+    user_to_provider = [m for m in captured if isinstance(m, ChatMessage) and m.role == "user"]
+    assert user_to_provider
+    assert "[Attached: doc.pdf]" in user_to_provider[-1].content
+    assert user_to_provider[-1].content.startswith("Please review")
