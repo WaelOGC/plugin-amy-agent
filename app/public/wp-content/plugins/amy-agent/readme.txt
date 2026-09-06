@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.23
+Stable tag: 0.2.24
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -22,6 +22,9 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 4. Reload any front-end page — the floating Amy widget should appear.
 
 == Changelog ==
+
+= 0.2.24 =
+* Dashboard Chat: talk with Amy the Leader from wp-admin, with persistent conversations, rename/delete/export, and image or PDF attachments.
 
 = 0.2.23 =
 * SEO Tasks: write Title and Caption on AI-generated featured images (not only alt text).

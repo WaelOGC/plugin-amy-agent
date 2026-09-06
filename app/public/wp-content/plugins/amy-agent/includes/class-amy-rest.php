@@ -116,6 +116,7 @@ class Amy_Rest {
 		);
 
 		$this->register_submit_idea_routes();
+		$this->register_admin_chat_routes();
 
 		register_rest_route(
 			self::NAMESPACE,
@@ -214,6 +215,369 @@ class Amy_Rest {
 				'permission_callback' => $nonce_perm,
 			)
 		);
+	}
+
+	/**
+	 * Admin Dashboard Chat proxies → Python /v1/conversations/* and /v1/chat.
+	 */
+	private function register_admin_chat_routes() {
+		$perm = array( $this, 'can_manage' );
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/admin-chat/conversations',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'handle_admin_chat_list' ),
+					'permission_callback' => $perm,
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'handle_admin_chat_create' ),
+					'permission_callback' => $perm,
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/admin-chat/conversations/(?P<id>[a-f0-9]+)',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'handle_admin_chat_get' ),
+					'permission_callback' => $perm,
+				),
+				array(
+					'methods'             => 'PATCH',
+					'callback'            => array( $this, 'handle_admin_chat_rename' ),
+					'permission_callback' => $perm,
+				),
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'handle_admin_chat_delete' ),
+					'permission_callback' => $perm,
+				),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/admin-chat/conversations/(?P<id>[a-f0-9]+)/export',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_admin_chat_export' ),
+				'permission_callback' => $perm,
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/admin-chat/conversations/(?P<id>[a-f0-9]+)/messages',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_admin_chat_send_message' ),
+				'permission_callback' => $perm,
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/admin-chat/conversations/(?P<id>[a-f0-9]+)/upload',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_admin_chat_upload' ),
+				'permission_callback' => $perm,
+			)
+		);
+	}
+
+	/**
+	 * @return int
+	 */
+	private function admin_chat_wp_user_id() {
+		return get_current_user_id();
+	}
+
+	/**
+	 * No distinct role system exists yet — every manage_options user is
+	 * treated as full admin for conversation visibility. When the 7-role
+	 * system is built, only this one method needs to change.
+	 *
+	 * @return bool
+	 */
+	private function admin_chat_is_full_admin() {
+		return current_user_can( 'manage_options' );
+	}
+
+	/**
+	 * Sanitize attachment refs for admin chat messages.
+	 *
+	 * @param mixed $attachments Raw attachments array.
+	 * @return array<int, array{url: string, filename: string, content_type: string|null}>
+	 */
+	private function sanitize_admin_chat_attachments( $attachments ) {
+		if ( ! is_array( $attachments ) ) {
+			return array();
+		}
+
+		$clean = array();
+		foreach ( $attachments as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$url      = isset( $item['url'] ) ? esc_url_raw( (string) $item['url'] ) : '';
+			$filename = isset( $item['filename'] ) ? sanitize_text_field( (string) $item['filename'] ) : '';
+			if ( '' === $url || '' === $filename ) {
+				continue;
+			}
+			$content_type = null;
+			if ( isset( $item['content_type'] ) && null !== $item['content_type'] && '' !== $item['content_type'] ) {
+				$content_type = sanitize_text_field( (string) $item['content_type'] );
+			}
+			$clean[] = array(
+				'url'          => $url,
+				'filename'     => $filename,
+				'content_type' => $content_type,
+			);
+			if ( count( $clean ) >= 10 ) {
+				break;
+			}
+		}
+		return $clean;
+	}
+
+	/**
+	 * GET /admin-chat/conversations
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_list( $request ) {
+		$include_archived = (bool) $request->get_param( 'include_archived' );
+		$result           = $this->api_client->list_conversations(
+			$this->admin_chat_wp_user_id(),
+			$this->admin_chat_is_full_admin(),
+			'admin',
+			$include_archived
+		);
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * POST /admin-chat/conversations
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_create( $request ) {
+		$title  = sanitize_text_field( (string) $request->get_param( 'title' ) );
+		$result = $this->api_client->create_conversation(
+			$this->admin_chat_wp_user_id(),
+			'admin',
+			'' !== $title ? $title : null
+		);
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * GET /admin-chat/conversations/{id}
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_get( $request ) {
+		$id     = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		$result = $this->api_client->get_conversation(
+			$id,
+			$this->admin_chat_wp_user_id(),
+			$this->admin_chat_is_full_admin()
+		);
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * PATCH /admin-chat/conversations/{id}
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_rename( $request ) {
+		$id    = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		$title = sanitize_text_field( (string) $request->get_param( 'title' ) );
+		if ( '' === $title ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'Title is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+		$result = $this->api_client->rename_conversation(
+			$id,
+			$title,
+			$this->admin_chat_wp_user_id(),
+			$this->admin_chat_is_full_admin()
+		);
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * DELETE /admin-chat/conversations/{id}
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_delete( $request ) {
+		$id     = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		$result = $this->api_client->delete_conversation(
+			$id,
+			$this->admin_chat_wp_user_id(),
+			$this->admin_chat_is_full_admin()
+		);
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+		if ( ! empty( $result['ok'] ) && $status >= 200 && $status < 300 ) {
+			return new WP_REST_Response( null, 204 );
+		}
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * GET /admin-chat/conversations/{id}/export
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_export( $request ) {
+		$id     = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		$result = $this->api_client->export_conversation(
+			$id,
+			$this->admin_chat_wp_user_id(),
+			$this->admin_chat_is_full_admin()
+		);
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+		if ( empty( $result['ok'] ) || ! is_array( $result['body'] ) ) {
+			return $this->upstream_response( $result );
+		}
+
+		$response = new WP_REST_Response( $result['body'], $status );
+		$response->header(
+			'Content-Disposition',
+			'attachment; filename="conversation-' . $id . '.json"'
+		);
+		return $response;
+	}
+
+	/**
+	 * POST /admin-chat/conversations/{id}/messages
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_send_message( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$id      = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		$content = sanitize_textarea_field( (string) $request->get_param( 'content' ) );
+		if ( '' === $content ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'Message content is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$attachments = $this->sanitize_admin_chat_attachments( $request->get_param( 'attachments' ) );
+
+		$payload = array(
+			'session_id'      => $id,
+			'mode'            => 'admin',
+			'conversation_id' => $id,
+			'wp_user_id'      => $this->admin_chat_wp_user_id(),
+			'is_full_admin'   => $this->admin_chat_is_full_admin(),
+			'messages'        => array(
+				array(
+					'role'        => 'user',
+					'content'     => $content,
+					'attachments' => $attachments,
+				),
+			),
+		);
+
+		$result = $this->api_client->chat( $payload );
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+
+		$body = is_array( $result['body'] ) ? $result['body'] : array(
+			'error'   => 'upstream_error',
+			'message' => __( 'Amy is unavailable right now.', 'amy-agent' ),
+		);
+
+		if ( ! empty( $result['error'] ) && empty( $body['message'] ) ) {
+			$body['message'] = __( 'Amy is unavailable right now.', 'amy-agent' );
+		}
+
+		return new WP_REST_Response( $body, $status );
+	}
+
+	/**
+	 * POST /admin-chat/conversations/{id}/upload
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_upload( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$id    = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		$files = $request->get_file_params();
+		$file  = isset( $files['file'] ) && is_array( $files['file'] ) ? $files['file'] : null;
+
+		if ( ! $file ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A file is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$result = $this->api_client->conversation_upload(
+			$id,
+			$this->admin_chat_wp_user_id(),
+			$this->admin_chat_is_full_admin(),
+			$file
+		);
+		return $this->upstream_response( $result );
 	}
 
 	/**

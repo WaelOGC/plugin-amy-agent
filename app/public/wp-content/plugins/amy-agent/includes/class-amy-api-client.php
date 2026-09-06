@@ -410,6 +410,229 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * GET /v1/conversations — list by owner / full-admin visibility.
+	 *
+	 * @param int         $wp_user_id       Owning WP user ID (filter when not full admin).
+	 * @param bool        $is_full_admin    Whether the caller may see all conversations.
+	 * @param string|null $mode             Optional mode filter (e.g. admin).
+	 * @param bool        $include_archived Include archived conversations.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_conversations( $wp_user_id, $is_full_admin, $mode = null, $include_archived = false ) {
+		$query = array(
+			'wp_user_id'        => (int) $wp_user_id,
+			'is_full_admin'     => $is_full_admin ? 'true' : 'false',
+			'include_archived'  => $include_archived ? 'true' : 'false',
+		);
+		if ( null !== $mode && '' !== $mode ) {
+			$query['mode'] = (string) $mode;
+		}
+		return $this->request( 'GET', '/v1/conversations?' . http_build_query( $query ) );
+	}
+
+	/**
+	 * POST /v1/conversations — create a conversation.
+	 *
+	 * @param int         $wp_user_id Owning WP user ID.
+	 * @param string      $mode       Conversation mode.
+	 * @param string|null $title      Optional title.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function create_conversation( $wp_user_id, $mode, $title = null ) {
+		$payload = array(
+			'wp_user_id' => (int) $wp_user_id,
+			'mode'       => (string) $mode,
+		);
+		if ( null !== $title && '' !== $title ) {
+			$payload['title'] = (string) $title;
+		}
+		return $this->request( 'POST', '/v1/conversations', $payload );
+	}
+
+	/**
+	 * GET /v1/conversations/{id}.
+	 *
+	 * @param string $id            Conversation id (hex).
+	 * @param int    $wp_user_id    Acting WP user ID.
+	 * @param bool   $is_full_admin Full-admin visibility flag.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function get_conversation( $id, $wp_user_id, $is_full_admin ) {
+		$query = array(
+			'wp_user_id'    => (int) $wp_user_id,
+			'is_full_admin' => $is_full_admin ? 'true' : 'false',
+		);
+		return $this->request(
+			'GET',
+			'/v1/conversations/' . rawurlencode( (string) $id ) . '?' . http_build_query( $query )
+		);
+	}
+
+	/**
+	 * PATCH /v1/conversations/{id} — rename.
+	 *
+	 * @param string $id            Conversation id.
+	 * @param string $title         New title.
+	 * @param int    $wp_user_id    Acting WP user ID.
+	 * @param bool   $is_full_admin Full-admin visibility flag.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function rename_conversation( $id, $title, $wp_user_id, $is_full_admin ) {
+		$query = array(
+			'wp_user_id'    => (int) $wp_user_id,
+			'is_full_admin' => $is_full_admin ? 'true' : 'false',
+		);
+		return $this->request(
+			'PATCH',
+			'/v1/conversations/' . rawurlencode( (string) $id ) . '?' . http_build_query( $query ),
+			array( 'title' => (string) $title )
+		);
+	}
+
+	/**
+	 * DELETE /v1/conversations/{id}.
+	 *
+	 * @param string $id            Conversation id.
+	 * @param int    $wp_user_id    Acting WP user ID.
+	 * @param bool   $is_full_admin Full-admin visibility flag.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function delete_conversation( $id, $wp_user_id, $is_full_admin ) {
+		$query = array(
+			'wp_user_id'    => (int) $wp_user_id,
+			'is_full_admin' => $is_full_admin ? 'true' : 'false',
+		);
+		return $this->request(
+			'DELETE',
+			'/v1/conversations/' . rawurlencode( (string) $id ) . '?' . http_build_query( $query )
+		);
+	}
+
+	/**
+	 * GET /v1/conversations/{id}/export — full conversation JSON for download.
+	 *
+	 * @param string $id            Conversation id.
+	 * @param int    $wp_user_id    Acting WP user ID.
+	 * @param bool   $is_full_admin Full-admin visibility flag.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function export_conversation( $id, $wp_user_id, $is_full_admin ) {
+		$query = array(
+			'wp_user_id'    => (int) $wp_user_id,
+			'is_full_admin' => $is_full_admin ? 'true' : 'false',
+		);
+		return $this->request(
+			'GET',
+			'/v1/conversations/' . rawurlencode( (string) $id ) . '/export?' . http_build_query( $query )
+		);
+	}
+
+	/**
+	 * POST /v1/conversations/{id}/upload — multipart file proxy.
+	 *
+	 * @param string $id            Conversation id.
+	 * @param int    $wp_user_id    Acting WP user ID.
+	 * @param bool   $is_full_admin Full-admin visibility flag.
+	 * @param array  $file          WordPress-style file array (name, type, tmp_name, size).
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function conversation_upload( $id, $wp_user_id, $is_full_admin, array $file ) {
+		$base = $this->settings->get_service_url();
+		if ( '' === $base ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Service URL is not configured.',
+			);
+		}
+
+		$secret = $this->settings->get_shared_secret();
+		if ( '' === $secret ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Shared secret is not configured.',
+			);
+		}
+
+		$tmp  = isset( $file['tmp_name'] ) ? (string) $file['tmp_name'] : '';
+		$name = isset( $file['name'] ) ? (string) $file['name'] : 'upload';
+		$type = isset( $file['type'] ) ? (string) $file['type'] : 'application/octet-stream';
+
+		if ( '' === $tmp || ! is_readable( $tmp ) ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Uploaded file is not readable.',
+			);
+		}
+
+		if ( ! class_exists( 'CURLFile' ) ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'CURLFile is required for uploads.',
+			);
+		}
+
+		$url  = $base . '/v1/conversations/' . rawurlencode( (string) $id ) . '/upload';
+		$body = array(
+			'wp_user_id'    => (string) (int) $wp_user_id,
+			'is_full_admin' => $is_full_admin ? 'true' : 'false',
+			'file'          => new \CURLFile( $tmp, $type, $name ),
+		);
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- multipart proxy to local Python service.
+		$ch = curl_init( $url );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_POST           => true,
+				CURLOPT_POSTFIELDS     => $body,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_TIMEOUT        => 60,
+				CURLOPT_HTTPHEADER     => array(
+					'Accept: application/json',
+					'X-Amy-Secret: ' . $secret,
+				),
+			)
+		);
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_exec
+		$raw = curl_exec( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_errno
+		$errno = curl_errno( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error
+		$errstr = curl_error( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo
+		$status = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_close
+		curl_close( $ch );
+
+		if ( $errno ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => $errstr ? $errstr : 'Upload request failed.',
+			);
+		}
+
+		$decoded = json_decode( (string) $raw, true );
+
+		return array(
+			'ok'          => $status >= 200 && $status < 300,
+			'status_code' => $status,
+			'body'        => is_array( $decoded ) ? $decoded : null,
+			'error'       => ( $status >= 200 && $status < 300 ) ? null : ( is_array( $decoded ) && isset( $decoded['message'] ) ? (string) $decoded['message'] : 'Request failed.' ),
+		);
+	}
+
+	/**
 	 * GET /v1/tasks/stats — aggregate counts for Task Service cards.
 	 *
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}

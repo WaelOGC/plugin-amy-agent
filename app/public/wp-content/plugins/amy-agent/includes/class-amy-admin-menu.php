@@ -53,6 +53,11 @@ class Amy_Admin_Menu {
 	/**
 	 * @var string|false|null
 	 */
+	private $hook_chat;
+
+	/**
+	 * @var string|false|null
+	 */
 	private $hook_settings;
 
 	/**
@@ -141,15 +146,13 @@ class Amy_Admin_Menu {
 			array( $this, 'render_brand_page' )
 		);
 
-		$this->hook_placeholders['amy-chat'] = add_submenu_page(
+		$this->hook_chat = add_submenu_page(
 			self::PARENT_SLUG,
 			__( 'Chat', 'amy-agent' ),
 			__( 'Chat', 'amy-agent' ),
 			'manage_options',
 			'amy-chat',
-			function () {
-				$this->render_placeholder( __( 'Chat', 'amy-agent' ) );
-			}
+			array( $this, 'render_chat_page' )
 		);
 
 		$this->hook_analytics = add_submenu_page(
@@ -323,6 +326,73 @@ class Amy_Admin_Menu {
 						'extensionAuto'    => __( 'Extension granted automatically. Due date updated.', 'amy-agent' ),
 						'extensionPending' => __( 'Extension request sent — awaiting creator approval.', 'amy-agent' ),
 						'extensionInvalid' => __( 'Enter a positive number of hours.', 'amy-agent' ),
+					),
+				)
+			);
+			return;
+		}
+
+		if ( $this->hook_chat === $hook_suffix ) {
+			wp_enqueue_style(
+				'amy-agent-admin-chat-fonts',
+				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+				array(),
+				null
+			);
+
+			wp_enqueue_style(
+				'amy-agent-admin-chat',
+				AMY_AGENT_URL . 'admin/css/admin-chat.css',
+				array( 'amy-agent-admin-chat-fonts', 'dashicons' ),
+				AMY_AGENT_VERSION
+			);
+
+			wp_enqueue_script(
+				'amy-agent-admin-chat',
+				AMY_AGENT_URL . 'admin/js/admin-chat.js',
+				array( 'jquery' ),
+				AMY_AGENT_VERSION,
+				true
+			);
+
+			$user = wp_get_current_user();
+			wp_localize_script(
+				'amy-agent-admin-chat',
+				'amyAgentAdminChat',
+				array(
+					'restUrl'         => esc_url_raw( rest_url( Amy_Rest::NAMESPACE ) ),
+					'restNonce'       => wp_create_nonce( 'wp_rest' ),
+					'currentUserId'   => get_current_user_id(),
+					'isFullAdmin'     => current_user_can( 'manage_options' ),
+					'currentUserName' => $user->display_name,
+					'amyAvatarUrl'    => $this->settings->get_avatar_url(),
+					'uploadAccept'    => '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,image/*,application/pdf',
+					'i18n'            => array(
+						'newChat'        => __( 'New chat', 'amy-agent' ),
+						'untitled'       => __( '(untitled)', 'amy-agent' ),
+						'deleteConfirm'  => __( 'Delete this conversation? This cannot be undone.', 'amy-agent' ),
+						'renamePrompt'   => __( 'Rename conversation', 'amy-agent' ),
+						'send'           => __( 'Send', 'amy-agent' ),
+						'sending'        => __( 'Sending…', 'amy-agent' ),
+						'thinking'       => __( 'Amy is thinking…', 'amy-agent' ),
+						'error'          => __( 'Something went wrong. Please try again.', 'amy-agent' ),
+						'emptyState'     => __( 'Start a new chat or pick one from the list.', 'amy-agent' ),
+						'emptyThread'    => __( 'No messages yet. Say hello to Amy.', 'amy-agent' ),
+						'loadError'      => __( 'Could not load conversations. Check the Amy Agent service connection.', 'amy-agent' ),
+						'exported'       => __( 'Conversation downloaded.', 'amy-agent' ),
+						'export'         => __( 'Export', 'amy-agent' ),
+						'rename'         => __( 'Rename', 'amy-agent' ),
+						'delete'         => __( 'Delete', 'amy-agent' ),
+						'attach'         => __( 'Attach a file', 'amy-agent' ),
+						'uploadError'    => __( 'Could not upload that file.', 'amy-agent' ),
+						'composerPlaceholder' => __( 'Message Amy…', 'amy-agent' ),
+						'justNow'        => __( 'just now', 'amy-agent' ),
+						'minutesAgo'     => __( 'm ago', 'amy-agent' ),
+						'hoursAgo'       => __( 'h ago', 'amy-agent' ),
+						'daysAgo'        => __( 'd ago', 'amy-agent' ),
+						'you'            => __( 'You', 'amy-agent' ),
+						'amy'            => __( 'Amy', 'amy-agent' ),
+						'removeAttach'   => __( 'Remove attachment', 'amy-agent' ),
 					),
 				)
 			);
@@ -1999,6 +2069,20 @@ class Amy_Admin_Menu {
 					<div class="amy-agent-seo__modal-body" id="amy-agent-seo-modal-body"></div>
 				</div>
 			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Dashboard Chat — conversation list + thread shell (UI built in JS).
+	 */
+	public function render_chat_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?>
+		<div class="wrap amy-agent-chat" id="amy-agent-chat-root">
+			<h1 class="amy-agent-chat__title"><?php echo esc_html__( 'Chat', 'amy-agent' ); ?></h1>
 		</div>
 		<?php
 	}
