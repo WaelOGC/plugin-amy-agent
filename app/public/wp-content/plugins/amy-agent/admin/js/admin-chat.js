@@ -33,6 +33,14 @@
 				'</div>' +
 				'<div class="amy-agent-chat__list" id="amy-chat-list" role="list"></div>' +
 				'<p class="amy-agent-chat__list-error" id="amy-chat-list-error" hidden role="alert"></p>' +
+				'<div class="amy-agent-chat__sidebar-foot">' +
+				'<img class="amy-agent-chat__sidebar-foot-avatar" src="' +
+				escapeHtml(cfg.currentUserAvatarUrl || '') +
+				'" alt="" />' +
+				'<span class="amy-agent-chat__sidebar-foot-name">' +
+				escapeHtml(cfg.currentUserName || '') +
+				'</span>' +
+				'</div>' +
 				'</aside>' +
 				'<section class="amy-agent-chat__pane">' +
 				'<header class="amy-agent-chat__pane-head" id="amy-chat-pane-head" hidden>' +
@@ -56,8 +64,12 @@
 				'<textarea id="amy-chat-input" class="amy-agent-chat__input" rows="2" placeholder="' +
 				escapeHtml(i18n.composerPlaceholder || 'Message Amy…') +
 				'"></textarea>' +
-				'<button type="button" class="amy-agent-chat__btn amy-agent-chat__btn--accent" id="amy-chat-send">' +
+				'<button type="button" class="amy-agent-chat__btn amy-agent-chat__btn--accent" id="amy-chat-send" title="' +
 				escapeHtml(i18n.send || 'Send') +
+				'" aria-label="' +
+				escapeHtml(i18n.send || 'Send') +
+				'">' +
+				'<span class="dashicons dashicons-arrow-up-alt2" aria-hidden="true"></span>' +
 				'</button>' +
 				'</div>' +
 				'<input type="file" id="amy-chat-file" hidden accept="' +
@@ -177,9 +189,11 @@
 			$send.prop('disabled', sending || uploading);
 			$attach.prop('disabled', sending || uploading);
 			$input.prop('disabled', sending);
-			$send.text(
-				sending ? i18n.sending || 'Sending…' : i18n.send || 'Send'
-			);
+			var sendLabel = sending
+				? i18n.sending || 'Sending…'
+				: i18n.send || 'Send';
+			$send.attr('aria-label', sendLabel);
+			$send.attr('title', sendLabel);
 		}
 
 		function conversationTitle(conv) {
@@ -287,30 +301,11 @@
 
 		function appendBubble(role, content, attachments) {
 			var isUser = role === 'user';
-			var label = isUser
-				? cfg.currentUserName || i18n.you || 'You'
-				: i18n.amy || 'Amy';
-			var avatar = '';
-			if (!isUser && cfg.amyAvatarUrl) {
-				avatar =
-					'<img class="amy-agent-chat__avatar" src="' +
-					escapeHtml(cfg.amyAvatarUrl) +
-					'" alt="" />';
-			} else {
-				avatar =
-					'<span class="amy-agent-chat__avatar amy-agent-chat__avatar--initial">' +
-					escapeHtml(String(label).charAt(0).toUpperCase()) +
-					'</span>';
-			}
 			var $bubble = $(
 				'<div class="amy-agent-chat__msg amy-agent-chat__msg--' +
 					(isUser ? 'user' : 'assistant') +
 					'">' +
-					avatar +
 					'<div class="amy-agent-chat__bubble">' +
-					'<div class="amy-agent-chat__bubble-label">' +
-					escapeHtml(label) +
-					'</div>' +
 					'<div class="amy-agent-chat__bubble-text"></div>' +
 					renderAttachmentsHtml(attachments) +
 					'</div>' +

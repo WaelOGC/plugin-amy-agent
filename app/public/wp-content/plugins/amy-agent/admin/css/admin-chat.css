@@ -219,14 +219,11 @@
 
 .amy-agent-chat__msg {
 	display: flex;
-	gap: 0.65rem;
-	max-width: min(42rem, 92%);
-	align-items: flex-start;
+	max-width: min(38rem, 85%);
 }
 
 .amy-agent-chat__msg--user {
 	align-self: flex-end;
-	flex-direction: row-reverse;
 }
 
 .amy-agent-chat__msg--assistant {
@@ -252,28 +249,13 @@
 }
 
 .amy-agent-chat__bubble {
-	padding: 0.7rem 0.9rem;
-	border-radius: 12px;
-	background: #1c1c1c;
-	border: 1px solid rgba(255, 255, 255, 0.06);
+	padding: 0.55rem 0.85rem;
+	border-radius: 14px;
+	background: var(--amy-panel);
 }
 
 .amy-agent-chat__msg--user .amy-agent-chat__bubble {
-	background: linear-gradient(
-		135deg,
-		rgba(255, 122, 24, 0.22),
-		rgba(255, 197, 66, 0.12)
-	);
-	border-color: rgba(247, 148, 29, 0.45);
-}
-
-.amy-agent-chat__bubble-label {
-	margin-bottom: 0.25rem;
-	font-size: 0.7rem;
-	font-weight: 600;
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
-	color: var(--amy-text-muted);
+	background: rgba(247, 148, 29, 0.16);
 }
 
 .amy-agent-chat__bubble-text {
@@ -321,7 +303,6 @@
 
 .amy-agent-chat__thinking {
 	align-self: flex-start;
-	margin-left: 2.65rem;
 	font-size: 0.8125rem;
 	color: var(--amy-text-muted);
 	font-style: italic;
@@ -383,6 +364,43 @@
 	display: flex;
 	align-items: flex-end;
 	gap: 0.5rem;
+	background: var(--amy-panel);
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 20px;
+	padding: 0.4rem 0.5rem 0.4rem 0.75rem;
+}
+
+.amy-agent-chat__composer-row .amy-agent-chat__icon-btn {
+	border: none;
+	background: transparent;
+	width: 2.25rem;
+	height: 2.25rem;
+	flex-shrink: 0;
+}
+
+.amy-agent-chat__composer-row .amy-agent-chat__input {
+	border: none;
+	background: transparent;
+	padding: 0.45rem 0.25rem;
+	border-radius: 0;
+}
+
+.amy-agent-chat__composer-row .amy-agent-chat__input:focus {
+	outline: none;
+	border: none;
+	box-shadow: none;
+}
+
+#amy-chat-send {
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: 999px;
+	border: none;
+	flex-shrink: 0;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .amy-agent-chat__input {
@@ -469,10 +487,29 @@
 	color: var(--amy-danger);
 }
 
-.amy-agent-chat__composer-row .amy-agent-chat__icon-btn {
-	width: 2.5rem;
-	height: 2.5rem;
+.amy-agent-chat__sidebar-foot {
+	margin-top: auto;
+	display: flex;
+	align-items: center;
+	gap: 0.6rem;
+	padding: 0.75rem 0.85rem;
+	border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.amy-agent-chat__sidebar-foot-avatar {
+	width: 28px;
+	height: 28px;
+	border-radius: 999px;
+	object-fit: cover;
 	flex-shrink: 0;
+}
+
+.amy-agent-chat__sidebar-foot-name {
+	font-size: 0.8125rem;
+	color: var(--amy-text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 @media (max-width: 900px) {

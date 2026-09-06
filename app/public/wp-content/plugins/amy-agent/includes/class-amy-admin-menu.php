@@ -365,6 +365,7 @@ class Amy_Admin_Menu {
 					'currentUserId'   => get_current_user_id(),
 					'isFullAdmin'     => current_user_can( 'manage_options' ),
 					'currentUserName' => $user->display_name,
+					'currentUserAvatarUrl' => get_avatar_url( $user->ID, array( 'size' => 64 ) ),
 					'amyAvatarUrl'    => $this->settings->get_avatar_url(),
 					'uploadAccept'    => '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,image/*,application/pdf',
 					'i18n'            => array(
