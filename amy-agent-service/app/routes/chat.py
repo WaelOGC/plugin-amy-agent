@@ -120,7 +120,12 @@ async def chat(body: ChatRequest) -> JSONResponse:
                 "Conversation not found.",
                 status.HTTP_404_NOT_FOUND,
             )
-        if not body.is_full_admin and conversation["wp_user_id"] != body.wp_user_id:
+        if not conversations_db.can_access_conversation(
+            conversation,
+            wp_user_id=body.wp_user_id,
+            is_full_admin=body.is_full_admin,
+            visitor_id=body.visitor_id,
+        ):
             return _error(
                 "forbidden",
                 "You do not have access to this conversation.",

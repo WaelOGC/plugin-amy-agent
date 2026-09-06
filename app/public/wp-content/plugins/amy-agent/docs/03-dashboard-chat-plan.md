@@ -120,7 +120,20 @@ one orchestrator.
   knowledge, not live search, so she cannot look up competitor pricing or
   current market info on demand.
 
-## 5. Build order implication
+## 5. Public widget memory (visitor-scoped)
+
+The public floating widget now persists conversation memory in the same
+`conversations` table used by the admin dashboard chat, using a sentinel
+`wp_user_id = 0` for anonymous rows and a browser-generated `visitor_id`
+(stored in `localStorage`) as the actual ownership key. Retention follows
+the same existing 90-day policy — no separate policy was introduced.
+
+There is intentionally no admin-facing UI for these conversations yet
+(no list/rename/delete/export support for the public path) — this step is
+backend continuity only. Admin visibility, if wanted, is a future step
+alongside Analytics.
+
+## 6. Build order implication
 
 This plan confirms the multi-channel orchestrator shape, but the actual
 sequence stays as previously agreed:
@@ -133,7 +146,7 @@ sequence stays as previously agreed:
 4. Telegram Support Bot and News Channel can be built in parallel or after,
    depending on priority — not blocking the admin-side orchestrator.
 
-## 6. Still to decide before a Cursor prompt is written
+## 7. Still to decide before a Cursor prompt is written
 
 - Exact Telegram bot setup steps (BotFather config for both bots) and where
   the whitelist of admin User IDs is stored/managed on the Python side.

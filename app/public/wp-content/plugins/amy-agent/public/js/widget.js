@@ -22,7 +22,6 @@
 		}
 
 		var sessionId = uuid();
-		var messages = [];
 		var busy = false;
 
 		var root = document.getElementById('amy-agent-root');
@@ -87,7 +86,70 @@
 		var input = root.querySelector('[data-amy-input]');
 		var sendBtn = root.querySelector('[data-amy-send]');
 
-		appendBubble(cfg.i18n.greeting, 'assistant');
+		function getVisitorId() {
+			try {
+				var existing = window.localStorage.getItem('amyAgentVisitorId');
+				if (existing) {
+					return existing;
+				}
+				var next = uuid();
+				window.localStorage.setItem('amyAgentVisitorId', next);
+				return next;
+			} catch (e) {
+				return uuid(); // localStorage unavailable (e.g. private mode) — degrade to session-only
+			}
+		}
+
+		var visitorId = getVisitorId();
+		var conversationId = null;
+		try {
+			conversationId = window.localStorage.getItem('amyAgentConversationId') || null;
+		} catch (e) {
+			conversationId = null;
+		}
+
+		function startFreshConversation() {
+			appendBubble(cfg.i18n.greeting, 'assistant');
+			fetch(cfg.restUrl.replace(/\/chat$/, '/chat/conversation'), {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-WP-Nonce': cfg.nonce },
+				body: JSON.stringify({ visitor_id: visitorId }),
+			})
+				.then(function (res) { return res.json(); })
+				.then(function (data) {
+					if (data && data.id) {
+						conversationId = data.id;
+						try {
+							window.localStorage.setItem('amyAgentConversationId', conversationId);
+						} catch (e) {}
+					}
+				})
+				.catch(function () {});
+		}
+
+		if (conversationId) {
+			fetch(
+				cfg.restUrl.replace(/\/chat$/, '/chat/conversation/') + conversationId + '?visitor_id=' + encodeURIComponent(visitorId),
+				{ credentials: 'same-origin', headers: { Accept: 'application/json', 'X-WP-Nonce': cfg.nonce } }
+			)
+				.then(function (res) { return res.ok ? res.json() : Promise.reject(); })
+				.then(function (data) {
+					if (data && Array.isArray(data.messages) && data.messages.length) {
+						data.messages.forEach(function (m) {
+							appendBubble(m.content, m.role === 'user' ? 'user' : 'assistant');
+						});
+					} else {
+						startFreshConversation();
+					}
+				})
+				.catch(function () {
+					conversationId = null;
+					startFreshConversation();
+				});
+		} else {
+			startFreshConversation();
+		}
 
 		function escapeHtml(str) {
 			return String(str)
@@ -279,13 +341,27 @@
 
 			input.value = '';
 			appendBubble(text, 'user');
-			messages.push({ role: 'user', content: text });
 			if (window.amyTrack) {
 				window.amyTrack('widget_message_sent');
 			}
 
 			var thinking = appendBubble(cfg.i18n.thinking, 'status');
 			setBusy(true);
+
+			var body = {
+				session_id: sessionId,
+				visitor_id: visitorId,
+				mode: 'general',
+				messages: [{ role: 'user', content: text }],
+				page: {
+					url: cfg.pageUrl || window.location.href,
+					slug: cfg.pageSlug || '',
+				},
+				context: {},
+			};
+			if (conversationId) {
+				body.conversation_id = conversationId;
+			}
 
 			fetch(cfg.restUrl, {
 				method: 'POST',
@@ -295,16 +371,7 @@
 					Accept: 'application/json',
 					'X-WP-Nonce': cfg.nonce,
 				},
-				body: JSON.stringify({
-					session_id: sessionId,
-					mode: 'general',
-					messages: messages,
-					page: {
-						url: cfg.pageUrl || window.location.href,
-						slug: cfg.pageSlug || '',
-					},
-					context: {},
-				}),
+				body: JSON.stringify(body),
 			})
 				.then(function (res) {
 					return res.json().then(function (data) {
@@ -323,7 +390,6 @@
 					) {
 						var reply = result.data.reply.content;
 						appendBubble(reply, 'assistant');
-						messages.push({ role: 'assistant', content: reply });
 						return;
 					}
 					appendBubble(cfg.i18n.unavailable, 'status');

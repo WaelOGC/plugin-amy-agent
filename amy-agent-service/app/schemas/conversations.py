@@ -15,6 +15,7 @@ class ConversationSummary(BaseModel):
     status: str
     created_at: float
     updated_at: float
+    visitor_id: str | None = None
 
 
 class ConversationDetail(ConversationSummary):
@@ -25,6 +26,7 @@ class CreateConversationRequest(BaseModel):
     wp_user_id: int
     mode: ChatMode = "admin"
     title: str | None = None
+    visitor_id: str | None = None
 
 
 class RenameConversationRequest(BaseModel):

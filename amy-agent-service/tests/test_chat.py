@@ -179,6 +179,90 @@ def test_chat_conversation_forbidden(client: TestClient, tmp_path, monkeypatch) 
     assert response.json()["error"] == "forbidden"
 
 
+def test_chat_conversation_full_admin_bypass(
+    client: TestClient, tmp_path, monkeypatch
+) -> None:
+    from app.db import conversations_db
+
+    get_settings.cache_clear()
+    monkeypatch.setattr(conversations_db, "_DB_PATH", tmp_path / "conversations.db")
+    conv = conversations_db.create_conversation(wp_user_id=5, mode="admin")
+
+    with patch("app.routes.chat.get_provider", return_value=_FakeProvider("ok")):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                conversation_id=conv["id"],
+                wp_user_id=99,
+                is_full_admin=True,
+                messages=[{"role": "user", "content": "admin peek"}],
+            ),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["reply"]["content"] == "ok"
+
+
+def test_chat_visitor_conversation_allows_matching_visitor(
+    client: TestClient, tmp_path, monkeypatch
+) -> None:
+    from app.db import conversations_db
+
+    get_settings.cache_clear()
+    monkeypatch.setattr(conversations_db, "_DB_PATH", tmp_path / "conversations.db")
+    conv = conversations_db.create_conversation(
+        wp_user_id=0, mode="general", visitor_id="abc123"
+    )
+
+    with patch("app.routes.chat.get_provider", return_value=_FakeProvider("visitor hi")):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                conversation_id=conv["id"],
+                wp_user_id=0,
+                is_full_admin=False,
+                visitor_id="abc123",
+                messages=[{"role": "user", "content": "hello visitor"}],
+            ),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["reply"]["content"] == "visitor hi"
+    stored = conversations_db.get_messages(conv["id"])
+    assert [m["content"] for m in stored] == ["hello visitor", "visitor hi"]
+
+
+def test_chat_visitor_conversation_rejects_mismatched_visitor(
+    client: TestClient, tmp_path, monkeypatch
+) -> None:
+    from app.db import conversations_db
+
+    get_settings.cache_clear()
+    monkeypatch.setattr(conversations_db, "_DB_PATH", tmp_path / "conversations.db")
+    conv = conversations_db.create_conversation(
+        wp_user_id=0, mode="general", visitor_id="abc123"
+    )
+
+    with patch("app.routes.chat.get_provider", return_value=_FakeProvider()):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                conversation_id=conv["id"],
+                wp_user_id=0,
+                is_full_admin=False,
+                visitor_id="other-visitor",
+                messages=[{"role": "user", "content": "nope"}],
+            ),
+        )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+    assert conversations_db.get_messages(conv["id"]) == []
+
+
 def test_chat_provider_failure_returns_502(client: TestClient) -> None:
     with patch("app.routes.chat.get_provider", return_value=_FailingProvider()):
         response = client.post("/v1/chat", headers=HEADERS, json=_chat_body())

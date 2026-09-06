@@ -300,6 +300,43 @@ def test_api_create_list_get_rename_delete_export(client: TestClient) -> None:
     assert missing.status_code == 404
 
 
+def test_api_create_visitor_conversation_persists_visitor_id(client: TestClient) -> None:
+    create = client.post(
+        "/v1/conversations",
+        headers=AUTH,
+        json={
+            "wp_user_id": 0,
+            "mode": "general",
+            "visitor_id": "abc123",
+        },
+    )
+    assert create.status_code == 201, create.text
+    body = create.json()
+    assert body["wp_user_id"] == 0
+    assert body["visitor_id"] == "abc123"
+    assert body["mode"] == "general"
+
+    stored = conversations_db.get_conversation(body["id"])
+    assert stored is not None
+    assert stored["visitor_id"] == "abc123"
+    assert stored["wp_user_id"] == 0
+
+    ok = client.get(
+        f"/v1/conversations/{body['id']}",
+        headers=AUTH,
+        params={"wp_user_id": 0, "is_full_admin": False, "visitor_id": "abc123"},
+    )
+    assert ok.status_code == 200
+
+    denied = client.get(
+        f"/v1/conversations/{body['id']}",
+        headers=AUTH,
+        params={"wp_user_id": 0, "is_full_admin": False, "visitor_id": "other"},
+    )
+    assert denied.status_code == 403
+    assert denied.json()["error"] == "forbidden"
+
+
 def test_append_message_attachments_round_trip(client: TestClient) -> None:
     conv = conversations_db.create_conversation(wp_user_id=1, mode="admin")
     attachments = [

@@ -57,6 +57,7 @@ def _to_summary(row: dict) -> ConversationSummary:
         status=row["status"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        visitor_id=row.get("visitor_id"),
     )
 
 
@@ -79,16 +80,20 @@ def _check_access(
     *,
     wp_user_id: int | None,
     is_full_admin: bool,
+    visitor_id: str | None = None,
 ) -> JSONResponse | None:
-    if is_full_admin:
+    if conversations_db.can_access_conversation(
+        conversation,
+        wp_user_id=wp_user_id,
+        is_full_admin=is_full_admin,
+        visitor_id=visitor_id,
+    ):
         return None
-    if wp_user_id is None or conversation["wp_user_id"] != wp_user_id:
-        return _error(
-            "forbidden",
-            "You do not have access to this conversation.",
-            status.HTTP_403_FORBIDDEN,
-        )
-    return None
+    return _error(
+        "forbidden",
+        "You do not have access to this conversation.",
+        status.HTTP_403_FORBIDDEN,
+    )
 
 
 @router.post(
@@ -104,6 +109,7 @@ async def create_conversation(
         wp_user_id=body.wp_user_id,
         mode=body.mode,
         title=body.title,
+        visitor_id=body.visitor_id,
     )
     return _to_summary(row)
 
@@ -137,6 +143,7 @@ async def get_conversation(
     conversation_id: str,
     wp_user_id: int = Query(...),
     is_full_admin: bool = Query(False),
+    visitor_id: str | None = Query(None),
 ) -> ConversationDetail | JSONResponse:
     row = conversations_db.get_conversation(conversation_id)
     if row is None:
@@ -145,7 +152,12 @@ async def get_conversation(
             "Conversation not found.",
             status.HTTP_404_NOT_FOUND,
         )
-    denied = _check_access(row, wp_user_id=wp_user_id, is_full_admin=is_full_admin)
+    denied = _check_access(
+        row,
+        wp_user_id=wp_user_id,
+        is_full_admin=is_full_admin,
+        visitor_id=visitor_id,
+    )
     if denied is not None:
         return denied
     messages = conversations_db.get_messages(conversation_id)

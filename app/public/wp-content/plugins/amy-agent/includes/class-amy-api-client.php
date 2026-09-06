@@ -436,9 +436,10 @@ class Amy_Api_Client {
 	 * @param int         $wp_user_id Owning WP user ID.
 	 * @param string      $mode       Conversation mode.
 	 * @param string|null $title      Optional title.
+	 * @param string|null $visitor_id Optional anonymous visitor token.
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
 	 */
-	public function create_conversation( $wp_user_id, $mode, $title = null ) {
+	public function create_conversation( $wp_user_id, $mode, $title = null, $visitor_id = null ) {
 		$payload = array(
 			'wp_user_id' => (int) $wp_user_id,
 			'mode'       => (string) $mode,
@@ -446,22 +447,29 @@ class Amy_Api_Client {
 		if ( null !== $title && '' !== $title ) {
 			$payload['title'] = (string) $title;
 		}
+		if ( null !== $visitor_id && '' !== $visitor_id ) {
+			$payload['visitor_id'] = (string) $visitor_id;
+		}
 		return $this->request( 'POST', '/v1/conversations', $payload );
 	}
 
 	/**
 	 * GET /v1/conversations/{id}.
 	 *
-	 * @param string $id            Conversation id (hex).
-	 * @param int    $wp_user_id    Acting WP user ID.
-	 * @param bool   $is_full_admin Full-admin visibility flag.
+	 * @param string      $id            Conversation id (hex).
+	 * @param int         $wp_user_id    Acting WP user ID.
+	 * @param bool        $is_full_admin Full-admin visibility flag.
+	 * @param string|null $visitor_id    Optional anonymous visitor token.
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
 	 */
-	public function get_conversation( $id, $wp_user_id, $is_full_admin ) {
+	public function get_conversation( $id, $wp_user_id, $is_full_admin, $visitor_id = null ) {
 		$query = array(
 			'wp_user_id'    => (int) $wp_user_id,
 			'is_full_admin' => $is_full_admin ? 'true' : 'false',
 		);
+		if ( null !== $visitor_id && '' !== $visitor_id ) {
+			$query['visitor_id'] = (string) $visitor_id;
+		}
 		return $this->request(
 			'GET',
 			'/v1/conversations/' . rawurlencode( (string) $id ) . '?' . http_build_query( $query )

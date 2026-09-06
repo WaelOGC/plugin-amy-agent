@@ -115,6 +115,26 @@ class Amy_Rest {
 			)
 		);
 
+		register_rest_route(
+			self::NAMESPACE,
+			'/chat/conversation',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_public_chat_create' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/chat/conversation/(?P<id>[a-f0-9]+)',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_public_chat_get' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
 		$this->register_submit_idea_routes();
 		$this->register_admin_chat_routes();
 
@@ -704,8 +724,10 @@ class Amy_Rest {
 			);
 		}
 
-		$page    = $request->get_param( 'page' );
-		$context = $request->get_param( 'context' );
+		$page            = $request->get_param( 'page' );
+		$context         = $request->get_param( 'context' );
+		$conversation_id = sanitize_text_field( (string) $request->get_param( 'conversation_id' ) );
+		$visitor_id      = $this->sanitize_visitor_id( $request->get_param( 'visitor_id' ) );
 
 		$payload = array(
 			'session_id' => $session_id,
@@ -713,6 +735,13 @@ class Amy_Rest {
 			'messages'   => $messages,
 			'context'    => is_array( $context ) && ! empty( $context ) ? $context : (object) array(),
 		);
+
+		if ( '' !== $conversation_id ) {
+			$payload['conversation_id'] = $conversation_id;
+		}
+		if ( '' !== $visitor_id ) {
+			$payload['visitor_id'] = $visitor_id;
+		}
 
 		if ( is_array( $page ) ) {
 			$payload['page'] = array(
@@ -737,6 +766,87 @@ class Amy_Rest {
 			$body['message'] = __( 'Amy is unavailable right now.', 'amy-agent' );
 		}
 
+		return new WP_REST_Response( $body, $status );
+	}
+
+	/**
+	 * POST /chat/conversation — create a conversation for an anonymous visitor.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_public_chat_create( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$visitor_id = $this->sanitize_visitor_id( $request->get_param( 'visitor_id' ) );
+		if ( '' === $visitor_id ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A valid visitor id is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$result = $this->api_client->create_conversation( 0, 'general', null, $visitor_id );
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+		$body = is_array( $result['body'] ) ? $result['body'] : array(
+			'error'   => 'upstream_error',
+			'message' => __( 'Amy is unavailable right now.', 'amy-agent' ),
+		);
+		return new WP_REST_Response( $body, $status );
+	}
+
+	/**
+	 * GET /chat/conversation/{id} — fetch a visitor's own conversation history.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_public_chat_get( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$id         = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		$visitor_id = $this->sanitize_visitor_id( $request->get_param( 'visitor_id' ) );
+		if ( '' === $visitor_id ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A valid visitor id is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$result = $this->api_client->get_conversation( $id, 0, false, $visitor_id );
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+		$body = is_array( $result['body'] ) ? $result['body'] : array(
+			'error'   => 'upstream_error',
+			'message' => __( 'Amy is unavailable right now.', 'amy-agent' ),
+		);
 		return new WP_REST_Response( $body, $status );
 	}
 
@@ -1028,6 +1138,20 @@ class Amy_Rest {
 			}
 		}
 		return $clean;
+	}
+
+	/**
+	 * Validate a client-generated visitor id (UUID-shaped token).
+	 *
+	 * @param mixed $raw Raw request value.
+	 * @return string Empty string when invalid.
+	 */
+	private function sanitize_visitor_id( $raw ) {
+		$value = sanitize_text_field( (string) $raw );
+		if ( ! preg_match( '/^[a-f0-9-]{16,64}$/i', $value ) ) {
+			return '';
+		}
+		return $value;
 	}
 
 	/**

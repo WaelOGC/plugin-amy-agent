@@ -17,7 +17,9 @@ _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Guarded-ALTER registry — empty in v1; add column name → SQL type/default
 # here when a future migration needs a new column on an existing conversations.db.
-_CONVERSATION_COLUMN_DEFAULTS: dict[str, str] = {}
+_CONVERSATION_COLUMN_DEFAULTS: dict[str, str] = {
+    "visitor_id": "TEXT",
+}
 _MESSAGE_COLUMN_DEFAULTS: dict[str, str] = {
     "attachments": "TEXT",
 }
@@ -75,6 +77,12 @@ def _connect() -> sqlite3.Connection:
         """
     )
     _ensure_columns(conn)
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_conversations_visitor
+        ON conversations (visitor_id, status)
+        """
+    )
     return conn
 
 
@@ -106,6 +114,7 @@ def _conversation_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "exported_at": float(row["exported_at"]) if row["exported_at"] is not None else None,
         "created_at": float(row["created_at"]),
         "updated_at": float(row["updated_at"]),
+        "visitor_id": row["visitor_id"] if row["visitor_id"] is not None else None,
     }
 
 
@@ -147,6 +156,7 @@ def create_conversation(
     wp_user_id: int,
     mode: str,
     title: str | None = None,
+    visitor_id: str | None = None,
 ) -> dict[str, Any]:
     conversation_id = uuid.uuid4().hex
     now = time.time()
@@ -157,10 +167,10 @@ def create_conversation(
                 """
                 INSERT INTO conversations (
                     id, wp_user_id, mode, title, status, exported_at,
-                    created_at, updated_at
-                ) VALUES (?, ?, ?, ?, 'active', NULL, ?, ?)
+                    created_at, updated_at, visitor_id
+                ) VALUES (?, ?, ?, ?, 'active', NULL, ?, ?, ?)
                 """,
-                (conversation_id, wp_user_id, mode, title, now, now),
+                (conversation_id, wp_user_id, mode, title, now, now, visitor_id),
             )
         row = conn.execute(
             "SELECT * FROM conversations WHERE id = ?",
@@ -170,6 +180,23 @@ def create_conversation(
         return _conversation_row_to_dict(row)
     finally:
         conn.close()
+
+
+def can_access_conversation(
+    conversation: dict[str, Any],
+    *,
+    wp_user_id: int | None,
+    is_full_admin: bool,
+    visitor_id: str | None = None,
+) -> bool:
+    """True if the caller may read/write this conversation."""
+    if conversation["wp_user_id"] == 0:
+        # Anonymous/public-widget conversation — ownership is by visitor_id,
+        # not wp_user_id (every anonymous row shares the same sentinel 0).
+        return bool(visitor_id) and conversation.get("visitor_id") == visitor_id
+    if is_full_admin:
+        return True
+    return conversation["wp_user_id"] == wp_user_id
 
 
 def get_conversation(conversation_id: str) -> dict[str, Any] | None:
