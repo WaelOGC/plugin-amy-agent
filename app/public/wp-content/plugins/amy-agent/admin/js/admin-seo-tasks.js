@@ -12,6 +12,7 @@
 		var cfg = window.amyAgentSeoTasks || {};
 		var i18n = cfg.i18n || {};
 		var metaKeys = cfg.metaKeys || {};
+		var scoreMetaKeys = cfg.scoreMetaKeys || {};
 		var restUrl = cfg.restUrl || '';
 
 		var currentType = null;
@@ -21,6 +22,7 @@
 		var snapshotsById = {};
 		var generatedFieldsById = {};
 		var generatedImageById = {};
+		var scoresByPostId = {};
 		var phase = 'idle';
 		var countChoice = null;
 		var modeChoice = null;
@@ -363,10 +365,10 @@
 
 		function listPathForType(type) {
 			if (type === 'page') {
-				return 'wp/v2/pages?status=publish&per_page=100&_fields=id,title';
+				return 'wp/v2/pages?status=publish&per_page=100&_fields=id,title,meta';
 			}
 			if (type === 'post') {
-				return 'wp/v2/posts?status=publish&per_page=100&_fields=id,title';
+				return 'wp/v2/posts?status=publish&per_page=100&_fields=id,title,meta';
 			}
 			if (type === 'category') {
 				return 'wp/v2/categories?per_page=100&_fields=id,name,count';
@@ -516,6 +518,13 @@
 						'</p>';
 				}
 				if (img) {
+					var listItem = items.filter(function (row) {
+						return row.id === itemId;
+					})[0];
+					var itemTitle =
+						(listItem && listItem.title) ||
+						(activeItem && activeItem.id === itemId ? activeItem.title : '') ||
+						'';
 					html +=
 						'<img class="amy-agent-seo__image-preview" ' +
 						'src="data:' +
@@ -529,6 +538,18 @@
 						inputHtml(
 							'featured_image_alt',
 							i18n.fieldAlt || 'Featured image alt text',
+							img.suggested_alt_text || '',
+							false
+						) +
+						inputHtml(
+							'featured_image_title',
+							i18n.fieldFeaturedTitle || 'Featured image title',
+							itemTitle,
+							false
+						) +
+						inputHtml(
+							'featured_image_caption',
+							i18n.fieldFeaturedCaption || 'Featured image caption',
 							img.suggested_alt_text || '',
 							false
 						);
@@ -750,7 +771,15 @@
 			var snap = snapshotsById[item.id];
 			var hasExistingImage = !!(snap && snap.featured_media_id);
 
-			function proceedWithFeaturedMedia(featuredMediaId) {
+			function proceedWithFeaturedMedia(featuredMediaId, sourceUrl) {
+				if (sourceUrl) {
+					if (!fields.og_image) {
+						fields.og_image = sourceUrl;
+					}
+					if (!fields.twitter_image) {
+						fields.twitter_image = sourceUrl;
+					}
+				}
 				var writes = [];
 				var meta = {};
 				Object.keys(metaKeys).forEach(function (field) {
@@ -771,10 +800,19 @@
 				if (Object.keys(body).length) {
 					writes.push(restPost(restCollection(type) + item.id, body));
 				}
-				if (fields.featured_image_alt && featuredMediaId) {
-					writes.push(restPost('wp/v2/media/' + featuredMediaId, { alt_text: fields.featured_image_alt }));
-				} else if (fields.featured_image_alt && snap && snap.featured_media_id) {
-					writes.push(restPost('wp/v2/media/' + snap.featured_media_id, { alt_text: fields.featured_image_alt }));
+				var mediaTargetId = featuredMediaId || (snap && snap.featured_media_id) || 0;
+				var mediaBody = {};
+				if (fields.featured_image_alt) {
+					mediaBody.alt_text = fields.featured_image_alt;
+				}
+				if (fields.featured_image_title) {
+					mediaBody.title = { raw: fields.featured_image_title };
+				}
+				if (fields.featured_image_caption) {
+					mediaBody.caption = { raw: fields.featured_image_caption };
+				}
+				if (mediaTargetId && Object.keys(mediaBody).length) {
+					writes.push(restPost('wp/v2/media/' + mediaTargetId, mediaBody));
 				}
 				if (!writes.length) {
 					return $.Deferred().resolve().promise();
@@ -787,7 +825,10 @@
 				var filename = 'amy-seo-' + item.id + '.' + (img.mime_type === 'image/jpeg' ? 'jpg' : 'png');
 				return restUpload('wp/v2/media', blob, filename).then(
 					function (media) {
-						return proceedWithFeaturedMedia(media && media.id ? media.id : 0);
+						return proceedWithFeaturedMedia(
+							media && media.id ? media.id : 0,
+							media && media.source_url ? media.source_url : ''
+						);
 					},
 					function () {
 						return proceedWithFeaturedMedia(0);
@@ -901,28 +942,114 @@
 			return d.promise();
 		}
 
+		function parseYoastScore(value) {
+			if (value == null || value === '') {
+				return null;
+			}
+			var n = parseInt(value, 10);
+			return isNaN(n) ? null : n;
+		}
+
+		function scoresFromMeta(meta) {
+			meta = meta || {};
+			return {
+				seo_score: parseYoastScore(meta[scoreMetaKeys.seo_score]),
+				readability_score: parseYoastScore(meta[scoreMetaKeys.readability_score]),
+			};
+		}
+
+		function scoreDotHtml(label, value) {
+			var tone = 'muted';
+			var tip = label + ': Not analyzed yet';
+			if (value != null && value > 0) {
+				if (value <= 39) {
+					tone = 'red';
+				} else if (value <= 69) {
+					tone = 'orange';
+				} else {
+					tone = 'green';
+				}
+				tip = label + ': ' + value;
+			}
+			return (
+				'<span class="amy-agent-seo__score-dot amy-agent-seo__score-dot--' +
+				tone +
+				'" title="' +
+				escapeHtml(tip) +
+				'" aria-label="' +
+				escapeHtml(tip) +
+				'"></span>'
+			);
+		}
+
+		function scoreDotsHtml(scores) {
+			scores = scores || {};
+			return (
+				'<span class="amy-agent-seo__scores">' +
+				scoreDotHtml(i18n.seoScore || 'SEO', scores.seo_score) +
+				scoreDotHtml(i18n.readabilityScore || 'Readability', scores.readability_score) +
+				'</span>'
+			);
+		}
+
+		function ensureScores(postId, contentType) {
+			if (scoresByPostId[postId]) {
+				return $.Deferred().resolve(scoresByPostId[postId]).promise();
+			}
+			if (contentType !== 'post' && contentType !== 'page') {
+				return $.Deferred().resolve(null).promise();
+			}
+			var path =
+				(contentType === 'page' ? 'wp/v2/pages/' : 'wp/v2/posts/') +
+				postId +
+				'?_fields=meta';
+			return restGet(path).then(
+				function (post) {
+					var scores = scoresFromMeta(post && post.meta);
+					scoresByPostId[postId] = scores;
+					return scores;
+				},
+				function () {
+					return null;
+				}
+			);
+		}
+
 		function cardBadge(item) {
 			var result = resultsById[item.id];
+			var scoresHtml = '';
+			if (item.type === 'post' || item.type === 'page' || currentType === 'post' || currentType === 'page') {
+				scoresHtml = scoreDotsHtml(scoresByPostId[item.id]);
+			}
 			if (result && result.error) {
 				return (
+					'<span class="amy-agent-seo__badge-wrap">' +
 					'<span class="amy-agent-seo__pill amy-agent-seo__pill--red">' +
 					escapeHtml(i18n.itemError || 'Error') +
+					'</span>' +
+					scoresHtml +
 					'</span>'
 				);
 			}
 			var verdict = (result && result.verdict) || item.verdict;
 			if (!verdict) {
 				return (
+					'<span class="amy-agent-seo__badge-wrap">' +
 					'<span class="amy-agent-seo__pill amy-agent-seo__pill--muted">' +
 					escapeHtml(i18n.notChecked || 'Not checked yet') +
+					'</span>' +
+					scoresHtml +
 					'</span>'
 				);
 			}
 			return (
+				'<span class="amy-agent-seo__badge-wrap">' +
 				'<span class="amy-agent-seo__pill amy-agent-seo__pill--' +
 				escapeHtml(verdict) +
 				'">' +
 				escapeHtml(verdictLabel(verdict)) +
+				'</span>' +
+				scoresHtml +
 				'</span>'
 			);
 		}
@@ -973,7 +1100,7 @@
 			$card.toggleClass('is-selected', !!selected[item.id]);
 			$card.toggleClass('is-pending', !!item.pending);
 			$card.toggleClass('is-checked', !!resultsById[item.id]);
-			$card.find('.amy-agent-seo__pill, .amy-agent-seo__card-title').remove();
+			$card.find('.amy-agent-seo__badge-wrap, .amy-agent-seo__pill, .amy-agent-seo__card-title').remove();
 			$card.append(
 				'<span class="amy-agent-seo__card-title">' +
 					escapeHtml(item.title || i18n.untitled || '(untitled)') +
@@ -1583,7 +1710,15 @@
 			appendBubble(i18n.checking || 'Checking…');
 			restPaged(listPathForType(type))
 				.then(function (raw) {
-					var mapped = (Array.isArray(raw) ? raw : []).map(function (row) {
+					var rows = Array.isArray(raw) ? raw : [];
+					if (type === 'page' || type === 'post') {
+						rows.forEach(function (row) {
+							if (row && row.id) {
+								scoresByPostId[row.id] = scoresFromMeta(row.meta);
+							}
+						});
+					}
+					var mapped = rows.map(function (row) {
 						return mapListItem(type, row);
 					});
 					return ajaxAction('amy_seo_checks_list', { content_type: type }).then(
@@ -1648,6 +1783,12 @@
 					}
 					$historyEmpty.attr('hidden', 'hidden');
 					checks.forEach(function (check) {
+						var ct = check.content_type || check.post_type || '';
+						var postId = check.wp_post_id;
+						var scoresHtml = '';
+						if (ct === 'post' || ct === 'page') {
+							scoresHtml = scoreDotsHtml(scoresByPostId[postId]);
+						}
 						var tr = document.createElement('tr');
 						tr.className = 'amy-agent-seo__history-row';
 						tr.setAttribute('data-check-id', check.check_id);
@@ -1656,14 +1797,22 @@
 							escapeHtml(check.title || '#' + check.wp_post_id) +
 							'</td>' +
 							'<td>' +
-							escapeHtml(check.content_type || check.post_type || '') +
+							escapeHtml(ct) +
 							' #' +
 							escapeHtml(String(check.wp_post_id)) +
 							'</td>' +
-							'<td><span class="amy-agent-seo__pill amy-agent-seo__pill--' +
+							'<td class="amy-agent-seo__history-verdict" data-wp-post-id="' +
+							escapeHtml(String(postId)) +
+							'" data-content-type="' +
+							escapeHtml(ct) +
+							'">' +
+							'<span class="amy-agent-seo__badge-wrap">' +
+							'<span class="amy-agent-seo__pill amy-agent-seo__pill--' +
 							escapeHtml(check.verdict || 'orange') +
 							'">' +
 							escapeHtml(verdictLabel(check.verdict)) +
+							'</span>' +
+							scoresHtml +
 							'</span></td>' +
 							'<td>' +
 							escapeHtml(statusLabel(check.status)) +
@@ -1672,6 +1821,26 @@
 							escapeHtml(formatWhen(check.checked_at)) +
 							'</td>';
 						$historyBody.append(tr);
+						if ((ct === 'post' || ct === 'page') && !scoresByPostId[postId]) {
+							ensureScores(postId, ct).done(function (scores) {
+								if (!scores) {
+									return;
+								}
+								$historyBody
+									.find(
+										'.amy-agent-seo__history-verdict[data-wp-post-id="' +
+											postId +
+											'"] .amy-agent-seo__scores'
+									)
+									.replaceWith(scoreDotsHtml(scores));
+								var item = items.filter(function (row) {
+									return row.id === postId;
+								})[0];
+								if (item) {
+									updateCard(item);
+								}
+							});
+						}
 					});
 				})
 				.fail(function () {

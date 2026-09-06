@@ -406,6 +406,7 @@ class Amy_Admin_Menu {
 					'restUrl'  => esc_url_raw( rest_url() ),
 					'restNonce' => wp_create_nonce( 'wp_rest' ),
 					'metaKeys' => Amy_Seo_Meta::writable_field_map(),
+					'scoreMetaKeys' => Amy_Seo_Meta::readonly_field_map(),
 					'aiProvider' => $this->settings->get_ai_provider(),
 					'i18n'     => array(
 						'error'              => __( 'Something went wrong. Please try again.', 'amy-agent' ),
