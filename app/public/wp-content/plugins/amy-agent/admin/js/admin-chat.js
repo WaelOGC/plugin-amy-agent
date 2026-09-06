@@ -104,14 +104,39 @@
 		}
 
 		function renderMarkdown(raw) {
-			var html = escapeHtml(raw || '');
-			html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-			html = html.replace(
-				/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-				'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
-			);
-			html = html.replace(/\n/g, '<br>');
-			return html;
+			var escaped = escapeHtml(raw || '');
+			var lines = escaped.split('\n');
+			var htmlParts = [];
+			var listBuffer = [];
+
+			function flushList() {
+				if (listBuffer.length) {
+					htmlParts.push('<ul>' + listBuffer.join('') + '</ul>');
+					listBuffer = [];
+				}
+			}
+
+			function inline(text) {
+				text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+				text = text.replace(
+					/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+					'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+				);
+				return text;
+			}
+
+			lines.forEach(function (line) {
+				var bulletMatch = /^\*\s+(.*)$/.exec(line);
+				if (bulletMatch) {
+					listBuffer.push('<li>' + inline(bulletMatch[1]) + '</li>');
+					return;
+				}
+				flushList();
+				htmlParts.push(inline(line));
+			});
+			flushList();
+
+			return htmlParts.join('<br>');
 		}
 
 		function resizeComposer() {

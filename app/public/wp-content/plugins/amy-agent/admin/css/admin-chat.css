@@ -278,6 +278,15 @@
 	font-weight: 600;
 }
 
+.amy-agent-chat__bubble-text ul {
+	margin: 0.35rem 0 0.15rem;
+	padding-left: 1.15rem;
+}
+
+.amy-agent-chat__bubble-text li {
+	margin: 0.15rem 0;
+}
+
 .amy-agent-chat__msg-atts {
 	display: flex;
 	flex-wrap: wrap;
