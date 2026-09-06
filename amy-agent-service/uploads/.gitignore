@@ -1,2 +1,3 @@
-uploads/submit-idea/*
-!uploads/submit-idea/.gitkeep
+# Runtime / test upload fixtures — keep only .gitkeep tracked.
+submit-idea/**
+!submit-idea/.gitkeep
