@@ -5,7 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 ProviderSlug = Literal["gemini", "openai", "anthropic", "deepseek"]
-ChatMode = Literal["general", "submit_idea", "support"]
+ChatMode = Literal["general", "submit_idea", "support", "admin"]
 MessageRole = Literal["user", "assistant", "system"]
 
 
@@ -45,6 +45,9 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     ai: AiConfig
     context: dict[str, Any] = Field(default_factory=dict)
+    conversation_id: str | None = None
+    wp_user_id: int | None = None
+    is_full_admin: bool = False
 
 
 class HealthResponse(BaseModel):

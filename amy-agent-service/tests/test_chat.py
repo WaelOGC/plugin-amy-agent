@@ -82,6 +82,101 @@ def test_chat_success_shape(client: TestClient) -> None:
     assert data["meta"]["model"] == "gpt-4o-mini"
 
 
+def test_chat_with_conversation_persists_on_success(
+    client: TestClient, tmp_path, monkeypatch
+) -> None:
+    from app.db import conversations_db
+
+    get_settings.cache_clear()
+    monkeypatch.setattr(conversations_db, "_DB_PATH", tmp_path / "conversations.db")
+    conv = conversations_db.create_conversation(wp_user_id=5, mode="admin")
+    conversations_db.append_message(conv["id"], "user", "earlier")
+    conversations_db.append_message(conv["id"], "assistant", "prior reply")
+
+    captured: list = []
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
+    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("New reply")):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                conversation_id=conv["id"],
+                wp_user_id=5,
+                is_full_admin=False,
+                messages=[{"role": "user", "content": "newest"}],
+            ),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["reply"]["content"] == "New reply"
+    roles = [m.role for m in captured]
+    assert roles[0] == "system"
+    assert [m.content for m in captured if m.role != "system"] == [
+        "earlier",
+        "prior reply",
+        "newest",
+    ]
+    stored = conversations_db.get_messages(conv["id"])
+    assert [m["content"] for m in stored] == [
+        "earlier",
+        "prior reply",
+        "newest",
+        "New reply",
+    ]
+
+
+def test_chat_with_conversation_does_not_persist_on_provider_failure(
+    client: TestClient, tmp_path, monkeypatch
+) -> None:
+    from app.db import conversations_db
+
+    get_settings.cache_clear()
+    monkeypatch.setattr(conversations_db, "_DB_PATH", tmp_path / "conversations.db")
+    conv = conversations_db.create_conversation(wp_user_id=5, mode="admin")
+
+    with patch("app.routes.chat.get_provider", return_value=_FailingProvider()):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                conversation_id=conv["id"],
+                wp_user_id=5,
+                messages=[{"role": "user", "content": "should not stick"}],
+            ),
+        )
+
+    assert response.status_code == 502
+    assert conversations_db.get_messages(conv["id"]) == []
+
+
+def test_chat_conversation_forbidden(client: TestClient, tmp_path, monkeypatch) -> None:
+    from app.db import conversations_db
+
+    get_settings.cache_clear()
+    monkeypatch.setattr(conversations_db, "_DB_PATH", tmp_path / "conversations.db")
+    conv = conversations_db.create_conversation(wp_user_id=5, mode="admin")
+
+    with patch("app.routes.chat.get_provider", return_value=_FakeProvider()):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                conversation_id=conv["id"],
+                wp_user_id=99,
+                is_full_admin=False,
+                messages=[{"role": "user", "content": "nope"}],
+            ),
+        )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+
+
 def test_chat_provider_failure_returns_502(client: TestClient) -> None:
     with patch("app.routes.chat.get_provider", return_value=_FailingProvider()):
         response = client.post("/v1/chat", headers=HEADERS, json=_chat_body())

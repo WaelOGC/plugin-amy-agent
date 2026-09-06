@@ -10,8 +10,19 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import config_task_rules as rules
-from app.db import analytics_db
-from app.routes import analytics, chat, config_sync, health, notifications, seo_batches, seo_tasks, submit_idea, tasks
+from app.db import analytics_db, conversations_db
+from app.routes import (
+    analytics,
+    chat,
+    config_sync,
+    conversations,
+    health,
+    notifications,
+    seo_batches,
+    seo_tasks,
+    submit_idea,
+    tasks,
+)
 from app.routes.submit_idea import UPLOAD_ROOT
 from app.services.task_escalation import run_escalation_pass
 
@@ -34,6 +45,32 @@ def run_analytics_purge() -> None:
         logger.exception("Analytics event purge failed")
 
 
+def run_conversation_archival() -> None:
+    """Archive conversations idle for 90+ days; never kill the scheduler on error."""
+    try:
+        result = conversations_db.archive_stale_conversations(days=90)
+        logger.info(
+            "Conversation archival complete (archived=%s)",
+            result.get("archived"),
+        )
+    except Exception:
+        logger.exception("Conversation archival failed")
+
+
+def run_conversation_purge() -> None:
+    """Purge archived conversations after export or grace window."""
+    try:
+        result = conversations_db.purge_exported_or_expired_conversations(
+            archived_grace_days=30
+        )
+        logger.info(
+            "Conversation purge complete (deleted=%s)",
+            result.get("deleted"),
+        )
+    except Exception:
+        logger.exception("Conversation purge failed")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     scheduler.add_job(
@@ -52,6 +89,22 @@ async def lifespan(_app: FastAPI):
         replace_existing=True,
         max_instances=1,
     )
+    scheduler.add_job(
+        run_conversation_archival,
+        "interval",
+        seconds=rules.ESCALATION_JOB_INTERVAL_SECONDS,
+        id="conversation_archival",
+        replace_existing=True,
+        max_instances=1,
+    )
+    scheduler.add_job(
+        run_conversation_purge,
+        "interval",
+        seconds=rules.ESCALATION_JOB_INTERVAL_SECONDS,
+        id="conversation_purge",
+        replace_existing=True,
+        max_instances=1,
+    )
     scheduler.start()
     logger.info(
         "Task escalation scheduler started (every %ss)",
@@ -59,6 +112,14 @@ async def lifespan(_app: FastAPI):
     )
     logger.info(
         "Analytics purge scheduler started (every %ss, retention 90 days)",
+        rules.ESCALATION_JOB_INTERVAL_SECONDS,
+    )
+    logger.info(
+        "Conversation archival scheduler started (every %ss, idle 90 days)",
+        rules.ESCALATION_JOB_INTERVAL_SECONDS,
+    )
+    logger.info(
+        "Conversation purge scheduler started (every %ss, grace 30 days)",
         rules.ESCALATION_JOB_INTERVAL_SECONDS,
     )
     try:
@@ -70,7 +131,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Amy Agent Service",
-    version="0.1.7",
+    version="0.1.8",
     description="Intelligence layer for the Amy Agent WordPress plugin (Phase 1 scaffold).",
     lifespan=lifespan,
 )
@@ -78,6 +139,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(config_sync.router)
 app.include_router(chat.router)
+app.include_router(conversations.router)
 app.include_router(submit_idea.router)
 app.include_router(tasks.router)
 app.include_router(notifications.router)
