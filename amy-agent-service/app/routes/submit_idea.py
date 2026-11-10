@@ -327,9 +327,11 @@ async def submit_idea_confirm(body: SubmitIdeaConfirmRequest) -> JSONResponse:
         sess.status = "awaiting_contact"
         sess.touch()
         state.save_session(sess)
+        # Contact (email first) is collected at the start of the flow on new
+        # sessions; the client finalizes via /contact with the stored email.
         message = (
-            "Thank you — that looks good. Please share your email "
-            "(and optionally WhatsApp) so our team can follow up within 48 hours."
+            "Thank you — that looks good. I'll send your brief to our team now "
+            "so they can follow up within 48 hours."
         )
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -408,14 +410,14 @@ async def submit_idea_deep_dive(body: SubmitIdeaDeepDiveRequest) -> JSONResponse
     if not message:
         return _error(status.HTTP_400_BAD_REQUEST, "invalid_request", "message is required.")
 
-    # Clear affirmative → move to contact collection.
+    # Clear affirmative → ready to finalize (email was captured at flow start).
     if _is_affirmative(message):
         sess.free_conversation.append({"role": "user", "content": message})
         sess.status = "awaiting_contact"
         sess.touch()
         reply = (
-            "Great — thank you. Please share your email "
-            "(and optionally WhatsApp) so our team can follow up within 48 hours."
+            "Great — thank you. I'll send your brief to our team now "
+            "so they can follow up within 48 hours."
         )
         sess.free_conversation.append({"role": "assistant", "content": reply})
         state.save_session(sess)

@@ -115,6 +115,7 @@ class Amy_Submit_Idea {
 				'avatarMouthHappyImage' => esc_url_raw( AMY_AGENT_URL . 'public/images/amy-avatar-mouth-happy.png' ),
 				'i18n'      => array(
 					'chooseService'   => __( 'Choose a service to get started', 'amy-agent' ),
+					'earlyContactPrompt' => __( 'Before we dive in — what\'s the best email so our team can reach you? WhatsApp is optional.', 'amy-agent' ),
 					'submitAnswers'   => __( 'Submit', 'amy-agent' ),
 					'yes'             => __( 'Yes', 'amy-agent' ),
 					'no'              => __( 'No', 'amy-agent' ),
@@ -125,6 +126,7 @@ class Amy_Submit_Idea {
 					'emailRequired'   => __( 'Please enter a valid email address.', 'amy-agent' ),
 					'emailLabel'      => __( 'Email', 'amy-agent' ),
 					'whatsappLabel'   => __( 'WhatsApp (optional)', 'amy-agent' ),
+					'contactContinue' => __( 'Continue', 'amy-agent' ),
 					'contactSubmit'   => __( 'Send my idea', 'amy-agent' ),
 					'uploadHint'      => __( 'Drag & drop files here, or click to browse (images, PDF, DOC — max 10 MB)', 'amy-agent' ),
 					'uploadError'     => __( 'Could not upload that file.', 'amy-agent' ),

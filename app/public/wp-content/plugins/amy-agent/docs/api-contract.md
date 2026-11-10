@@ -173,7 +173,9 @@ Routes messages to the selected provider adapter and returns the assistant reply
 
 All require `X-Amy-Secret`. Unknown `event_type` values are rejected (`400`); the allowlist is:
 
-`page_view`, `widget_opened`, `widget_message_sent`, `submit_idea_started`, `submit_idea_step_reached`, `submit_idea_abandoned`, `submit_idea_completed`, `contact_form_started`, `contact_form_abandoned`, `contact_form_submitted`.
+`page_view`, `widget_opened`, `widget_message_sent`, `submit_idea_started`, `submit_idea_step_reached`, `submit_idea_abandoned`, `submit_idea_completed`, `submit_idea_contact_captured`, `contact_form_started`, `contact_form_abandoned`, `contact_form_submitted`.
+
+`submit_idea_contact_captured` fires as soon as the visitor shares email (email-first Submit Idea step) and is an email-capture event (`event_data.email` → `lead_email`). `submit_idea_completed` still fires when the brief is finalized.
 
 There is no newsletter event type (the newsletter form has no working backend yet).
 

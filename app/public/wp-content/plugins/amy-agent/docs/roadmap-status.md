@@ -37,7 +37,9 @@
 - Backend (`amy-agent-service`): `POST /v1/submit-idea/{start|answers|confirm|deep-dive-message|contact|upload}`
 - Templates for 6 services (`app/data/submit_idea_templates.py`), SQLite sessions w/ 2h TTL
 - Frontend (`public/js/submit-idea.js` + `.css`): service cards → dynamic questions → summary
-  Yes/No → deep-dive chat (with `choice:` pills) → contact (email + optional WhatsApp) → thank-you
+  email + optional WhatsApp first → service cards → questions → summary
+  Yes/No → deep-dive chat (with `choice:` pills) → finalize → thank-you
+  (`submit_idea_contact_captured` persists `lead_email` as soon as email is shared)
 - File uploads (image/PDF) with chip UI, reject bad types
 - Emails: admin brief (`contact@ogcnewfinity.com`) + client confirmation
   (`class-amy-submit-idea-mail.php`)

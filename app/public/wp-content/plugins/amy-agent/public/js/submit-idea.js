@@ -36,19 +36,23 @@
 		];
 
 		// Intentionally NOT persisted — a refresh must restart the flow.
+		// Mid-flow browser sessions always restart cleanly (email-first is new-session only).
 		var sessionId = uuid();
 		var step = 'avatar-landing';
 		var template = null;
 		var answers = {};
 		var attachments = [];
 		var busy = false;
-		/** @type {'services'|'questions'|'summary'|'deep-dive'|'contact'|'done'} */
-		var chatPhase = 'services';
+		/** @type {'contact'|'services'|'questions'|'summary'|'deep-dive'|'done'} */
+		var chatPhase = 'contact';
 		var questionIndex = 0;
 		var servicesBlock = null;
 		var activeChoiceWrap = null;
 		var contactForm = null;
 		var contactError = null;
+		var capturedEmail = '';
+		var capturedWhatsapp = '';
+		var contactCaptured = false;
 		var COMPOSER_MAX_HEIGHT_PX = 7.5 * 16;
 		var siStarted = false;
 		var siAbandoned = false;
@@ -543,11 +547,14 @@
 
 		function beginChat() {
 			showStep('chat');
-			chatPhase = 'services';
+			chatPhase = 'contact';
+			capturedEmail = '';
+			capturedWhatsapp = '';
+			contactCaptured = false;
 			if (!siStarted) {
 				siStarted = true;
 				trackAmy('submit_idea_started');
-				trackAmy('submit_idea_step_reached', { step: 'services' });
+				trackAmy('submit_idea_step_reached', { step: 'contact' });
 			}
 			if (trayEl) {
 				trayEl.hidden = false;
@@ -574,10 +581,33 @@
 			contactError = null;
 			attachments = [];
 			renderFileChips();
+			// Email first: capture contact before service Q&A so Analytics gets lead_email early.
+			appendBubble(cfg.i18n.earlyContactPrompt || cfg.i18n.chooseService, 'assistant');
+			renderContactBubble({ early: true });
+			setTrustCardsVisible(true);
+			setComposerMode('disabled');
+		}
+
+		function proceedToServices() {
+			chatPhase = 'services';
+			trackAmy('submit_idea_step_reached', { step: 'services' });
 			appendBubble(cfg.i18n.chooseService, 'assistant');
 			renderServiceCards();
 			setTrustCardsVisible(true);
 			setComposerMode('disabled');
+		}
+
+		function finalizeIdea() {
+			if (!capturedEmail || !isValidEmail(capturedEmail)) {
+				appendBubble(
+					cfg.i18n.earlyContactPrompt ||
+						'Please share your email so our team can follow up.',
+					'assistant'
+				);
+				renderContactBubble({ early: false });
+				return;
+			}
+			submitContact(capturedEmail, capturedWhatsapp);
 		}
 
 		function renderServiceCards() {
@@ -867,12 +897,12 @@
 						window.alert(cfg.i18n.unavailable);
 						return;
 					}
+					appendBubble(result.data.message || '', 'assistant');
 					if (confirmed) {
-						renderContactBubble();
+						finalizeIdea();
 					} else {
 						chatPhase = 'deep-dive';
 						trackAmy('submit_idea_step_reached', { step: 'deep-dive' });
-						appendBubble(result.data.message || '', 'assistant');
 						setComposerMode('text');
 						composerInput.focus();
 					}
@@ -1233,9 +1263,18 @@
 			return dial ? dial + ' ' + phone : phone;
 		}
 
-		function renderContactBubble() {
+		/**
+		 * Contact form: email required first, WhatsApp optional on the same step.
+		 * @param {{ early?: boolean }} options early=true at flow start (analytics capture);
+		 *   early=false is a late fallback if email was somehow missing at finalize.
+		 */
+		function renderContactBubble(options) {
+			options = options || {};
+			var early = !!options.early;
 			chatPhase = 'contact';
-			trackAmy('submit_idea_step_reached', { step: 'contact' });
+			if (!early) {
+				trackAmy('submit_idea_step_reached', { step: 'contact' });
+			}
 			setComposerMode('disabled');
 
 			var form = document.createElement('form');
@@ -1281,7 +1320,9 @@
 			var submitBtn = document.createElement('button');
 			submitBtn.className = 'amy-si-btn amy-si-btn--primary';
 			submitBtn.type = 'submit';
-			submitBtn.textContent = cfg.i18n.contactSubmit;
+			submitBtn.textContent = early
+				? cfg.i18n.contactContinue || cfg.i18n.contactSubmit
+				: cfg.i18n.contactSubmit;
 			actions.appendChild(submitBtn);
 
 			form.appendChild(emailField);
@@ -1305,7 +1346,13 @@
 					contactError.hidden = false;
 					return;
 				}
-				submitContact(email, whatsapp);
+				if (early) {
+					captureContactEarly(email, whatsapp, form);
+				} else {
+					capturedEmail = email;
+					capturedWhatsapp = whatsapp || '';
+					submitContact(email, whatsapp);
+				}
 			});
 
 			appendCustomBubble(form, 'contact');
@@ -1313,6 +1360,26 @@
 			if (emailInput) {
 				emailInput.focus();
 			}
+		}
+
+		function captureContactEarly(email, whatsapp, form) {
+			capturedEmail = email;
+			capturedWhatsapp = whatsapp || '';
+			contactCaptured = true;
+			// Persist to Analytics immediately (lead_email) — before deep Q&A.
+			trackAmy('submit_idea_contact_captured', {
+				email: email,
+				whatsapp: whatsapp || '',
+			});
+			var bubble = form.closest('.amy-si-bubble');
+			if (bubble) {
+				bubble.remove();
+			}
+			contactForm = null;
+			contactError = null;
+			appendBubble(email, 'user');
+			setTrustCardsVisible(false);
+			proceedToServices();
 		}
 
 		function showConfirmation() {
@@ -1378,7 +1445,7 @@
 					}
 					appendBubble(result.data.reply || '', 'assistant');
 					if (result.data.status === 'awaiting_contact') {
-						renderContactBubble();
+						finalizeIdea();
 					}
 				})
 				.catch(function () {

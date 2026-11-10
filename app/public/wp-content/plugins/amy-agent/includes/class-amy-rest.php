@@ -35,6 +35,7 @@ class Amy_Rest {
 		'submit_idea_step_reached',
 		'submit_idea_abandoned',
 		'submit_idea_completed',
+		'submit_idea_contact_captured',
 		'contact_form_started',
 		'contact_form_abandoned',
 		'contact_form_submitted',
