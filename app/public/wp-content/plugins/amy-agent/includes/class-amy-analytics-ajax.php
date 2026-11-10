@@ -49,6 +49,9 @@ class Amy_Analytics_Ajax {
 	/**
 	 * Forward a failed API response as JSON error.
 	 *
+	 * Connection / misconfig failures (status_code 0) become HTTP 502 so they are
+	 * distinguishable from a true PHP fatal 500. Upstream 4xx/5xx are forwarded.
+	 *
 	 * @param array{ok: bool, status_code: int, body: array|null, error: string|null} $result API result.
 	 */
 	private function send_api_error( array $result ) {
@@ -58,9 +61,14 @@ class Amy_Analytics_Ajax {
 		} elseif ( is_array( $result['body'] ) && ! empty( $result['body']['message'] ) ) {
 			$message = (string) $result['body']['message'];
 		}
-		$status = ! empty( $result['status_code'] ) ? (int) $result['status_code'] : 500;
-		if ( $status < 400 ) {
+		$upstream = isset( $result['status_code'] ) ? (int) $result['status_code'] : 0;
+		if ( $upstream <= 0 ) {
+			// Service URL/secret missing, DNS/connect refused, timeout, etc.
+			$status = 502;
+		} elseif ( $upstream < 400 ) {
 			$status = 500;
+		} else {
+			$status = $upstream;
 		}
 		wp_send_json_error( array( 'message' => $message ), $status );
 	}

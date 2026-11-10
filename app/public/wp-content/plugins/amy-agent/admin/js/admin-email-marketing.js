@@ -579,8 +579,15 @@
 					selectedIds = valid;
 					renderTable();
 				})
-				.fail(function () {
-					showError(i18n.loadError || 'Could not load audience.');
+				.fail(function (xhr) {
+					var msg =
+						(xhr &&
+							xhr.responseJSON &&
+							xhr.responseJSON.data &&
+							xhr.responseJSON.data.message) ||
+						i18n.loadError ||
+						'Could not load audience.';
+					showError(msg);
 				});
 		}
 
