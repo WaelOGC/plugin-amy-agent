@@ -1,0 +1,90 @@
+# Deploy only the WordPress Amy Agent plugin to Hostinger.
+# Does not touch Dokploy / amy-agent-service (that stays on its own GitHub autodeploy).
+name: Deploy Amy Plugin
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/public/wp-content/plugins/amy-agent/**"
+      - ".github/workflows/deploy-amy-plugin.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-amy-plugin-hostinger
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Rsync plugin to Hostinger
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify required secrets
+        env:
+          HOSTINGER_SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          HOSTINGER_SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          HOSTINGER_SSH_PRIVATE_KEY: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+          HOSTINGER_PLUGIN_PATH: ${{ secrets.HOSTINGER_PLUGIN_PATH }}
+        run: |
+          missing=0
+          for name in HOSTINGER_SSH_HOST HOSTINGER_SSH_USER HOSTINGER_SSH_PRIVATE_KEY HOSTINGER_PLUGIN_PATH; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub secret: $name — see docs/amy-plugin-autodeploy.md"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          case "$HOSTINGER_PLUGIN_PATH" in
+            */amy-agent|*/amy-agent/)
+              ;;
+            *)
+              echo "::error::HOSTINGER_PLUGIN_PATH must end with /amy-agent (got: $HOSTINGER_PLUGIN_PATH)"
+              exit 1
+              ;;
+          esac
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.HOSTINGER_SSH_PRIVATE_KEY }}
+
+      - name: Add Hostinger host key
+        env:
+          HOSTINGER_SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          port="${HOSTINGER_SSH_PORT:-22}"
+          ssh-keyscan -p "$port" -H "$HOSTINGER_SSH_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Rsync plugin folder
+        env:
+          HOSTINGER_SSH_HOST: ${{ secrets.HOSTINGER_SSH_HOST }}
+          HOSTINGER_SSH_USER: ${{ secrets.HOSTINGER_SSH_USER }}
+          HOSTINGER_SSH_PORT: ${{ secrets.HOSTINGER_SSH_PORT }}
+          HOSTINGER_PLUGIN_PATH: ${{ secrets.HOSTINGER_PLUGIN_PATH }}
+        run: |
+          set -euo pipefail
+          port="${HOSTINGER_SSH_PORT:-22}"
+          # Normalize remote path (no trailing slash for dirname checks; rsync dest gets /)
+          remote_path="${HOSTINGER_PLUGIN_PATH%/}"
+          src="app/public/wp-content/plugins/amy-agent/"
+          dest="${HOSTINGER_SSH_USER}@${HOSTINGER_SSH_HOST}:${remote_path}/"
+
+          echo "Deploying $src → $dest (port $port)"
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.DS_Store' \
+            -e "ssh -p ${port} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            "$src" "$dest"
+
+          echo "Plugin deploy finished."
