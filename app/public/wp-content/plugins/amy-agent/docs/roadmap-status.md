@@ -139,18 +139,13 @@
 
 ---
 
-## 🚧 STUB ONLY — menu item exists, page says "Coming soon.", zero logic behind it
+## 🚧 PARTIAL / NEXT
 
-Confirmed by direct code read of `includes/class-amy-admin-menu.php` (the `$placeholders`
-array) — these are **not partially built**, they are literally one hardcoded string each:
-
-- **Chat** (`amy-chat`) — priority #3 Dashboard Chat. Nothing built. Plan locked:
-  `docs/03-dashboard-chat-plan.md` (WP admin + Telegram Admin Bot as Amy the
-  Leader with conversation memory; specialists/`/` deferred until tools exist).
-- **Email Marketing** (`amy-email-marketing`) — priority #8 stub page; plan locked:
-  `docs/04-email-marketing-plan.md`. Not a newsletter tool — Amy-triggered
-  1-to-1 sends via Hostinger Agentic Mail REST + `message.received` webhook.
-  Builds after Dashboard Chat + Analytics; FluentSMTP stays for WP transactional.
+- **Email Marketing** (`amy-email-marketing`) — audience UI wired (2026-11-10):
+  lists Analytics `lead_email` captures, Hot/Warm/Cold filters, draft composer,
+  human **Approve draft (no send)**. Hostinger Agentic Mail send + webhook still
+  pending per `docs/04-email-marketing-plan.md`. Not a newsletter tool; no Gmail /
+  AgentMail. FluentSMTP stays for WP transactional.
 
 ## ❌ NOT STARTED — no code, no admin page, design-only in the roadmap doc
 

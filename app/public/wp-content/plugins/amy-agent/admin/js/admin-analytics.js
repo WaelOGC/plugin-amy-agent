@@ -11,7 +11,9 @@
 		var $empty = $('#amy-agent-analytics-empty');
 		var $error = $('#amy-agent-analytics-error');
 		var $statusFilters = $('[data-amy-analytics-status]');
+		var $emailFilters = $('[data-amy-analytics-has-email]');
 		var currentStatus = '';
+		var currentHasEmail = '';
 
 		function escapeHtml(str) {
 			return String(str == null ? '' : str)
@@ -121,6 +123,7 @@
 					action: 'amy_analytics_leads_list',
 					nonce: cfg.nonce,
 					status: currentStatus,
+					has_email: currentHasEmail,
 				},
 			})
 				.done(function (res) {
@@ -149,6 +152,14 @@
 			var next = String($(this).data('amy-analytics-status') || '');
 			currentStatus = next;
 			$statusFilters.removeClass('is-active').attr('aria-selected', 'false');
+			$(this).addClass('is-active').attr('aria-selected', 'true');
+			loadLeads();
+		});
+
+		$emailFilters.on('click', function () {
+			var next = String($(this).data('amy-analytics-has-email') || '');
+			currentHasEmail = next;
+			$emailFilters.removeClass('is-active').attr('aria-selected', 'false');
 			$(this).addClass('is-active').attr('aria-selected', 'true');
 			loadLeads();
 		});

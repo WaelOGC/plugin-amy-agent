@@ -127,6 +127,43 @@ def test_leads_filter_and_timeline(client: TestClient) -> None:
     assert timeline.json()["events"][0]["event_type"] == "widget_message_sent"
 
 
+def test_leads_has_email_filter(client: TestClient) -> None:
+    _ingest(client, "sess-no-mail", "page_view", page_path="/")
+    _ingest(client, "sess-mail", "submit_idea_started")
+    _ingest(
+        client,
+        "sess-mail",
+        "submit_idea_completed",
+        event_data={"email": "audience@example.com"},
+    )
+
+    with_email = client.get(
+        "/v1/analytics/leads",
+        headers=AUTH,
+        params={"has_email": "true"},
+    ).json()["leads"]
+    with_ids = {item["session_id"] for item in with_email}
+    assert "sess-mail" in with_ids
+    assert "sess-no-mail" not in with_ids
+    assert all(item.get("lead_email") for item in with_email)
+
+    without_email = client.get(
+        "/v1/analytics/leads",
+        headers=AUTH,
+        params={"has_email": "false"},
+    ).json()["leads"]
+    without_ids = {item["session_id"] for item in without_email}
+    assert "sess-no-mail" in without_ids
+    assert "sess-mail" not in without_ids
+
+    hot_with_email = client.get(
+        "/v1/analytics/leads",
+        headers=AUTH,
+        params={"status": "hot", "has_email": "true"},
+    ).json()["leads"]
+    assert {item["session_id"] for item in hot_with_email} == {"sess-mail"}
+
+
 def test_geolocation_null_does_not_drop_event(client: TestClient, monkeypatch) -> None:
     monkeypatch.setattr(geolocation, "lookup_ip", lambda ip: (None, None))
     data = _ingest(client, "sess-geo", "page_view", page_path="/about")

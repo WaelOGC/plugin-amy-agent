@@ -79,7 +79,17 @@ class Amy_Analytics_Ajax {
 			}
 		}
 
-		$result = $this->api_client->list_leads( $status );
+		$has_email = null;
+		if ( isset( $_REQUEST['has_email'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- verified in guard().
+			$raw = strtolower( sanitize_text_field( wp_unslash( $_REQUEST['has_email'] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			if ( in_array( $raw, array( '1', 'true', 'yes' ), true ) ) {
+				$has_email = true;
+			} elseif ( in_array( $raw, array( '0', 'false', 'no' ), true ) ) {
+				$has_email = false;
+			}
+		}
+
+		$result = $this->api_client->list_leads( $status, $has_email );
 		if ( ! $result['ok'] ) {
 			$this->send_api_error( $result );
 		}

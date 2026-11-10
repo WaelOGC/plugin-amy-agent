@@ -8,17 +8,18 @@
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Registers Amy → Overview / My Profile / Task Service / Analytics / SEO Tasks / Settings / Brand & Avatar / placeholders in wp-admin.
+ * Registers Amy → Overview / My Profile / Task Service / Analytics / Email Marketing / SEO Tasks / Settings / Brand & Avatar in wp-admin.
  */
 class Amy_Admin_Menu {
 
 	const PARENT_SLUG             = 'amy-overview';
 	const MY_PROFILE_PAGE_SLUG    = 'amy-my-profile';
 	const TASK_SERVICE_PAGE_SLUG  = 'amy-task-service';
-	const ANALYTICS_PAGE_SLUG     = 'amy-analytics';
-	const SEO_TASKS_PAGE_SLUG     = 'amy-seo-tasks';
-	const BRAND_PAGE_SLUG         = 'amy-brand-avatar';
-	const USER_AVATAR_META        = 'amy_agent_user_avatar_url';
+	const ANALYTICS_PAGE_SLUG       = 'amy-analytics';
+	const EMAIL_MARKETING_PAGE_SLUG = 'amy-email-marketing';
+	const SEO_TASKS_PAGE_SLUG       = 'amy-seo-tasks';
+	const BRAND_PAGE_SLUG           = 'amy-brand-avatar';
+	const USER_AVATAR_META          = 'amy_agent_user_avatar_url';
 
 	/**
 	 * @var Amy_Settings
@@ -48,6 +49,11 @@ class Amy_Admin_Menu {
 	/**
 	 * @var string|false|null
 	 */
+	private $hook_email_marketing;
+
+	/**
+	 * @var string|false|null
+	 */
 	private $hook_seo_tasks;
 
 	/**
@@ -64,11 +70,6 @@ class Amy_Admin_Menu {
 	 * @var string|false|null
 	 */
 	private $hook_brand;
-
-	/**
-	 * @var array<string, string|false>
-	 */
-	private $hook_placeholders = array();
 
 	/**
 	 * @param Amy_Settings $settings Settings instance (existing settings page).
@@ -173,22 +174,14 @@ class Amy_Admin_Menu {
 			array( $this, 'render_seo_tasks_page' )
 		);
 
-		$placeholders = array(
-			'amy-email-marketing' => __( 'Email Marketing', 'amy-agent' ),
+		$this->hook_email_marketing = add_submenu_page(
+			self::PARENT_SLUG,
+			__( 'Email Marketing', 'amy-agent' ),
+			__( 'Email Marketing', 'amy-agent' ),
+			'manage_options',
+			self::EMAIL_MARKETING_PAGE_SLUG,
+			array( $this, 'render_email_marketing_page' )
 		);
-
-		foreach ( $placeholders as $slug => $title ) {
-			$this->hook_placeholders[ $slug ] = add_submenu_page(
-				self::PARENT_SLUG,
-				$title,
-				$title,
-				'manage_options',
-				$slug,
-				function () use ( $title ) {
-					$this->render_placeholder( $title );
-				}
-			);
-		}
 	}
 
 	/**
@@ -445,6 +438,64 @@ class Amy_Admin_Menu {
 			return;
 		}
 
+		if ( $this->hook_email_marketing === $hook_suffix ) {
+			wp_enqueue_style(
+				'amy-agent-admin-email-marketing-fonts',
+				'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+				array(),
+				null
+			);
+
+			wp_enqueue_style(
+				'amy-agent-admin-email-marketing',
+				AMY_AGENT_URL . 'admin/css/admin-email-marketing.css',
+				array( 'amy-agent-admin-email-marketing-fonts', 'dashicons' ),
+				AMY_AGENT_VERSION
+			);
+
+			wp_enqueue_script(
+				'amy-agent-admin-email-marketing',
+				AMY_AGENT_URL . 'admin/js/admin-email-marketing.js',
+				array( 'jquery' ),
+				AMY_AGENT_VERSION,
+				true
+			);
+
+			wp_localize_script(
+				'amy-agent-admin-email-marketing',
+				'amyAgentEmailMarketing',
+				array(
+					'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+					'nonce'         => wp_create_nonce( Amy_Analytics_Ajax::NONCE_ACTION ),
+					'analyticsUrl'  => admin_url( 'admin.php?page=' . self::ANALYTICS_PAGE_SLUG ),
+					'i18n'          => array(
+						'loadError'       => __( 'Could not load audience. Check the Amy Agent service connection.', 'amy-agent' ),
+						'empty'           => __( 'No visitor emails yet. Captures appear after Submit Idea or contact form completion.', 'amy-agent' ),
+						'justNow'         => __( 'just now', 'amy-agent' ),
+						'minutesAgo'      => __( 'm ago', 'amy-agent' ),
+						'hoursAgo'        => __( 'h ago', 'amy-agent' ),
+						'daysAgo'         => __( 'd ago', 'amy-agent' ),
+						'statusHot'       => __( 'Hot', 'amy-agent' ),
+						'statusWarm'      => __( 'Warm', 'amy-agent' ),
+						'statusCold'      => __( 'Cold', 'amy-agent' ),
+						'selectRecipient' => __( 'Select a recipient from the audience list.', 'amy-agent' ),
+						'needSubject'     => __( 'Add a subject before approving.', 'amy-agent' ),
+						'needBody'        => __( 'Add a message body before approving.', 'amy-agent' ),
+						'confirmApprove'  => __( 'Approve this draft for sending? No email will go out until Hostinger Agentic Mail is connected. Personal Gmail and AgentMail are never used.', 'amy-agent' ),
+						'approvedNotice'  => __( 'Draft approved locally. Sending is not connected yet — Hostinger Agentic Mail comes next. Nothing was sent.', 'amy-agent' ),
+						'cleared'         => __( 'Draft cleared.', 'amy-agent' ),
+						'leadOnly'        => __( 'Lead capture', 'amy-agent' ),
+						'audienceCount'   => __( '%d shown', 'amy-agent' ),
+						'coverageValue'   => __( '%1$d of %2$d visitors (%3$s%%)', 'amy-agent' ),
+						'coverageEmpty'   => __( 'No Analytics visitors yet.', 'amy-agent' ),
+						'signalRow'       => __( '%1$s · %2$s · %3$s', 'amy-agent' ),
+						'unknownSignal'   => __( 'No signal', 'amy-agent' ),
+					),
+				)
+			);
+			return;
+		}
+
 		if ( $this->hook_seo_tasks === $hook_suffix ) {
 			wp_enqueue_style(
 				'amy-agent-admin-seo-tasks-fonts',
@@ -682,14 +733,12 @@ class Amy_Admin_Menu {
 				),
 			),
 			array(
-				'slug'        => 'amy-email-marketing',
+				'slug'        => self::EMAIL_MARKETING_PAGE_SLUG,
 				'title'       => __( 'Email Marketing', 'amy-agent' ),
-				'description' => __( 'One-to-one sends and campaign status powered by Amy.', 'amy-agent' ),
+				'description' => __( 'Audience from Analytics visitor emails — draft and approve, no auto-send.', 'amy-agent' ),
 				'icon'        => 'email',
 				'metrics'     => array(
-					// TODO: wire to Email Marketing once built.
-					__( 'Open rate', 'amy-agent' ),
-					// TODO: wire to Email Marketing once built.
+					__( 'Audience', 'amy-agent' ),
 					__( 'Drafts', 'amy-agent' ),
 				),
 			),
@@ -1919,6 +1968,20 @@ class Amy_Admin_Menu {
 						<?php echo esc_html__( 'Cold', 'amy-agent' ); ?>
 					</button>
 				</div>
+				<div class="amy-agent-analytics__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter by email', 'amy-agent' ); ?>">
+					<button
+						type="button"
+						class="amy-agent-analytics__filter is-active"
+						role="tab"
+						aria-selected="true"
+						data-amy-analytics-has-email=""
+					>
+						<?php echo esc_html__( 'Any email', 'amy-agent' ); ?>
+					</button>
+					<button type="button" class="amy-agent-analytics__filter" role="tab" aria-selected="false" data-amy-analytics-has-email="1">
+						<?php echo esc_html__( 'With email', 'amy-agent' ); ?>
+					</button>
+				</div>
 			</div>
 
 			<div class="amy-agent-analytics__list">
@@ -2091,18 +2154,184 @@ class Amy_Admin_Menu {
 	}
 
 	/**
-	 * Empty placeholder admin page.
-	 *
-	 * @param string $title Page title.
+	 * Email Marketing — audience from Analytics visitor emails (draft / approve only).
 	 */
-	public function render_placeholder( $title ) {
+	public function render_email_marketing_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 		?>
-		<div class="wrap">
-			<h1><?php echo esc_html( $title ); ?></h1>
-			<p><?php echo esc_html__( 'Coming soon.', 'amy-agent' ); ?></p>
+		<div class="wrap amy-agent-email" id="amy-agent-email-marketing">
+			<header class="amy-agent-email__header">
+				<h1 class="amy-agent-email__title"><?php echo esc_html__( 'Email Marketing', 'amy-agent' ); ?></h1>
+				<p class="amy-agent-email__intro">
+					<?php echo esc_html__( 'Audience from Amy Analytics visitor emails. Draft and approve — nothing auto-sends.', 'amy-agent' ); ?>
+				</p>
+				<span class="amy-agent-email__underline" aria-hidden="true"></span>
+			</header>
+
+			<div class="amy-agent-email__notice" role="note">
+				<p>
+					<?php
+					echo esc_html__(
+						'Emails here are lead captures (Submit Idea / contact), not proven marketing opt-ins. Treat as lead-only until consent is confirmed. Sends never use personal Gmail or AgentMail.',
+						'amy-agent'
+					);
+					?>
+				</p>
+				<p>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::ANALYTICS_PAGE_SLUG ) ); ?>">
+						<?php echo esc_html__( 'Open Analytics', 'amy-agent' ); ?>
+					</a>
+				</p>
+			</div>
+
+			<p class="amy-agent-email__error" id="amy-agent-email-error" hidden role="alert"></p>
+			<p class="amy-agent-email__status" id="amy-agent-email-status" hidden role="status"></p>
+
+			<section class="amy-agent-email__analysis" aria-label="<?php echo esc_attr__( 'Audience analysis', 'amy-agent' ); ?>">
+				<div class="amy-agent-email__stats">
+					<button type="button" class="amy-agent-email__stat is-active" data-amy-email-stat="">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-email-alt"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'With email', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-total">—</span>
+						</span>
+					</button>
+					<button type="button" class="amy-agent-email__stat amy-agent-email__stat--hot" data-amy-email-stat="hot">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-warning"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'Hot', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-hot">—</span>
+						</span>
+					</button>
+					<button type="button" class="amy-agent-email__stat amy-agent-email__stat--warm" data-amy-email-stat="warm">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-visibility"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'Warm', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-warm">—</span>
+						</span>
+					</button>
+					<button type="button" class="amy-agent-email__stat amy-agent-email__stat--cold" data-amy-email-stat="cold">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-minus"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'Cold', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-cold">—</span>
+						</span>
+					</button>
+				</div>
+
+				<div class="amy-agent-email__insight-row">
+					<article class="amy-agent-email__panel" aria-labelledby="amy-agent-email-coverage-title">
+						<h2 class="amy-agent-email__panel-title" id="amy-agent-email-coverage-title">
+							<?php echo esc_html__( 'Email coverage', 'amy-agent' ); ?>
+						</h2>
+						<p class="amy-agent-email__coverage-value" id="amy-agent-email-coverage-value">—</p>
+						<p class="amy-agent-email__panel-note" id="amy-agent-email-coverage-note">
+							<?php echo esc_html__( 'Share of Analytics visitors with a captured email.', 'amy-agent' ); ?>
+						</p>
+						<div class="amy-agent-email__meter" aria-hidden="true">
+							<span class="amy-agent-email__meter-fill" id="amy-agent-email-coverage-meter"></span>
+						</div>
+					</article>
+
+					<article class="amy-agent-email__panel" aria-labelledby="amy-agent-email-signals-title">
+						<h2 class="amy-agent-email__panel-title" id="amy-agent-email-signals-title">
+							<?php echo esc_html__( 'Recent signals', 'amy-agent' ); ?>
+						</h2>
+						<ul class="amy-agent-email__signals" id="amy-agent-email-signals"></ul>
+						<p class="amy-agent-email__panel-note amy-agent-email__signals-empty" id="amy-agent-email-signals-empty" hidden>
+							<?php echo esc_html__( 'No email captures yet — signals appear after Submit Idea or contact completion.', 'amy-agent' ); ?>
+						</p>
+					</article>
+				</div>
+			</section>
+
+			<div class="amy-agent-email__layout">
+				<section class="amy-agent-email__audience" aria-labelledby="amy-agent-email-audience-title">
+					<div class="amy-agent-email__audience-head">
+						<h2 class="amy-agent-email__section-title" id="amy-agent-email-audience-title">
+							<?php echo esc_html__( 'Audience', 'amy-agent' ); ?>
+						</h2>
+						<p class="amy-agent-email__count" id="amy-agent-email-count"></p>
+					</div>
+
+					<div class="amy-agent-email__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter audience by status', 'amy-agent' ); ?>">
+						<button type="button" class="amy-agent-email__filter is-active" role="tab" aria-selected="true" data-amy-email-status="">
+							<?php echo esc_html__( 'All', 'amy-agent' ); ?>
+						</button>
+						<button type="button" class="amy-agent-email__filter" role="tab" aria-selected="false" data-amy-email-status="hot">
+							<?php echo esc_html__( 'Hot', 'amy-agent' ); ?>
+						</button>
+						<button type="button" class="amy-agent-email__filter" role="tab" aria-selected="false" data-amy-email-status="warm">
+							<?php echo esc_html__( 'Warm', 'amy-agent' ); ?>
+						</button>
+						<button type="button" class="amy-agent-email__filter" role="tab" aria-selected="false" data-amy-email-status="cold">
+							<?php echo esc_html__( 'Cold', 'amy-agent' ); ?>
+						</button>
+					</div>
+
+					<div class="amy-agent-email__list">
+						<table class="amy-agent-email__table">
+							<thead>
+								<tr>
+									<th scope="col" class="amy-agent-email__col-check">
+										<span class="screen-reader-text"><?php echo esc_html__( 'Select', 'amy-agent' ); ?></span>
+									</th>
+									<th scope="col"><?php echo esc_html__( 'Email', 'amy-agent' ); ?></th>
+									<th scope="col"><?php echo esc_html__( 'Visitor', 'amy-agent' ); ?></th>
+									<th scope="col"><?php echo esc_html__( 'Status', 'amy-agent' ); ?></th>
+									<th scope="col"><?php echo esc_html__( 'Signal', 'amy-agent' ); ?></th>
+									<th scope="col"><?php echo esc_html__( 'Last seen', 'amy-agent' ); ?></th>
+								</tr>
+							</thead>
+							<tbody id="amy-agent-email-body"></tbody>
+						</table>
+						<p class="amy-agent-email__empty" id="amy-agent-email-empty" hidden>
+							<?php echo esc_html__( 'No visitor emails yet. Captures appear after Submit Idea or contact form completion.', 'amy-agent' ); ?>
+						</p>
+					</div>
+				</section>
+
+				<section class="amy-agent-email__draft" aria-labelledby="amy-agent-email-draft-title">
+					<h2 class="amy-agent-email__section-title" id="amy-agent-email-draft-title">
+						<?php echo esc_html__( 'Draft follow-up', 'amy-agent' ); ?>
+					</h2>
+					<p class="amy-agent-email__draft-hint">
+						<?php echo esc_html__( 'One recipient at a time. Approve stores a local draft only — no campaign is sent automatically.', 'amy-agent' ); ?>
+					</p>
+
+					<label class="amy-agent-email__field">
+						<span><?php echo esc_html__( 'To', 'amy-agent' ); ?></span>
+						<input type="email" id="amy-agent-email-to" readonly placeholder="<?php echo esc_attr__( 'Select a row', 'amy-agent' ); ?>" />
+					</label>
+					<label class="amy-agent-email__field">
+						<span><?php echo esc_html__( 'Subject', 'amy-agent' ); ?></span>
+						<input type="text" id="amy-agent-email-subject" maxlength="200" placeholder="<?php echo esc_attr__( 'Follow-up on your idea', 'amy-agent' ); ?>" />
+					</label>
+					<label class="amy-agent-email__field">
+						<span><?php echo esc_html__( 'Message', 'amy-agent' ); ?></span>
+						<textarea id="amy-agent-email-message" rows="10" placeholder="<?php echo esc_attr__( 'Write a personalized follow-up…', 'amy-agent' ); ?>"></textarea>
+					</label>
+
+					<div class="amy-agent-email__actions">
+						<button type="button" class="button" id="amy-agent-email-clear">
+							<?php echo esc_html__( 'Clear draft', 'amy-agent' ); ?>
+						</button>
+						<button type="button" class="button button-primary" id="amy-agent-email-approve">
+							<?php echo esc_html__( 'Approve draft (no send)', 'amy-agent' ); ?>
+						</button>
+					</div>
+				</section>
+			</div>
 		</div>
 		<?php
 	}
