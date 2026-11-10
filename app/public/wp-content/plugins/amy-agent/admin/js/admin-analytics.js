@@ -141,8 +141,15 @@
 					var leads = Array.isArray(payload.leads) ? payload.leads : [];
 					render(leads);
 				})
-				.fail(function () {
-					$error.removeAttr('hidden').text(i18n.loadError || 'Could not load leads.');
+				.fail(function (xhr) {
+					var msg =
+						(xhr &&
+							xhr.responseJSON &&
+							xhr.responseJSON.data &&
+							xhr.responseJSON.data.message) ||
+						i18n.loadError ||
+						'Could not load leads.';
+					$error.removeAttr('hidden').text(msg);
 					$tbody.empty();
 					$empty.attr('hidden', 'hidden');
 				});
