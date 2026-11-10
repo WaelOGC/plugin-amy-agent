@@ -144,12 +144,12 @@
 ## 🚧 PARTIAL / NEXT
 
 - **Email Marketing** (`amy-email-marketing`) — audience UI wired (2026-11-10),
-  extended in plugin **0.2.34**: multi-select (checkboxes + select-all) feeds
-  draft recipients; SVG/CSS charts (status donut, last-seen, signal mix);
-  search, Needs follow-up (Hot), export selected CSV, sticky selected count.
-  Human **Approve draft (no send)** only. Hostinger Agentic Mail send + webhook
-  still pending per `docs/04-email-marketing-plan.md`. Not a newsletter tool;
-  no Gmail / AgentMail. FluentSMTP stays for WP transactional.
+  extended in plugin **0.2.34** (multi-select/charts) and **0.2.37** (explicit
+  Send). Flow: select audience → Approve draft (localStorage) → **Send now**
+  confirmation → `wp_mail` via FluentSMTP From **`hello@ogcnewfinity.com`**
+  (configurable in Settings). Never silent; no Gmail / AgentMail. Hostinger
+  Agentic Mail REST + `message.received` webhook still future per
+  `docs/04-email-marketing-plan.md`. Setup: `docs/09-email-marketing-fluentsmtp.md`.
 
 ## ❌ NOT STARTED — no code, no admin page, design-only in the roadmap doc
 

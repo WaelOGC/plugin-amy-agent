@@ -1,5 +1,5 @@
 /**
- * Amy Agent — Email Marketing admin (multi-select audience, charts, draft / approve only).
+ * Amy Agent — Email Marketing admin (multi-select, approve, explicit Send via wp_mail).
  */
 (function ($) {
 	'use strict';
@@ -7,6 +7,7 @@
 	$(function () {
 		var cfg = window.amyAgentEmailMarketing || {};
 		var i18n = cfg.i18n || {};
+		var fromEmail = cfg.fromEmail || 'hello@ogcnewfinity.com';
 		var $tbody = $('#amy-agent-email-body');
 		var $empty = $('#amy-agent-email-empty');
 		var $error = $('#amy-agent-email-error');
@@ -18,6 +19,9 @@
 		var $toMeta = $('#amy-agent-email-to-meta');
 		var $subject = $('#amy-agent-email-subject');
 		var $body = $('#amy-agent-email-message');
+		var $approve = $('#amy-agent-email-approve');
+		var $send = $('#amy-agent-email-send');
+		var $sendHint = $('#amy-agent-email-send-hint');
 		var $signals = $('#amy-agent-email-signals');
 		var $signalsEmpty = $('#amy-agent-email-signals-empty');
 		var $selectAll = $('#amy-agent-email-select-all');
@@ -34,6 +38,9 @@
 		var selectedIds = {};
 		var allLeads = [];
 		var lastFiltered = [];
+		var draftApproved = false;
+		var approvedSnapshot = null;
+		var sending = false;
 		var DRAFT_KEY = 'amyAgentEmailDraft';
 
 		function escapeHtml(str) {
@@ -104,6 +111,10 @@
 			syncSelectionUi();
 		}
 
+		function showSendError(msg) {
+			$error.removeAttr('hidden').text(msg || i18n.sendError || 'Send failed.');
+		}
+
 		function setStatusFilter(next) {
 			currentStatus = String(next || '');
 			$statusFilters.removeClass('is-active').attr('aria-selected', 'false');
@@ -120,6 +131,76 @@
 			renderTable();
 		}
 
+		function currentDraftPayload() {
+			var selected = selectedLeads();
+			var emails = selected
+				.map(function (lead) {
+					return String(lead.lead_email || '').trim();
+				})
+				.filter(Boolean);
+			return {
+				recipients: emails,
+				session_ids: selected.map(function (lead) {
+					return lead.session_id;
+				}),
+				subject: String($subject.val() || '').trim(),
+				body: String($body.val() || '').trim(),
+			};
+		}
+
+		function snapshotKey(payload) {
+			return JSON.stringify({
+				recipients: (payload.recipients || []).slice().sort(),
+				subject: payload.subject || '',
+				body: payload.body || '',
+			});
+		}
+
+		function markDraftDirtyIfNeeded() {
+			if (!draftApproved || !approvedSnapshot) {
+				return;
+			}
+			if (snapshotKey(currentDraftPayload()) !== approvedSnapshot) {
+				draftApproved = false;
+				approvedSnapshot = null;
+				var draft = readDraft() || {};
+				draft.approved = false;
+				delete draft.approved_at;
+				writeDraft(
+					Object.assign({}, draft, currentDraftPayload(), {
+						to: (currentDraftPayload().recipients || []).join(', '),
+						approved: false,
+					})
+				);
+				updateSendButton();
+				showStatus(i18n.draftDirty || 'Draft changed after approval — approve again before sending.');
+			}
+		}
+
+		function updateSendButton() {
+			var payload = currentDraftPayload();
+			var canSend =
+				draftApproved &&
+				!sending &&
+				payload.recipients.length > 0 &&
+				!!payload.subject &&
+				!!payload.body &&
+				approvedSnapshot &&
+				snapshotKey(payload) === approvedSnapshot;
+			$send.prop('disabled', !canSend);
+			if (canSend) {
+				$sendHint.text(
+					(i18n.confirmSend || 'Ready to send %1$d recipient(s) From %2$s.')
+						.replace('%1$d', String(payload.recipients.length))
+						.replace('%2$s', fromEmail)
+				);
+			} else if (draftApproved) {
+				$sendHint.text(i18n.draftDirty || 'Draft changed after approval — approve again before sending.');
+			} else {
+				$sendHint.text(i18n.needApprove || 'Send stays disabled until you approve the current draft.');
+			}
+		}
+
 		function syncSelectionUi() {
 			var selected = selectedLeads();
 			var emails = selected
@@ -133,10 +214,9 @@
 			$to.val(emails.join('\n'));
 			if (count) {
 				$toMeta.text(
-					(i18n.toMeta || '%d recipient(s) ready for draft — send later via Hostinger Agentic Mail.').replace(
-						'%d',
-						String(count)
-					)
+					(i18n.toMeta || '%d recipient(s) selected — approve, then click Send. From %s.')
+						.replace('%d', String(count))
+						.replace('%s', fromEmail)
 				);
 				$selectedBar.removeAttr('hidden');
 				$selectedCount.text(countTpl.replace('%d', String(count)));
@@ -145,6 +225,8 @@
 				$selectedBar.attr('hidden', 'hidden');
 				$selectedCount.text(i18n.selectedNone || 'No emails selected');
 			}
+			markDraftDirtyIfNeeded();
+			updateSendButton();
 
 			var visibleIds = lastFiltered.map(function (lead) {
 				return lead.session_id;
@@ -641,10 +723,9 @@
 			if (recipients.length) {
 				$to.val(recipients.join('\n'));
 				$toMeta.text(
-					(i18n.toMeta || '%d recipient(s) ready for draft — send later via Hostinger Agentic Mail.').replace(
-						'%d',
-						String(recipients.length)
-					)
+					(i18n.toMeta || '%d recipient(s) selected — approve, then click Send. From %s.')
+						.replace('%d', String(recipients.length))
+						.replace('%s', fromEmail)
 				);
 			}
 			if (Array.isArray(draft.session_ids)) {
@@ -657,8 +738,15 @@
 				selectedIds[draft.session_id] = true;
 			}
 			if (draft.approved) {
-				showStatus(i18n.approvedNotice || 'Draft approved locally. Nothing was sent.');
+				draftApproved = true;
+				approvedSnapshot = snapshotKey({
+					recipients: recipients,
+					subject: String(draft.subject || '').trim(),
+					body: String(draft.body || '').trim(),
+				});
+				showStatus(i18n.approvedNotice || 'Draft approved. Click Send to deliver. Nothing was sent yet.');
 			}
+			updateSendButton();
 		}
 
 		function exportSelectedCsv() {
@@ -740,58 +828,138 @@
 			$body.val('');
 			clearSelection(false);
 			clearDraftStorage();
+			draftApproved = false;
+			approvedSnapshot = null;
+			updateSendButton();
 			showStatus(i18n.cleared || 'Draft cleared.');
 		});
 
-		$('#amy-agent-email-approve').on('click', function () {
-			var selected = selectedLeads();
-			var emails = selected
-				.map(function (lead) {
-					return String(lead.lead_email || '').trim();
-				})
-				.filter(Boolean);
-			var subject = String($subject.val() || '').trim();
-			var body = String($body.val() || '').trim();
+		$subject.on('input', markDraftDirtyIfNeeded);
+		$body.on('input', markDraftDirtyIfNeeded);
+
+		$approve.on('click', function () {
+			var payload = currentDraftPayload();
+			var emails = payload.recipients;
 
 			if (!emails.length) {
 				showStatus(i18n.selectRecipient || 'Select at least one recipient from the audience list.');
 				return;
 			}
-			if (!subject) {
+			if (!payload.subject) {
 				showStatus(i18n.needSubject || 'Add a subject before approving.');
 				return;
 			}
-			if (!body) {
+			if (!payload.body) {
 				showStatus(i18n.needBody || 'Add a message body before approving.');
 				return;
 			}
 
 			var ok = window.confirm(
 				i18n.confirmApprove ||
-					'Approve this draft for the selected audience? No email will go out until Hostinger Agentic Mail is connected.'
+					'Approve this draft for the selected audience? Nothing is sent yet — you must click Send afterward.'
 			);
 			if (!ok) {
 				return;
 			}
 
+			draftApproved = true;
+			approvedSnapshot = snapshotKey(payload);
 			writeDraft({
 				to: emails.join(', '),
 				recipients: emails,
-				session_ids: selected.map(function (lead) {
-					return lead.session_id;
-				}),
-				subject: subject,
-				body: body,
+				session_ids: payload.session_ids,
+				subject: payload.subject,
+				body: payload.body,
 				approved: true,
 				approved_at: Date.now(),
+				from_email: fromEmail,
 			});
+			updateSendButton();
 			showStatus(
 				i18n.approvedNotice ||
-					'Draft approved locally for the selected audience. Sending is not connected yet — Hostinger Agentic Mail comes next. Nothing was sent.'
+					'Draft approved. Click Send to deliver via wp_mail / FluentSMTP. Nothing was sent yet.'
 			);
+		});
+
+		$send.on('click', function () {
+			if (sending) {
+				return;
+			}
+			var payload = currentDraftPayload();
+			if (
+				!draftApproved ||
+				!approvedSnapshot ||
+				snapshotKey(payload) !== approvedSnapshot ||
+				!payload.recipients.length
+			) {
+				showStatus(i18n.needApprove || 'Approve the draft first. Send stays disabled until you approve.');
+				updateSendButton();
+				return;
+			}
+
+			var confirmMsg = (i18n.confirmSend || 'Send this approved draft to %1$d recipient(s) From %2$s via FluentSMTP (wp_mail)? This cannot be undone.')
+				.replace('%1$d', String(payload.recipients.length))
+				.replace('%2$s', fromEmail);
+			if (!window.confirm(confirmMsg)) {
+				return;
+			}
+
+			sending = true;
+			updateSendButton();
+			showStatus(i18n.sending || 'Sending…');
+			$error.attr('hidden', 'hidden').text('');
+
+			$.ajax({
+				url: cfg.ajaxUrl,
+				method: 'POST',
+				dataType: 'json',
+				data: {
+					action: 'amy_email_marketing_send',
+					nonce: cfg.sendNonce,
+					approved: '1',
+					confirmed: '1',
+					subject: payload.subject,
+					body: payload.body,
+					recipients: payload.recipients,
+				},
+			})
+				.done(function (res) {
+					if (!res || !res.success) {
+						var failMsg =
+							(res && res.data && res.data.message) ||
+							i18n.sendError ||
+							'Send failed. Check FluentSMTP and that hello@ is verified.';
+						showSendError(failMsg);
+						showStatus('');
+						return;
+					}
+					var data = res.data || {};
+					$error.attr('hidden', 'hidden').text('');
+					showStatus(data.message || 'Sent.');
+					draftApproved = false;
+					approvedSnapshot = null;
+					clearDraftStorage();
+					updateSendButton();
+				})
+				.fail(function (xhr) {
+					var msg =
+						(xhr &&
+							xhr.responseJSON &&
+							xhr.responseJSON.data &&
+							xhr.responseJSON.data.message) ||
+						i18n.sendError ||
+						'Send failed. Check FluentSMTP and that hello@ is verified.';
+					showSendError(msg);
+					showStatus('');
+				})
+				.always(function () {
+					sending = false;
+					updateSendButton();
+				});
 		});
 
 		restoreDraft();
 		loadAudience();
+		updateSendButton();
 	});
 })(jQuery);

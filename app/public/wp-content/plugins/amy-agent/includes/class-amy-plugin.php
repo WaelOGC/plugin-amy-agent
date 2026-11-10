@@ -70,6 +70,11 @@ class Amy_Plugin {
 	public $analytics_ajax;
 
 	/**
+	 * @var Amy_Email_Marketing_Ajax
+	 */
+	public $email_marketing_ajax;
+
+	/**
 	 * @var Amy_Seo_Meta
 	 */
 	public $seo_meta;
@@ -109,21 +114,23 @@ class Amy_Plugin {
 		$this->admin_menu         = new Amy_Admin_Menu( $this->settings );
 		$this->api_client         = new Amy_Api_Client( $this->settings );
 		$this->tasks_ajax         = new Amy_Tasks_Ajax( $this->api_client );
-		$this->analytics_ajax     = new Amy_Analytics_Ajax( $this->api_client );
-		$this->seo_meta           = new Amy_Seo_Meta();
-		$this->seo_tasks_ajax     = new Amy_Seo_Tasks_Ajax( $this->api_client );
-		$this->seo_taxonomy_meta  = new Amy_Seo_Taxonomy_Meta();
-		$this->seo_batches_ajax   = new Amy_Seo_Batches_Ajax( $this->api_client );
-		$this->rest               = new Amy_Rest( $this->api_client, $this->settings );
-		$this->theme_bridge       = new Amy_Theme_Bridge( $this->settings );
-		$this->assets             = new Amy_Assets( $this->settings );
-		$this->submit_idea        = new Amy_Submit_Idea( $this->settings );
-		$this->submit_idea_mail   = new Amy_Submit_Idea_Mail();
+		$this->analytics_ajax       = new Amy_Analytics_Ajax( $this->api_client );
+		$this->email_marketing_ajax = new Amy_Email_Marketing_Ajax( $this->settings );
+		$this->seo_meta             = new Amy_Seo_Meta();
+		$this->seo_tasks_ajax       = new Amy_Seo_Tasks_Ajax( $this->api_client );
+		$this->seo_taxonomy_meta    = new Amy_Seo_Taxonomy_Meta();
+		$this->seo_batches_ajax     = new Amy_Seo_Batches_Ajax( $this->api_client );
+		$this->rest                 = new Amy_Rest( $this->api_client, $this->settings );
+		$this->theme_bridge         = new Amy_Theme_Bridge( $this->settings );
+		$this->assets               = new Amy_Assets( $this->settings );
+		$this->submit_idea          = new Amy_Submit_Idea( $this->settings );
+		$this->submit_idea_mail     = new Amy_Submit_Idea_Mail();
 
 		$this->settings->register();
 		$this->admin_menu->register();
 		$this->tasks_ajax->register();
 		$this->analytics_ajax->register();
+		$this->email_marketing_ajax->register();
 		$this->seo_meta->register();
 		$this->seo_tasks_ajax->register();
 		$this->seo_taxonomy_meta->register();
@@ -140,13 +147,15 @@ class Amy_Plugin {
 	 */
 	public static function activate() {
 		$defaults = array(
-			'amy_agent_enabled'       => '0',
-			'amy_agent_service_url'   => 'http://127.0.0.1:8765',
-			'amy_agent_shared_secret' => '',
-			'amy_agent_ai_provider'   => 'gemini',
-			'amy_agent_ai_api_key'    => '',
-			'amy_agent_ai_model'      => '',
-			'amy_agent_avatar_url'    => '',
+			'amy_agent_enabled'               => '0',
+			'amy_agent_service_url'           => 'http://127.0.0.1:8765',
+			'amy_agent_shared_secret'         => '',
+			'amy_agent_ai_provider'           => 'gemini',
+			'amy_agent_ai_api_key'            => '',
+			'amy_agent_ai_model'              => '',
+			'amy_agent_avatar_url'            => '',
+			'amy_agent_marketing_from_email'  => Amy_Settings::DEFAULT_MARKETING_FROM_EMAIL,
+			'amy_agent_marketing_from_name'   => Amy_Settings::DEFAULT_MARKETING_FROM_NAME,
 		);
 
 		foreach ( $defaults as $key => $value ) {
