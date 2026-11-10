@@ -115,6 +115,34 @@ def test_submit_idea_completed_stores_email_and_is_hot(client: TestClient) -> No
     assert match["ip_country"] == "Netherlands"
 
 
+def test_submit_idea_contact_captured_stores_email_early(client: TestClient) -> None:
+    """Email-first step: lead_email is set before Q&A / completion."""
+    _ingest(client, "sess-early", "submit_idea_started")
+    data = _ingest(
+        client,
+        "sess-early",
+        "submit_idea_contact_captured",
+        event_data={"email": "early@example.com", "whatsapp": "+31 6 11112222"},
+    )
+    assert data["ok"] is True
+    leads = client.get("/v1/analytics/leads", headers=AUTH).json()["leads"]
+    match = next(item for item in leads if item["session_id"] == "sess-early")
+    assert match["lead_email"] == "early@example.com"
+    assert match["lead_whatsapp"] == "+31 6 11112222"
+    assert match["signal"] == "Shared email on Submit Idea"
+
+    # Abandon after early contact still keeps the email for marketing.
+    _ingest(
+        client,
+        "sess-early",
+        "submit_idea_abandoned",
+        event_data={"last_step": "questions"},
+    )
+    leads2 = client.get("/v1/analytics/leads", headers=AUTH).json()["leads"]
+    match2 = next(item for item in leads2 if item["session_id"] == "sess-early")
+    assert match2["lead_email"] == "early@example.com"
+
+
 def test_leads_filter_and_timeline(client: TestClient) -> None:
     _ingest(client, "sess-a", "page_view", page_path="/")
     _ingest(client, "sess-b", "widget_message_sent")
@@ -267,6 +295,18 @@ def test_extract_captured_whatsapp() -> None:
     assert lead_scoring.extract_captured_whatsapp("submit_idea_completed", {"whatsapp": "123"}) is None
     assert lead_scoring.extract_captured_whatsapp("submit_idea_completed", {"whatsapp": "abc1234567"}) is None
     assert lead_scoring.extract_captured_whatsapp("page_view", {"whatsapp": "+31612345678"}) is None
+    assert (
+        lead_scoring.extract_captured_whatsapp(
+            "submit_idea_contact_captured", {"whatsapp": "+31699998888"}
+        )
+        == "+31699998888"
+    )
+    assert (
+        lead_scoring.extract_captured_email(
+            "submit_idea_contact_captured", {"email": "cap@example.com"}
+        )
+        == "cap@example.com"
+    )
 
 
 def test_existing_db_gains_lead_whatsapp_column(tmp_path, monkeypatch) -> None:

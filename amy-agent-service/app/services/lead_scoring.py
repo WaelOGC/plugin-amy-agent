@@ -98,6 +98,8 @@ def signal_for_events(events: list[dict[str, Any]]) -> str:
         return "Submitted contact form"
     if event_type == "submit_idea_completed":
         return "Completed Submit Idea"
+    if event_type == "submit_idea_contact_captured":
+        return "Shared email on Submit Idea"
     if event_type == "widget_message_sent":
         return "Sent a chat message"
     if event_type == "widget_opened":

@@ -19,6 +19,7 @@ VALID_EVENT_TYPES = frozenset(
         "submit_idea_step_reached",
         "submit_idea_abandoned",
         "submit_idea_completed",
+        "submit_idea_contact_captured",
         "contact_form_started",
         "contact_form_abandoned",
         "contact_form_submitted",
@@ -29,6 +30,7 @@ VALID_LEAD_STATUSES = frozenset({"cold", "warm", "hot"})
 EMAIL_CAPTURE_EVENT_TYPES = frozenset(
     {
         "submit_idea_completed",
+        "submit_idea_contact_captured",
         "contact_form_submitted",
     }
 )
