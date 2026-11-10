@@ -469,27 +469,39 @@ class Amy_Admin_Menu {
 					'nonce'         => wp_create_nonce( Amy_Analytics_Ajax::NONCE_ACTION ),
 					'analyticsUrl'  => admin_url( 'admin.php?page=' . self::ANALYTICS_PAGE_SLUG ),
 					'i18n'          => array(
-						'loadError'       => __( 'Could not load audience. Check the Amy Agent service connection.', 'amy-agent' ),
-						'empty'           => __( 'No visitor emails yet. Captures appear after Submit Idea or contact form completion.', 'amy-agent' ),
-						'justNow'         => __( 'just now', 'amy-agent' ),
-						'minutesAgo'      => __( 'm ago', 'amy-agent' ),
-						'hoursAgo'        => __( 'h ago', 'amy-agent' ),
-						'daysAgo'         => __( 'd ago', 'amy-agent' ),
-						'statusHot'       => __( 'Hot', 'amy-agent' ),
-						'statusWarm'      => __( 'Warm', 'amy-agent' ),
-						'statusCold'      => __( 'Cold', 'amy-agent' ),
-						'selectRecipient' => __( 'Select a recipient from the audience list.', 'amy-agent' ),
-						'needSubject'     => __( 'Add a subject before approving.', 'amy-agent' ),
-						'needBody'        => __( 'Add a message body before approving.', 'amy-agent' ),
-						'confirmApprove'  => __( 'Approve this draft for sending? No email will go out until Hostinger Agentic Mail is connected. Personal Gmail and AgentMail are never used.', 'amy-agent' ),
-						'approvedNotice'  => __( 'Draft approved locally. Sending is not connected yet — Hostinger Agentic Mail comes next. Nothing was sent.', 'amy-agent' ),
-						'cleared'         => __( 'Draft cleared.', 'amy-agent' ),
-						'leadOnly'        => __( 'Lead capture', 'amy-agent' ),
-						'audienceCount'   => __( '%d shown', 'amy-agent' ),
-						'coverageValue'   => __( '%1$d of %2$d visitors (%3$s%%)', 'amy-agent' ),
-						'coverageEmpty'   => __( 'No Analytics visitors yet.', 'amy-agent' ),
-						'signalRow'       => __( '%1$s · %2$s · %3$s', 'amy-agent' ),
-						'unknownSignal'   => __( 'No signal', 'amy-agent' ),
+						'loadError'         => __( 'Could not load audience. Check the Amy Agent service connection.', 'amy-agent' ),
+						'empty'             => __( 'No visitor emails yet. Captures appear after Submit Idea or contact form completion.', 'amy-agent' ),
+						'emptyFiltered'     => __( 'No email leads match this filter or search.', 'amy-agent' ),
+						'justNow'           => __( 'just now', 'amy-agent' ),
+						'minutesAgo'        => __( 'm ago', 'amy-agent' ),
+						'hoursAgo'          => __( 'h ago', 'amy-agent' ),
+						'daysAgo'           => __( 'd ago', 'amy-agent' ),
+						'statusHot'         => __( 'Hot', 'amy-agent' ),
+						'statusWarm'        => __( 'Warm', 'amy-agent' ),
+						'statusCold'        => __( 'Cold', 'amy-agent' ),
+						'selectRecipient'   => __( 'Select at least one recipient from the audience list.', 'amy-agent' ),
+						'needSubject'       => __( 'Add a subject before approving.', 'amy-agent' ),
+						'needBody'          => __( 'Add a message body before approving.', 'amy-agent' ),
+						'confirmApprove'    => __( 'Approve this draft for the selected audience? No email will go out until Hostinger Agentic Mail is connected. Personal Gmail and AgentMail are never used.', 'amy-agent' ),
+						'approvedNotice'    => __( 'Draft approved locally for the selected audience. Sending is not connected yet — Hostinger Agentic Mail comes next. Nothing was sent.', 'amy-agent' ),
+						'cleared'           => __( 'Draft cleared.', 'amy-agent' ),
+						'leadOnly'          => __( 'Lead capture', 'amy-agent' ),
+						'audienceCount'     => __( '%d shown', 'amy-agent' ),
+						'coverageValue'     => __( '%1$d of %2$d visitors (%3$s%%)', 'amy-agent' ),
+						'coverageEmpty'     => __( 'No Analytics visitors yet.', 'amy-agent' ),
+						'signalRow'         => __( '%1$s · %2$s · %3$s', 'amy-agent' ),
+						'unknownSignal'     => __( 'No signal', 'amy-agent' ),
+						'selectedCount'     => __( '%d selected', 'amy-agent' ),
+						'selectedNone'      => __( 'No emails selected', 'amy-agent' ),
+						'toMeta'            => __( '%d recipient(s) ready for draft — send later via Hostinger Agentic Mail.', 'amy-agent' ),
+						'seen24h'           => __( 'Last 24h', 'amy-agent' ),
+						'seen7d'            => __( '1–7 days', 'amy-agent' ),
+						'seen30d'           => __( '8–30 days', 'amy-agent' ),
+						'seenOlder'         => __( 'Older', 'amy-agent' ),
+						'chartEmpty'        => __( 'No data yet', 'amy-agent' ),
+						'exportEmpty'       => __( 'Select at least one email to export.', 'amy-agent' ),
+						'exportDone'        => __( 'Selected emails exported as CSV.', 'amy-agent' ),
+						'selectionCleared'  => __( 'Selection cleared.', 'amy-agent' ),
 					),
 				)
 			);
@@ -2241,6 +2253,10 @@ class Amy_Admin_Menu {
 						<div class="amy-agent-email__meter" aria-hidden="true">
 							<span class="amy-agent-email__meter-fill" id="amy-agent-email-coverage-meter"></span>
 						</div>
+						<div class="amy-agent-email__chart amy-agent-email__chart--donut" id="amy-agent-email-chart-status" aria-hidden="true"></div>
+						<p class="amy-agent-email__chart-caption" id="amy-agent-email-chart-status-caption">
+							<?php echo esc_html__( 'Hot / Warm / Cold mix among email leads.', 'amy-agent' ); ?>
+						</p>
 					</article>
 
 					<article class="amy-agent-email__panel" aria-labelledby="amy-agent-email-signals-title">
@@ -2253,7 +2269,40 @@ class Amy_Admin_Menu {
 						</p>
 					</article>
 				</div>
+
+				<div class="amy-agent-email__charts" aria-label="<?php echo esc_attr__( 'Audience charts', 'amy-agent' ); ?>">
+					<article class="amy-agent-email__panel" aria-labelledby="amy-agent-email-chart-seen-title">
+						<h2 class="amy-agent-email__panel-title" id="amy-agent-email-chart-seen-title">
+							<?php echo esc_html__( 'Last seen', 'amy-agent' ); ?>
+						</h2>
+						<div class="amy-agent-email__bars" id="amy-agent-email-chart-seen" role="img" aria-label="<?php echo esc_attr__( 'Email leads by last-seen bucket', 'amy-agent' ); ?>"></div>
+						<p class="amy-agent-email__panel-note">
+							<?php echo esc_html__( 'How recently email leads were active.', 'amy-agent' ); ?>
+						</p>
+					</article>
+					<article class="amy-agent-email__panel" aria-labelledby="amy-agent-email-chart-signal-title">
+						<h2 class="amy-agent-email__panel-title" id="amy-agent-email-chart-signal-title">
+							<?php echo esc_html__( 'Signal mix', 'amy-agent' ); ?>
+						</h2>
+						<div class="amy-agent-email__bars" id="amy-agent-email-chart-signal" role="img" aria-label="<?php echo esc_attr__( 'Top signals among email leads', 'amy-agent' ); ?>"></div>
+						<p class="amy-agent-email__panel-note">
+							<?php echo esc_html__( 'Top capture signals among email leads.', 'amy-agent' ); ?>
+						</p>
+					</article>
+				</div>
 			</section>
+
+			<div class="amy-agent-email__selected-bar" id="amy-agent-email-selected-bar" hidden>
+				<p class="amy-agent-email__selected-count" id="amy-agent-email-selected-count"></p>
+				<div class="amy-agent-email__selected-actions">
+					<button type="button" class="button" id="amy-agent-email-export">
+						<?php echo esc_html__( 'Export selected CSV', 'amy-agent' ); ?>
+					</button>
+					<button type="button" class="button" id="amy-agent-email-clear-selection">
+						<?php echo esc_html__( 'Clear selection', 'amy-agent' ); ?>
+					</button>
+				</div>
+			</div>
 
 			<div class="amy-agent-email__layout">
 				<section class="amy-agent-email__audience" aria-labelledby="amy-agent-email-audience-title">
@@ -2262,6 +2311,16 @@ class Amy_Admin_Menu {
 							<?php echo esc_html__( 'Audience', 'amy-agent' ); ?>
 						</h2>
 						<p class="amy-agent-email__count" id="amy-agent-email-count"></p>
+					</div>
+
+					<div class="amy-agent-email__toolbar">
+						<label class="amy-agent-email__search">
+							<span class="screen-reader-text"><?php echo esc_html__( 'Search emails', 'amy-agent' ); ?></span>
+							<input type="search" id="amy-agent-email-search" placeholder="<?php echo esc_attr__( 'Search emails or visitors…', 'amy-agent' ); ?>" autocomplete="off" />
+						</label>
+						<button type="button" class="amy-agent-email__filter amy-agent-email__filter--followup" id="amy-agent-email-needs-followup" aria-pressed="false">
+							<?php echo esc_html__( 'Needs follow-up', 'amy-agent' ); ?>
+						</button>
 					</div>
 
 					<div class="amy-agent-email__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter audience by status', 'amy-agent' ); ?>">
@@ -2284,7 +2343,10 @@ class Amy_Admin_Menu {
 							<thead>
 								<tr>
 									<th scope="col" class="amy-agent-email__col-check">
-										<span class="screen-reader-text"><?php echo esc_html__( 'Select', 'amy-agent' ); ?></span>
+										<label class="amy-agent-email__select-all">
+											<input type="checkbox" id="amy-agent-email-select-all" />
+											<span class="screen-reader-text"><?php echo esc_html__( 'Select all filtered', 'amy-agent' ); ?></span>
+										</label>
 									</th>
 									<th scope="col"><?php echo esc_html__( 'Email', 'amy-agent' ); ?></th>
 									<th scope="col"><?php echo esc_html__( 'Visitor', 'amy-agent' ); ?></th>
@@ -2306,13 +2368,14 @@ class Amy_Admin_Menu {
 						<?php echo esc_html__( 'Draft follow-up', 'amy-agent' ); ?>
 					</h2>
 					<p class="amy-agent-email__draft-hint">
-						<?php echo esc_html__( 'One recipient at a time. Approve stores a local draft only — no campaign is sent automatically.', 'amy-agent' ); ?>
+						<?php echo esc_html__( 'Select one or more audience emails. Approve stores a local draft only — no campaign is sent automatically. Hostinger Agentic Mail send comes later.', 'amy-agent' ); ?>
 					</p>
 
 					<label class="amy-agent-email__field">
-						<span><?php echo esc_html__( 'To', 'amy-agent' ); ?></span>
-						<input type="email" id="amy-agent-email-to" readonly placeholder="<?php echo esc_attr__( 'Select a row', 'amy-agent' ); ?>" />
+						<span id="amy-agent-email-to-label"><?php echo esc_html__( 'To (selected audience)', 'amy-agent' ); ?></span>
+						<textarea id="amy-agent-email-to" rows="4" readonly placeholder="<?php echo esc_attr__( 'Select audience rows', 'amy-agent' ); ?>"></textarea>
 					</label>
+					<p class="amy-agent-email__to-meta" id="amy-agent-email-to-meta"></p>
 					<label class="amy-agent-email__field">
 						<span><?php echo esc_html__( 'Subject', 'amy-agent' ); ?></span>
 						<input type="text" id="amy-agent-email-subject" maxlength="200" placeholder="<?php echo esc_attr__( 'Follow-up on your idea', 'amy-agent' ); ?>" />

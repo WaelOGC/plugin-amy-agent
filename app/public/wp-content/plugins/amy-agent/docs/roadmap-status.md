@@ -141,11 +141,13 @@
 
 ## 🚧 PARTIAL / NEXT
 
-- **Email Marketing** (`amy-email-marketing`) — audience UI wired (2026-11-10):
-  lists Analytics `lead_email` captures, Hot/Warm/Cold filters, draft composer,
-  human **Approve draft (no send)**. Hostinger Agentic Mail send + webhook still
-  pending per `docs/04-email-marketing-plan.md`. Not a newsletter tool; no Gmail /
-  AgentMail. FluentSMTP stays for WP transactional.
+- **Email Marketing** (`amy-email-marketing`) — audience UI wired (2026-11-10),
+  extended in plugin **0.2.34**: multi-select (checkboxes + select-all) feeds
+  draft recipients; SVG/CSS charts (status donut, last-seen, signal mix);
+  search, Needs follow-up (Hot), export selected CSV, sticky selected count.
+  Human **Approve draft (no send)** only. Hostinger Agentic Mail send + webhook
+  still pending per `docs/04-email-marketing-plan.md`. Not a newsletter tool;
+  no Gmail / AgentMail. FluentSMTP stays for WP transactional.
 
 ## ❌ NOT STARTED — no code, no admin page, design-only in the roadmap doc
 
