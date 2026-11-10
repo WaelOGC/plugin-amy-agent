@@ -1,5 +1,5 @@
 /**
- * Amy Agent — Email Marketing admin (Analytics audience, draft / approve only).
+ * Amy Agent — Email Marketing admin (Analytics audience + analysis, draft / approve only).
  */
 (function ($) {
 	'use strict';
@@ -13,11 +13,15 @@
 		var $statusMsg = $('#amy-agent-email-status');
 		var $count = $('#amy-agent-email-count');
 		var $statusFilters = $('[data-amy-email-status]');
+		var $statButtons = $('[data-amy-email-stat]');
 		var $to = $('#amy-agent-email-to');
 		var $subject = $('#amy-agent-email-subject');
 		var $body = $('#amy-agent-email-body');
+		var $signals = $('#amy-agent-email-signals');
+		var $signalsEmpty = $('#amy-agent-email-signals-empty');
 		var currentStatus = '';
 		var selected = null;
+		var allLeads = [];
 		var DRAFT_KEY = 'amyAgentEmailDraft';
 
 		function escapeHtml(str) {
@@ -57,6 +61,14 @@
 			return i18n.statusCold || 'Cold';
 		}
 
+		function hasEmail(lead) {
+			return !!(lead && lead.lead_email && String(lead.lead_email).trim());
+		}
+
+		function emailLeads() {
+			return allLeads.filter(hasEmail);
+		}
+
 		function showStatus(msg) {
 			if (!msg) {
 				$statusMsg.attr('hidden', 'hidden').text('');
@@ -70,6 +82,18 @@
 			$tbody.empty();
 			$empty.attr('hidden', 'hidden');
 			$count.text('');
+			renderAnalysis([]);
+		}
+
+		function setStatusFilter(next) {
+			currentStatus = String(next || '');
+			$statusFilters.removeClass('is-active').attr('aria-selected', 'false');
+			$statusFilters.filter('[data-amy-email-status="' + currentStatus + '"]')
+				.addClass('is-active')
+				.attr('aria-selected', 'true');
+			$statButtons.removeClass('is-active');
+			$statButtons.filter('[data-amy-email-stat="' + currentStatus + '"]').addClass('is-active');
+			renderTable();
 		}
 
 		function selectLead(lead) {
@@ -86,25 +110,110 @@
 			$to.val(selected.lead_email || '');
 		}
 
-		function render(leads) {
+		function renderAnalysis(leadsWithEmail) {
+			var totalVisitors = allLeads.length;
+			var totalEmail = leadsWithEmail.length;
+			var hot = 0;
+			var warm = 0;
+			var cold = 0;
+
+			leadsWithEmail.forEach(function (lead) {
+				var status = lead.lead_status || 'cold';
+				if (status === 'hot') {
+					hot += 1;
+				} else if (status === 'warm') {
+					warm += 1;
+				} else {
+					cold += 1;
+				}
+			});
+
+			$('#amy-agent-email-stat-total').text(String(totalEmail));
+			$('#amy-agent-email-stat-hot').text(String(hot));
+			$('#amy-agent-email-stat-warm').text(String(warm));
+			$('#amy-agent-email-stat-cold').text(String(cold));
+
+			var $coverageValue = $('#amy-agent-email-coverage-value');
+			var $meter = $('#amy-agent-email-coverage-meter');
+			if (!totalVisitors) {
+				$coverageValue.text(i18n.coverageEmpty || 'No Analytics visitors yet.');
+				$meter.css('width', '0%');
+			} else {
+				var pct = Math.round((totalEmail / totalVisitors) * 100);
+				var tpl = i18n.coverageValue || '%1$d of %2$d visitors (%3$s%%)';
+				$coverageValue.text(
+					tpl
+						.replace('%1$d', String(totalEmail))
+						.replace('%2$d', String(totalVisitors))
+						.replace('%3$s', String(pct))
+				);
+				$meter.css('width', Math.min(100, pct) + '%');
+			}
+
+			var recent = leadsWithEmail
+				.slice()
+				.sort(function (a, b) {
+					return (parseFloat(b.last_seen_at) || 0) - (parseFloat(a.last_seen_at) || 0);
+				})
+				.slice(0, 5);
+
+			$signals.empty();
+			if (!recent.length) {
+				$signalsEmpty.removeAttr('hidden');
+				return;
+			}
+
+			$signalsEmpty.attr('hidden', 'hidden');
+			recent.forEach(function (lead) {
+				var email = lead.lead_email || '';
+				var signal = lead.signal || i18n.unknownSignal || 'No signal';
+				var when = formatLastSeen(lead.last_seen_at);
+				var status = lead.lead_status || 'cold';
+				var rowTpl = i18n.signalRow || '%1$s · %2$s · %3$s';
+				var line = rowTpl
+					.replace('%1$s', email)
+					.replace('%2$s', signal)
+					.replace('%3$s', when);
+				var li = document.createElement('li');
+				li.className = 'amy-agent-email__signal';
+				li.innerHTML =
+					'<span class="amy-agent-email__badge amy-agent-email__badge--' +
+					escapeHtml(status) +
+					'">' +
+					escapeHtml(statusLabel(status)) +
+					'</span>' +
+					'<span class="amy-agent-email__signal-text">' +
+					escapeHtml(line) +
+					'</span>';
+				$signals.append(li);
+			});
+		}
+
+		function renderTable() {
 			$error.attr('hidden', 'hidden').text('');
 			$tbody.empty();
 
-			var withEmail = leads.filter(function (lead) {
-				return !!(lead.lead_email && String(lead.lead_email).trim());
+			var withEmail = emailLeads();
+			renderAnalysis(withEmail);
+
+			var filtered = withEmail.filter(function (lead) {
+				if (!currentStatus) {
+					return true;
+				}
+				return (lead.lead_status || 'cold') === currentStatus;
 			});
 
-			var countTpl = i18n.audienceCount || '%d with email';
-			$count.text(countTpl.replace('%d', String(withEmail.length)));
+			var countTpl = i18n.audienceCount || '%d shown';
+			$count.text(countTpl.replace('%d', String(filtered.length)));
 
-			if (!withEmail.length) {
+			if (!filtered.length) {
 				$empty.removeAttr('hidden');
 				selectLead(null);
 				return;
 			}
 
 			$empty.attr('hidden', 'hidden');
-			withEmail.forEach(function (lead) {
+			filtered.forEach(function (lead) {
 				var status = lead.lead_status || 'cold';
 				var visitor = lead.visitor_label || ('Visitor ' + (lead.session_id_short || ''));
 				var email = lead.lead_email || '';
@@ -150,7 +259,7 @@
 			});
 
 			if (selected) {
-				var stillThere = withEmail.some(function (lead) {
+				var stillThere = filtered.some(function (lead) {
 					return lead.session_id === selected.session_id;
 				});
 				if (stillThere) {
@@ -170,8 +279,8 @@
 				data: {
 					action: 'amy_analytics_leads_list',
 					nonce: cfg.nonce,
-					status: currentStatus,
-					has_email: '1',
+					status: '',
+					has_email: '',
 				},
 			})
 				.done(function (res) {
@@ -184,8 +293,8 @@
 						return;
 					}
 					var payload = res.data || {};
-					var leads = Array.isArray(payload.leads) ? payload.leads : [];
-					render(leads);
+					allLeads = Array.isArray(payload.leads) ? payload.leads : [];
+					renderTable();
 				})
 				.fail(function () {
 					showError(i18n.loadError || 'Could not load audience.');
@@ -241,11 +350,11 @@
 		}
 
 		$statusFilters.on('click', function () {
-			var next = String($(this).data('amy-email-status') || '');
-			currentStatus = next;
-			$statusFilters.removeClass('is-active').attr('aria-selected', 'false');
-			$(this).addClass('is-active').attr('aria-selected', 'true');
-			loadAudience();
+			setStatusFilter($(this).data('amy-email-status') || '');
+		});
+
+		$statButtons.on('click', function () {
+			setStatusFilter($(this).data('amy-email-stat') || '');
 		});
 
 		$('#amy-agent-email-clear').on('click', function () {

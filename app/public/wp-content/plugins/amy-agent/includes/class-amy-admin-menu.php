@@ -485,7 +485,11 @@ class Amy_Admin_Menu {
 						'approvedNotice'  => __( 'Draft approved locally. Sending is not connected yet — Hostinger Agentic Mail comes next. Nothing was sent.', 'amy-agent' ),
 						'cleared'         => __( 'Draft cleared.', 'amy-agent' ),
 						'leadOnly'        => __( 'Lead capture', 'amy-agent' ),
-						'audienceCount'   => __( '%d with email', 'amy-agent' ),
+						'audienceCount'   => __( '%d shown', 'amy-agent' ),
+						'coverageValue'   => __( '%1$d of %2$d visitors (%3$s%%)', 'amy-agent' ),
+						'coverageEmpty'   => __( 'No Analytics visitors yet.', 'amy-agent' ),
+						'signalRow'       => __( '%1$s · %2$s · %3$s', 'amy-agent' ),
+						'unknownSignal'   => __( 'No signal', 'amy-agent' ),
 					),
 				)
 			);
@@ -2184,6 +2188,72 @@ class Amy_Admin_Menu {
 
 			<p class="amy-agent-email__error" id="amy-agent-email-error" hidden role="alert"></p>
 			<p class="amy-agent-email__status" id="amy-agent-email-status" hidden role="status"></p>
+
+			<section class="amy-agent-email__analysis" aria-label="<?php echo esc_attr__( 'Audience analysis', 'amy-agent' ); ?>">
+				<div class="amy-agent-email__stats">
+					<button type="button" class="amy-agent-email__stat is-active" data-amy-email-stat="">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-email-alt"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'With email', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-total">—</span>
+						</span>
+					</button>
+					<button type="button" class="amy-agent-email__stat amy-agent-email__stat--hot" data-amy-email-stat="hot">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-warning"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'Hot', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-hot">—</span>
+						</span>
+					</button>
+					<button type="button" class="amy-agent-email__stat amy-agent-email__stat--warm" data-amy-email-stat="warm">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-visibility"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'Warm', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-warm">—</span>
+						</span>
+					</button>
+					<button type="button" class="amy-agent-email__stat amy-agent-email__stat--cold" data-amy-email-stat="cold">
+						<span class="amy-agent-email__stat-icon" aria-hidden="true">
+							<span class="dashicons dashicons-minus"></span>
+						</span>
+						<span class="amy-agent-email__stat-copy">
+							<span class="amy-agent-email__stat-label"><?php echo esc_html__( 'Cold', 'amy-agent' ); ?></span>
+							<span class="amy-agent-email__stat-value" id="amy-agent-email-stat-cold">—</span>
+						</span>
+					</button>
+				</div>
+
+				<div class="amy-agent-email__insight-row">
+					<article class="amy-agent-email__panel" aria-labelledby="amy-agent-email-coverage-title">
+						<h2 class="amy-agent-email__panel-title" id="amy-agent-email-coverage-title">
+							<?php echo esc_html__( 'Email coverage', 'amy-agent' ); ?>
+						</h2>
+						<p class="amy-agent-email__coverage-value" id="amy-agent-email-coverage-value">—</p>
+						<p class="amy-agent-email__panel-note" id="amy-agent-email-coverage-note">
+							<?php echo esc_html__( 'Share of Analytics visitors with a captured email.', 'amy-agent' ); ?>
+						</p>
+						<div class="amy-agent-email__meter" aria-hidden="true">
+							<span class="amy-agent-email__meter-fill" id="amy-agent-email-coverage-meter"></span>
+						</div>
+					</article>
+
+					<article class="amy-agent-email__panel" aria-labelledby="amy-agent-email-signals-title">
+						<h2 class="amy-agent-email__panel-title" id="amy-agent-email-signals-title">
+							<?php echo esc_html__( 'Recent signals', 'amy-agent' ); ?>
+						</h2>
+						<ul class="amy-agent-email__signals" id="amy-agent-email-signals"></ul>
+						<p class="amy-agent-email__panel-note amy-agent-email__signals-empty" id="amy-agent-email-signals-empty" hidden>
+							<?php echo esc_html__( 'No email captures yet — signals appear after Submit Idea or contact completion.', 'amy-agent' ); ?>
+						</p>
+					</article>
+				</div>
+			</section>
 
 			<div class="amy-agent-email__layout">
 				<section class="amy-agent-email__audience" aria-labelledby="amy-agent-email-audience-title">
