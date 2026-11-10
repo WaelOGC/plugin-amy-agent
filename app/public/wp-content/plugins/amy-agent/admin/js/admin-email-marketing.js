@@ -16,7 +16,7 @@
 		var $statButtons = $('[data-amy-email-stat]');
 		var $to = $('#amy-agent-email-to');
 		var $subject = $('#amy-agent-email-subject');
-		var $body = $('#amy-agent-email-body');
+		var $body = $('#amy-agent-email-message');
 		var $signals = $('#amy-agent-email-signals');
 		var $signalsEmpty = $('#amy-agent-email-signals-empty');
 		var currentStatus = '';

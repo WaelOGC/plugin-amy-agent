@@ -2319,7 +2319,7 @@ class Amy_Admin_Menu {
 					</label>
 					<label class="amy-agent-email__field">
 						<span><?php echo esc_html__( 'Message', 'amy-agent' ); ?></span>
-						<textarea id="amy-agent-email-body" rows="10" placeholder="<?php echo esc_attr__( 'Write a personalized follow-up…', 'amy-agent' ); ?>"></textarea>
+						<textarea id="amy-agent-email-message" rows="10" placeholder="<?php echo esc_attr__( 'Write a personalized follow-up…', 'amy-agent' ); ?>"></textarea>
 					</label>
 
 					<div class="amy-agent-email__actions">
