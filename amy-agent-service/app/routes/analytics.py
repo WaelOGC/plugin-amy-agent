@@ -44,6 +44,7 @@ def _to_lead_item(session: dict, events: list[dict]) -> LeadListItem:
         last_seen_at=float(session["last_seen_at"]),
         lead_status=session["lead_status"],
         lead_email=session.get("lead_email"),
+        lead_whatsapp=session.get("lead_whatsapp"),
         signal=lead_scoring.signal_for_events(events),
     )
 
@@ -95,6 +96,10 @@ async def ingest_event(body: EventIngestRequest) -> EventIngestResponse | JSONRe
     email = lead_scoring.extract_captured_email(event_type, event_data)
     if email:
         analytics_db.set_lead_email(session_id, email)
+
+    whatsapp = lead_scoring.extract_captured_whatsapp(event_type, event_data)
+    if whatsapp:
+        analytics_db.set_lead_whatsapp(session_id, whatsapp)
 
     lead_status = lead_scoring.compute_lead_status(session_id)
     analytics_db.set_lead_status(session_id, lead_status)

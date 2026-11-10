@@ -41,7 +41,9 @@ _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Guarded-ALTER registry — empty in v1; add column name → SQL type/default
 # here when a future migration needs a new column on an existing analytics.db.
-_SESSION_COLUMN_DEFAULTS: dict[str, str] = {}
+_SESSION_COLUMN_DEFAULTS: dict[str, str] = {
+    "lead_whatsapp": "TEXT",
+}
 _EVENT_COLUMN_DEFAULTS: dict[str, str] = {}
 
 
@@ -135,6 +137,7 @@ def _session_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "last_seen_at": float(row["last_seen_at"]),
         "lead_status": row["lead_status"] if row["lead_status"] in VALID_LEAD_STATUSES else "cold",
         "lead_email": row["lead_email"],
+        "lead_whatsapp": row["lead_whatsapp"] if "lead_whatsapp" in row.keys() else None,
     }
 
 
@@ -273,6 +276,21 @@ def set_lead_email(session_id: str, email: str) -> None:
             conn.execute(
                 "UPDATE visitor_sessions SET lead_email = ? WHERE id = ?",
                 (email, session_id),
+            )
+    finally:
+        conn.close()
+
+
+def set_lead_whatsapp(session_id: str, whatsapp: str) -> None:
+    whatsapp = (whatsapp or "").strip()
+    if not whatsapp:
+        return
+    conn = _connect()
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE visitor_sessions SET lead_whatsapp = ? WHERE id = ?",
+                (whatsapp, session_id),
             )
     finally:
         conn.close()
