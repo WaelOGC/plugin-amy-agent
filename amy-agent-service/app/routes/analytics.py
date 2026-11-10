@@ -114,9 +114,13 @@ async def ingest_event(body: EventIngestRequest) -> EventIngestResponse | JSONRe
 )
 async def list_leads(
     status_filter: str | None = Query(default=None, alias="status"),
+    has_email: bool | None = Query(default=None),
 ) -> LeadListResponse | JSONResponse:
     try:
-        rows = analytics_db.list_leads(status=status_filter)  # type: ignore[arg-type]
+        rows = analytics_db.list_leads(
+            status=status_filter,  # type: ignore[arg-type]
+            has_email=has_email,
+        )
     except ValueError as exc:
         return _error("invalid_filter", str(exc), status.HTTP_400_BAD_REQUEST)
 

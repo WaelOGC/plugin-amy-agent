@@ -187,15 +187,23 @@ class Amy_Api_Client {
 	}
 
 	/**
-	 * GET /v1/analytics/leads — optional status filter (cold/warm/hot).
+	 * GET /v1/analytics/leads — optional status and has_email filters.
 	 *
-	 * @param string|null $status Lead status filter.
+	 * @param string|null $status    Lead status filter (cold/warm/hot).
+	 * @param bool|null   $has_email When true, only sessions with a stored email.
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
 	 */
-	public function list_leads( $status = null ) {
-		$path = '/v1/analytics/leads';
+	public function list_leads( $status = null, $has_email = null ) {
+		$path  = '/v1/analytics/leads';
+		$query = array();
 		if ( null !== $status && '' !== $status ) {
-			$path .= '?' . http_build_query( array( 'status' => $status ) );
+			$query['status'] = $status;
+		}
+		if ( null !== $has_email ) {
+			$query['has_email'] = $has_email ? 'true' : 'false';
+		}
+		if ( ! empty( $query ) ) {
+			$path .= '?' . http_build_query( $query );
 		}
 		return $this->request( 'GET', $path );
 	}

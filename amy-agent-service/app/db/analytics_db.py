@@ -296,15 +296,26 @@ def set_lead_whatsapp(session_id: str, whatsapp: str) -> None:
         conn.close()
 
 
-def list_leads(*, status: LeadStatus | None = None) -> list[dict[str, Any]]:
+def list_leads(
+    *,
+    status: LeadStatus | None = None,
+    has_email: bool | None = None,
+) -> list[dict[str, Any]]:
     if status is not None and status not in VALID_LEAD_STATUSES:
         raise ValueError("invalid status")
 
     sql = "SELECT * FROM visitor_sessions"
     params: list[Any] = []
+    clauses: list[str] = []
     if status is not None:
-        sql += " WHERE lead_status = ?"
+        clauses.append("lead_status = ?")
         params.append(status)
+    if has_email is True:
+        clauses.append("lead_email IS NOT NULL AND TRIM(lead_email) != ''")
+    elif has_email is False:
+        clauses.append("(lead_email IS NULL OR TRIM(lead_email) = '')")
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
     sql += """
         ORDER BY CASE lead_status
             WHEN 'hot' THEN 0
