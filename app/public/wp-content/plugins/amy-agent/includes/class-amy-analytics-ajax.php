@@ -31,6 +31,7 @@ class Amy_Analytics_Ajax {
 	 */
 	public function register() {
 		add_action( 'wp_ajax_amy_analytics_leads_list', array( $this, 'ajax_leads_list' ) );
+		add_action( 'wp_ajax_amy_analytics_save_prefs', array( $this, 'ajax_save_prefs' ) );
 	}
 
 	/**
@@ -85,5 +86,33 @@ class Amy_Analytics_Ajax {
 		}
 
 		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array( 'leads' => array() ) );
+	}
+
+	/**
+	 * Save per-user Analytics view/sort preferences.
+	 */
+	public function ajax_save_prefs() {
+		$this->guard();
+
+		$view = isset( $_POST['view'] ) ? sanitize_key( wp_unslash( $_POST['view'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
+		$sort = isset( $_POST['sort'] ) ? sanitize_key( wp_unslash( $_POST['sort'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		$allowed_views = array( 'table', 'compact', 'cards', 'board', 'contacts' );
+		$allowed_sorts = array( 'newest', 'oldest', 'hottest', 'email' );
+
+		if ( ! in_array( $view, $allowed_views, true ) || ! in_array( $sort, $allowed_sorts, true ) ) {
+			wp_send_json_error( array( 'message' => __( 'Invalid preference.', 'amy-agent' ) ), 400 );
+		}
+
+		update_user_meta(
+			get_current_user_id(),
+			'amy_agent_analytics_prefs',
+			array(
+				'view' => $view,
+				'sort' => $sort,
+			)
+		);
+
+		wp_send_json_success();
 	}
 }

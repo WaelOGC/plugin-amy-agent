@@ -423,22 +423,82 @@ class Amy_Admin_Menu {
 				true
 			);
 
+			$prefs_raw = get_user_meta( get_current_user_id(), 'amy_agent_analytics_prefs', true );
+			$prefs     = array(
+				'view' => 'table',
+				'sort' => 'newest',
+			);
+			if ( is_array( $prefs_raw ) ) {
+				$allowed_views = array( 'table', 'compact', 'cards', 'board', 'contacts' );
+				$allowed_sorts = array( 'newest', 'oldest', 'hottest', 'email' );
+				if ( ! empty( $prefs_raw['view'] ) && in_array( $prefs_raw['view'], $allowed_views, true ) ) {
+					$prefs['view'] = $prefs_raw['view'];
+				}
+				if ( ! empty( $prefs_raw['sort'] ) && in_array( $prefs_raw['sort'], $allowed_sorts, true ) ) {
+					$prefs['sort'] = $prefs_raw['sort'];
+				}
+			}
+
 			wp_localize_script(
 				'amy-agent-admin-analytics',
 				'amyAgentAnalytics',
 				array(
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonce'   => wp_create_nonce( Amy_Analytics_Ajax::NONCE_ACTION ),
+					'prefs'   => $prefs,
 					'i18n'    => array(
-						'loadError'  => __( 'Could not load leads. Check the Amy Agent service connection.', 'amy-agent' ),
-						'empty'      => __( 'No visitors yet.', 'amy-agent' ),
-						'justNow'    => __( 'just now', 'amy-agent' ),
-						'minutesAgo' => __( 'm ago', 'amy-agent' ),
-						'hoursAgo'   => __( 'h ago', 'amy-agent' ),
-						'daysAgo'    => __( 'd ago', 'amy-agent' ),
-						'statusHot'  => __( 'Hot', 'amy-agent' ),
-						'statusWarm' => __( 'Warm', 'amy-agent' ),
-						'statusCold' => __( 'Cold', 'amy-agent' ),
+						'loadError'         => __( 'Could not load leads. Check the Amy Agent service connection.', 'amy-agent' ),
+						'empty'             => __( 'No visitors yet.', 'amy-agent' ),
+						'emptyFilters'      => __( 'No visitors match these filters.', 'amy-agent' ),
+						'clearFilters'      => __( 'Clear filters', 'amy-agent' ),
+						'resetFilters'      => __( 'Reset filters', 'amy-agent' ),
+						'justNow'           => __( 'just now', 'amy-agent' ),
+						'minutesAgo'        => __( 'm ago', 'amy-agent' ),
+						'hoursAgo'          => __( 'h ago', 'amy-agent' ),
+						'daysAgo'           => __( 'd ago', 'amy-agent' ),
+						'statusHot'         => __( 'Hot', 'amy-agent' ),
+						'statusWarm'        => __( 'Warm', 'amy-agent' ),
+						'statusCold'        => __( 'Cold', 'amy-agent' ),
+						'statusAll'         => __( 'All', 'amy-agent' ),
+						'searchPlaceholder' => __( 'Search visitors…', 'amy-agent' ),
+						'searchClear'       => __( 'Clear search', 'amy-agent' ),
+						'refresh'           => __( 'Refresh', 'amy-agent' ),
+						'updated'           => __( 'Updated', 'amy-agent' ),
+						'loading'           => __( 'Loading…', 'amy-agent' ),
+						'showing'           => __( 'Showing %1$s of %2$s visitors', 'amy-agent' ),
+						'viewTable'         => __( 'Table', 'amy-agent' ),
+						'viewCompact'       => __( 'Compact', 'amy-agent' ),
+						'viewCards'         => __( 'Cards', 'amy-agent' ),
+						'viewBoard'         => __( 'Board', 'amy-agent' ),
+						'viewContacts'      => __( 'Contacts', 'amy-agent' ),
+						'viewSwitcher'      => __( 'Layout', 'amy-agent' ),
+						'countryAll'        => __( 'All countries', 'amy-agent' ),
+						'seenAny'           => __( 'Any time', 'amy-agent' ),
+						'seenHour'          => __( 'Last hour', 'amy-agent' ),
+						'seenToday'         => __( 'Today', 'amy-agent' ),
+						'seen7'             => __( 'Last 7 days', 'amy-agent' ),
+						'seen30'            => __( 'Last 30 days', 'amy-agent' ),
+						'contactAny'        => __( 'Any contact', 'amy-agent' ),
+						'contactEmail'      => __( 'Has email', 'amy-agent' ),
+						'contactPhone'      => __( 'Has phone', 'amy-agent' ),
+						'contactBoth'       => __( 'Has both', 'amy-agent' ),
+						'contactNone'       => __( 'No contact details', 'amy-agent' ),
+						'contactsInfo'      => __( 'Contacts view only shows visitors with email or phone.', 'amy-agent' ),
+						'sortNewest'        => __( 'Newest activity', 'amy-agent' ),
+						'sortOldest'        => __( 'Oldest activity', 'amy-agent' ),
+						'sortHottest'       => __( 'Hottest first', 'amy-agent' ),
+						'sortEmail'         => __( 'Email A–Z', 'amy-agent' ),
+						'copied'            => __( 'Copied', 'amy-agent' ),
+						'copyEmail'         => __( 'Copy email', 'amy-agent' ),
+						'copyPhone'         => __( 'Copy phone', 'amy-agent' ),
+						'whatsapp'          => __( 'Open WhatsApp', 'amy-agent' ),
+						'colVisitor'        => __( 'Visitor', 'amy-agent' ),
+						'colEmail'          => __( 'Email', 'amy-agent' ),
+						'colPhone'          => __( 'Phone', 'amy-agent' ),
+						'colLocation'       => __( 'Location', 'amy-agent' ),
+						'colLastSeen'       => __( 'Last seen', 'amy-agent' ),
+						'colSignal'         => __( 'Signal', 'amy-agent' ),
+						'colStatus'         => __( 'Status', 'amy-agent' ),
 					),
 				)
 			);
@@ -1898,48 +1958,136 @@ class Amy_Admin_Menu {
 
 			<p class="amy-agent-analytics__error" id="amy-agent-analytics-error" hidden role="alert"></p>
 
-			<div class="amy-agent-analytics__toolbar">
-				<div class="amy-agent-analytics__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter by lead status', 'amy-agent' ); ?>">
-					<button
-						type="button"
-						class="amy-agent-analytics__filter is-active"
-						role="tab"
-						aria-selected="true"
-						data-amy-analytics-status=""
+			<div class="amy-agent-analytics__toolbar-card">
+				<div class="amy-agent-analytics__toolbar-row amy-agent-analytics__toolbar-row--primary">
+					<div class="amy-agent-analytics__search-wrap">
+						<span class="amy-agent-analytics__search-icon dashicons dashicons-search" aria-hidden="true"></span>
+						<input
+							type="search"
+							id="amy-agent-analytics-search"
+							class="amy-agent-analytics__search"
+							autocomplete="off"
+							placeholder="<?php echo esc_attr__( 'Search visitors…', 'amy-agent' ); ?>"
+						/>
+						<button
+							type="button"
+							id="amy-agent-analytics-search-clear"
+							class="amy-agent-analytics__search-clear"
+							hidden
+							aria-label="<?php echo esc_attr__( 'Clear search', 'amy-agent' ); ?>"
+						>
+							<span aria-hidden="true">×</span>
+						</button>
+					</div>
+					<div
+						class="amy-agent-analytics__view-switcher"
+						id="amy-agent-analytics-view-switcher"
+						role="radiogroup"
+						aria-label="<?php echo esc_attr__( 'Layout', 'amy-agent' ); ?>"
 					>
-						<?php echo esc_html__( 'All', 'amy-agent' ); ?>
+						<button type="button" class="amy-agent-analytics__view-btn" role="radio" aria-checked="true" data-amy-view="table">
+							<span class="dashicons dashicons-list-view" aria-hidden="true"></span>
+							<span class="amy-agent-analytics__view-label"><?php echo esc_html__( 'Table', 'amy-agent' ); ?></span>
+						</button>
+						<button type="button" class="amy-agent-analytics__view-btn" role="radio" aria-checked="false" data-amy-view="compact">
+							<span class="dashicons dashicons-menu" aria-hidden="true"></span>
+							<span class="amy-agent-analytics__view-label"><?php echo esc_html__( 'Compact', 'amy-agent' ); ?></span>
+						</button>
+						<button type="button" class="amy-agent-analytics__view-btn" role="radio" aria-checked="false" data-amy-view="cards">
+							<span class="dashicons dashicons-grid-view" aria-hidden="true"></span>
+							<span class="amy-agent-analytics__view-label"><?php echo esc_html__( 'Cards', 'amy-agent' ); ?></span>
+						</button>
+						<button type="button" class="amy-agent-analytics__view-btn" role="radio" aria-checked="false" data-amy-view="board">
+							<span class="dashicons dashicons-columns" aria-hidden="true"></span>
+							<span class="amy-agent-analytics__view-label"><?php echo esc_html__( 'Board', 'amy-agent' ); ?></span>
+						</button>
+						<button type="button" class="amy-agent-analytics__view-btn" role="radio" aria-checked="false" data-amy-view="contacts">
+							<span class="dashicons dashicons-id" aria-hidden="true"></span>
+							<span class="amy-agent-analytics__view-label"><?php echo esc_html__( 'Contacts', 'amy-agent' ); ?></span>
+						</button>
+					</div>
+				</div>
+
+				<div class="amy-agent-analytics__toolbar-row amy-agent-analytics__toolbar-row--secondary">
+					<div class="amy-agent-analytics__status-chips" role="group" aria-label="<?php echo esc_attr__( 'Filter by lead status', 'amy-agent' ); ?>">
+						<button type="button" class="amy-agent-analytics__chip is-active" data-amy-status="" aria-pressed="true">
+							<?php echo esc_html__( 'All', 'amy-agent' ); ?> <span class="amy-agent-analytics__chip-count" data-amy-count-all>0</span>
+						</button>
+						<button type="button" class="amy-agent-analytics__chip" data-amy-status="hot" aria-pressed="false">
+							<?php echo esc_html__( 'Hot', 'amy-agent' ); ?> <span class="amy-agent-analytics__chip-count" data-amy-count-hot>0</span>
+						</button>
+						<button type="button" class="amy-agent-analytics__chip" data-amy-status="warm" aria-pressed="false">
+							<?php echo esc_html__( 'Warm', 'amy-agent' ); ?> <span class="amy-agent-analytics__chip-count" data-amy-count-warm>0</span>
+						</button>
+						<button type="button" class="amy-agent-analytics__chip" data-amy-status="cold" aria-pressed="false">
+							<?php echo esc_html__( 'Cold', 'amy-agent' ); ?> <span class="amy-agent-analytics__chip-count" data-amy-count-cold>0</span>
+						</button>
+					</div>
+
+					<select id="amy-agent-analytics-country" class="amy-agent-analytics__select" aria-label="<?php echo esc_attr__( 'Country', 'amy-agent' ); ?>">
+						<option value=""><?php echo esc_html__( 'All countries', 'amy-agent' ); ?></option>
+					</select>
+
+					<select id="amy-agent-analytics-seen" class="amy-agent-analytics__select" aria-label="<?php echo esc_attr__( 'Last seen', 'amy-agent' ); ?>">
+						<option value=""><?php echo esc_html__( 'Any time', 'amy-agent' ); ?></option>
+						<option value="hour"><?php echo esc_html__( 'Last hour', 'amy-agent' ); ?></option>
+						<option value="today"><?php echo esc_html__( 'Today', 'amy-agent' ); ?></option>
+						<option value="7"><?php echo esc_html__( 'Last 7 days', 'amy-agent' ); ?></option>
+						<option value="30"><?php echo esc_html__( 'Last 30 days', 'amy-agent' ); ?></option>
+					</select>
+
+					<select id="amy-agent-analytics-contact" class="amy-agent-analytics__select" aria-label="<?php echo esc_attr__( 'Contact details', 'amy-agent' ); ?>">
+						<option value=""><?php echo esc_html__( 'Any contact', 'amy-agent' ); ?></option>
+						<option value="email"><?php echo esc_html__( 'Has email', 'amy-agent' ); ?></option>
+						<option value="phone"><?php echo esc_html__( 'Has phone', 'amy-agent' ); ?></option>
+						<option value="both"><?php echo esc_html__( 'Has both', 'amy-agent' ); ?></option>
+						<option value="none"><?php echo esc_html__( 'No contact details', 'amy-agent' ); ?></option>
+					</select>
+
+					<select id="amy-agent-analytics-sort" class="amy-agent-analytics__select" aria-label="<?php echo esc_attr__( 'Sort', 'amy-agent' ); ?>">
+						<option value="newest"><?php echo esc_html__( 'Newest activity', 'amy-agent' ); ?></option>
+						<option value="oldest"><?php echo esc_html__( 'Oldest activity', 'amy-agent' ); ?></option>
+						<option value="hottest"><?php echo esc_html__( 'Hottest first', 'amy-agent' ); ?></option>
+						<option value="email"><?php echo esc_html__( 'Email A–Z', 'amy-agent' ); ?></option>
+					</select>
+
+					<button type="button" id="amy-agent-analytics-refresh" class="amy-agent-analytics__refresh">
+						<span class="dashicons dashicons-update" aria-hidden="true"></span>
+						<?php echo esc_html__( 'Refresh', 'amy-agent' ); ?>
 					</button>
-					<button type="button" class="amy-agent-analytics__filter" role="tab" aria-selected="false" data-amy-analytics-status="hot">
-						<?php echo esc_html__( 'Hot', 'amy-agent' ); ?>
-					</button>
-					<button type="button" class="amy-agent-analytics__filter" role="tab" aria-selected="false" data-amy-analytics-status="warm">
-						<?php echo esc_html__( 'Warm', 'amy-agent' ); ?>
-					</button>
-					<button type="button" class="amy-agent-analytics__filter" role="tab" aria-selected="false" data-amy-analytics-status="cold">
-						<?php echo esc_html__( 'Cold', 'amy-agent' ); ?>
+					<span class="amy-agent-analytics__updated" id="amy-agent-analytics-updated" aria-live="polite"></span>
+
+					<button type="button" id="amy-agent-analytics-reset" class="amy-agent-analytics__reset" hidden>
+						<?php echo esc_html__( 'Reset filters', 'amy-agent' ); ?>
 					</button>
 				</div>
+
+				<p class="amy-agent-analytics__result-count" id="amy-agent-analytics-result-count" aria-live="polite"></p>
 			</div>
 
-			<div class="amy-agent-analytics__list">
-				<table class="amy-agent-analytics__table">
-					<thead>
-						<tr>
-							<th><?php echo esc_html__( 'Visitor', 'amy-agent' ); ?></th>
-							<th><?php echo esc_html__( 'Email', 'amy-agent' ); ?></th>
-							<th><?php echo esc_html__( 'Phone', 'amy-agent' ); ?></th>
-							<th><?php echo esc_html__( 'Location', 'amy-agent' ); ?></th>
-							<th><?php echo esc_html__( 'Last seen', 'amy-agent' ); ?></th>
-							<th><?php echo esc_html__( 'Signal', 'amy-agent' ); ?></th>
-							<th><?php echo esc_html__( 'Status', 'amy-agent' ); ?></th>
-						</tr>
-					</thead>
-					<tbody id="amy-agent-analytics-body"></tbody>
-				</table>
-				<p class="amy-agent-analytics__empty" id="amy-agent-analytics-empty" hidden>
-					<?php echo esc_html__( 'No visitors yet.', 'amy-agent' ); ?>
-				</p>
+			<div class="amy-agent-analytics__list" id="amy-agent-analytics-list" data-view="table">
+				<div class="amy-agent-analytics__loading" id="amy-agent-analytics-loading" hidden>
+					<?php echo esc_html__( 'Loading…', 'amy-agent' ); ?>
+				</div>
+				<div class="amy-agent-analytics__list-inner" id="amy-agent-analytics-list-inner"></div>
 			</div>
+
+			<p class="amy-agent-analytics__empty" id="amy-agent-analytics-empty" hidden>
+				<?php echo esc_html__( 'No visitors yet.', 'amy-agent' ); ?>
+			</p>
+
+			<div class="amy-agent-analytics__empty-filters" id="amy-agent-analytics-empty-filters" hidden>
+				<p><?php echo esc_html__( 'No visitors match these filters.', 'amy-agent' ); ?></p>
+				<button type="button" class="amy-agent-analytics__clear-filters" id="amy-agent-analytics-clear-filters">
+					<?php echo esc_html__( 'Clear filters', 'amy-agent' ); ?>
+				</button>
+			</div>
+
+			<p class="amy-agent-analytics__contacts-info" id="amy-agent-analytics-contacts-info" hidden>
+				<?php echo esc_html__( 'Contacts view only shows visitors with email or phone.', 'amy-agent' ); ?>
+			</p>
+
+			<div class="amy-agent-analytics__toast" id="amy-agent-analytics-toast" role="status" aria-live="polite" hidden></div>
 		</div>
 		<?php
 	}
