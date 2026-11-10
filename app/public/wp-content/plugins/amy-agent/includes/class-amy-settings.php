@@ -14,13 +14,25 @@ class Amy_Settings {
 
 	const PAGE_SLUG = 'amy-settings';
 
-	const OPTION_ENABLED       = 'amy_agent_enabled';
-	const OPTION_SERVICE_URL   = 'amy_agent_service_url';
-	const OPTION_SHARED_SECRET = 'amy_agent_shared_secret';
-	const OPTION_AI_PROVIDER   = 'amy_agent_ai_provider';
-	const OPTION_AI_API_KEY    = 'amy_agent_ai_api_key';
-	const OPTION_AI_MODEL      = 'amy_agent_ai_model';
-	const OPTION_AVATAR_URL    = 'amy_agent_avatar_url';
+	const OPTION_ENABLED              = 'amy_agent_enabled';
+	const OPTION_SERVICE_URL          = 'amy_agent_service_url';
+	const OPTION_SHARED_SECRET        = 'amy_agent_shared_secret';
+	const OPTION_AI_PROVIDER          = 'amy_agent_ai_provider';
+	const OPTION_AI_API_KEY           = 'amy_agent_ai_api_key';
+	const OPTION_AI_MODEL             = 'amy_agent_ai_model';
+	const OPTION_AVATAR_URL           = 'amy_agent_avatar_url';
+	const OPTION_MARKETING_FROM_EMAIL = 'amy_agent_marketing_from_email';
+	const OPTION_MARKETING_FROM_NAME  = 'amy_agent_marketing_from_name';
+
+	/**
+	 * Default marketing From when Settings field is empty.
+	 */
+	const DEFAULT_MARKETING_FROM_EMAIL = 'hello@ogcnewfinity.com';
+
+	/**
+	 * Default marketing From display name.
+	 */
+	const DEFAULT_MARKETING_FROM_NAME = 'OGC NewFinity';
 
 	/**
 	 * Hook suffix returned by add_submenu_page() for Settings.
@@ -184,6 +196,26 @@ class Amy_Settings {
 			)
 		);
 
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_MARKETING_FROM_EMAIL,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_marketing_from_email' ),
+				'default'           => self::DEFAULT_MARKETING_FROM_EMAIL,
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_MARKETING_FROM_NAME,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_marketing_from_name' ),
+				'default'           => self::DEFAULT_MARKETING_FROM_NAME,
+			)
+		);
+
 		add_settings_section(
 			'amy_agent_section_general',
 			__( 'General', 'amy-agent' ),
@@ -244,6 +276,29 @@ class Amy_Settings {
 			array( $this, 'render_field_model' ),
 			self::PAGE_SLUG,
 			'amy_agent_section_ai'
+		);
+
+		add_settings_section(
+			'amy_agent_section_email_marketing',
+			__( 'Email Marketing', 'amy-agent' ),
+			array( $this, 'render_section_email_marketing' ),
+			self::PAGE_SLUG
+		);
+
+		add_settings_field(
+			self::OPTION_MARKETING_FROM_EMAIL,
+			__( 'Marketing From email', 'amy-agent' ),
+			array( $this, 'render_field_marketing_from_email' ),
+			self::PAGE_SLUG,
+			'amy_agent_section_email_marketing'
+		);
+
+		add_settings_field(
+			self::OPTION_MARKETING_FROM_NAME,
+			__( 'Marketing From name', 'amy-agent' ),
+			array( $this, 'render_field_marketing_from_name' ),
+			self::PAGE_SLUG,
+			'amy_agent_section_email_marketing'
 		);
 	}
 
@@ -340,6 +395,89 @@ class Amy_Settings {
 	public function sanitize_avatar_url( $value ) {
 		$url = esc_url_raw( trim( (string) $value ) );
 		return $url ? $url : '';
+	}
+
+	/**
+	 * Marketing From email — empty falls back to hello@ogcnewfinity.com.
+	 * Rejects personal Gmail / AgentMail / free webmail.
+	 *
+	 * @param mixed $value Submitted email.
+	 * @return string
+	 */
+	public function sanitize_marketing_from_email( $value ) {
+		$email = sanitize_email( trim( (string) $value ) );
+		if ( '' === $email || ! is_email( $email ) ) {
+			return self::DEFAULT_MARKETING_FROM_EMAIL;
+		}
+		$host    = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
+		$blocked = array(
+			'gmail.com',
+			'googlemail.com',
+			'agentmail.to',
+			'yahoo.com',
+			'outlook.com',
+			'hotmail.com',
+			'live.com',
+			'icloud.com',
+		);
+		if ( in_array( $host, $blocked, true ) ) {
+			add_settings_error(
+				'amy_agent_settings',
+				'amy_marketing_from_blocked',
+				__( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Kept hello@ogcnewfinity.com.', 'amy-agent' ),
+				'error'
+			);
+			return self::DEFAULT_MARKETING_FROM_EMAIL;
+		}
+		return strtolower( $email );
+	}
+
+	/**
+	 * @param mixed $value Display name.
+	 * @return string
+	 */
+	public function sanitize_marketing_from_name( $value ) {
+		$name = sanitize_text_field( trim( (string) $value ) );
+		$name = str_replace( array( '<', '>' ), '', $name );
+		return '' !== $name ? $name : self::DEFAULT_MARKETING_FROM_NAME;
+	}
+
+	/**
+	 * Resolved marketing From email (always a usable address).
+	 *
+	 * @return string
+	 */
+	public function get_marketing_from_email() {
+		$email = sanitize_email( trim( (string) get_option( self::OPTION_MARKETING_FROM_EMAIL, '' ) ) );
+		if ( '' === $email || ! is_email( $email ) ) {
+			return self::DEFAULT_MARKETING_FROM_EMAIL;
+		}
+		$host    = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
+		$blocked = array(
+			'gmail.com',
+			'googlemail.com',
+			'agentmail.to',
+			'yahoo.com',
+			'outlook.com',
+			'hotmail.com',
+			'live.com',
+			'icloud.com',
+		);
+		if ( in_array( $host, $blocked, true ) ) {
+			return self::DEFAULT_MARKETING_FROM_EMAIL;
+		}
+		return strtolower( $email );
+	}
+
+	/**
+	 * Resolved marketing From display name.
+	 *
+	 * @return string
+	 */
+	public function get_marketing_from_name() {
+		$name = sanitize_text_field( trim( (string) get_option( self::OPTION_MARKETING_FROM_NAME, '' ) ) );
+		$name = str_replace( array( '<', '>' ), '', $name );
+		return '' !== $name ? $name : self::DEFAULT_MARKETING_FROM_NAME;
 	}
 
 	/**
@@ -467,6 +605,38 @@ class Amy_Settings {
 	 */
 	public function render_section_ai() {
 		echo '<p>' . esc_html__( 'Choose which AI provider powers Amy. The key is stored in the WordPress database and sent to the Python service at request time — never hardcoded.', 'amy-agent' ) . '</p>';
+	}
+
+	/**
+	 * Section intro: Email Marketing From.
+	 */
+	public function render_section_email_marketing() {
+		echo '<p>' . esc_html__( 'Marketing follow-ups send via WordPress wp_mail (FluentSMTP on ogcnewfinity.com). From must be a verified domain mailbox — never personal Gmail or AgentMail. hello@ must be verified in FluentSMTP / Hostinger before live sends.', 'amy-agent' ) . '</p>';
+	}
+
+	/**
+	 * Marketing From email field.
+	 */
+	public function render_field_marketing_from_email() {
+		printf(
+			'<input type="email" class="regular-text" name="%1$s" value="%2$s" placeholder="%3$s" />',
+			esc_attr( self::OPTION_MARKETING_FROM_EMAIL ),
+			esc_attr( $this->get_marketing_from_email() ),
+			esc_attr( self::DEFAULT_MARKETING_FROM_EMAIL )
+		);
+		echo '<p class="description">' . esc_html__( 'Default: hello@ogcnewfinity.com. Must match a mailbox FluentSMTP is authorized to send as (SPF/DKIM on the domain).', 'amy-agent' ) . '</p>';
+	}
+
+	/**
+	 * Marketing From name field.
+	 */
+	public function render_field_marketing_from_name() {
+		printf(
+			'<input type="text" class="regular-text" name="%1$s" value="%2$s" placeholder="%3$s" />',
+			esc_attr( self::OPTION_MARKETING_FROM_NAME ),
+			esc_attr( $this->get_marketing_from_name() ),
+			esc_attr( self::DEFAULT_MARKETING_FROM_NAME )
+		);
 	}
 
 	/**

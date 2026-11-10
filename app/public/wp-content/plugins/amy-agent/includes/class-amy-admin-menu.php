@@ -461,13 +461,20 @@ class Amy_Admin_Menu {
 				true
 			);
 
+			$from_email = $this->settings->get_marketing_from_email();
+			$from_name  = $this->settings->get_marketing_from_name();
+
 			wp_localize_script(
 				'amy-agent-admin-email-marketing',
 				'amyAgentEmailMarketing',
 				array(
 					'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
 					'nonce'         => wp_create_nonce( Amy_Analytics_Ajax::NONCE_ACTION ),
+					'sendNonce'     => wp_create_nonce( Amy_Email_Marketing_Ajax::NONCE_ACTION ),
 					'analyticsUrl'  => admin_url( 'admin.php?page=' . self::ANALYTICS_PAGE_SLUG ),
+					'settingsUrl'   => admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG ),
+					'fromEmail'     => $from_email,
+					'fromName'      => $from_name,
 					'i18n'          => array(
 						'loadError'         => __( 'Could not load audience. Check the Amy Agent service connection.', 'amy-agent' ),
 						'empty'             => __( 'No visitor emails yet. Captures appear after Submit Idea or contact form completion.', 'amy-agent' ),
@@ -482,8 +489,12 @@ class Amy_Admin_Menu {
 						'selectRecipient'   => __( 'Select at least one recipient from the audience list.', 'amy-agent' ),
 						'needSubject'       => __( 'Add a subject before approving.', 'amy-agent' ),
 						'needBody'          => __( 'Add a message body before approving.', 'amy-agent' ),
-						'confirmApprove'    => __( 'Approve this draft for the selected audience? No email will go out until Hostinger Agentic Mail is connected. Personal Gmail and AgentMail are never used.', 'amy-agent' ),
-						'approvedNotice'    => __( 'Draft approved locally for the selected audience. Sending is not connected yet — Hostinger Agentic Mail comes next. Nothing was sent.', 'amy-agent' ),
+						'needApprove'       => __( 'Approve the draft first. Send stays disabled until you approve.', 'amy-agent' ),
+						'confirmApprove'    => __( 'Approve this draft for the selected audience? Nothing is sent yet — you must click Send afterward. Personal Gmail and AgentMail are never used.', 'amy-agent' ),
+						'approvedNotice'    => __( 'Draft approved. Click Send to deliver via wp_mail / FluentSMTP From the address shown above. Nothing was sent yet.', 'amy-agent' ),
+						'confirmSend'       => __( 'Send this approved draft to %1$d recipient(s) From %2$s via FluentSMTP (wp_mail)? This cannot be undone.', 'amy-agent' ),
+						'sending'           => __( 'Sending…', 'amy-agent' ),
+						'sendError'         => __( 'Send failed. Check FluentSMTP and that hello@ is verified.', 'amy-agent' ),
 						'cleared'           => __( 'Draft cleared.', 'amy-agent' ),
 						'leadOnly'          => __( 'Lead capture', 'amy-agent' ),
 						'audienceCount'     => __( '%d shown', 'amy-agent' ),
@@ -493,7 +504,7 @@ class Amy_Admin_Menu {
 						'unknownSignal'     => __( 'No signal', 'amy-agent' ),
 						'selectedCount'     => __( '%d selected', 'amy-agent' ),
 						'selectedNone'      => __( 'No emails selected', 'amy-agent' ),
-						'toMeta'            => __( '%d recipient(s) ready for draft — send later via Hostinger Agentic Mail.', 'amy-agent' ),
+						'toMeta'            => __( '%d recipient(s) selected — approve, then click Send. From %s.', 'amy-agent' ),
 						'seen24h'           => __( 'Last 24h', 'amy-agent' ),
 						'seen7d'            => __( '1–7 days', 'amy-agent' ),
 						'seen30d'           => __( '8–30 days', 'amy-agent' ),
@@ -502,6 +513,7 @@ class Amy_Admin_Menu {
 						'exportEmpty'       => __( 'Select at least one email to export.', 'amy-agent' ),
 						'exportDone'        => __( 'Selected emails exported as CSV.', 'amy-agent' ),
 						'selectionCleared'  => __( 'Selection cleared.', 'amy-agent' ),
+						'draftDirty'        => __( 'Draft changed after approval — approve again before sending.', 'amy-agent' ),
 					),
 				)
 			);
@@ -2166,21 +2178,45 @@ class Amy_Admin_Menu {
 	}
 
 	/**
-	 * Email Marketing — audience from Analytics visitor emails (draft / approve only).
+	 * Email Marketing — audience from Analytics; approve then explicit Send via wp_mail.
 	 */
 	public function render_email_marketing_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+		$from_email = $this->settings->get_marketing_from_email();
+		$from_name  = $this->settings->get_marketing_from_name();
 		?>
 		<div class="wrap amy-agent-email" id="amy-agent-email-marketing">
 			<header class="amy-agent-email__header">
 				<h1 class="amy-agent-email__title"><?php echo esc_html__( 'Email Marketing', 'amy-agent' ); ?></h1>
 				<p class="amy-agent-email__intro">
-					<?php echo esc_html__( 'Audience from Amy Analytics visitor emails. Draft and approve — nothing auto-sends.', 'amy-agent' ); ?>
+					<?php echo esc_html__( 'Audience from Amy Analytics visitor emails. Approve the draft, then click Send — nothing auto-sends.', 'amy-agent' ); ?>
 				</p>
 				<span class="amy-agent-email__underline" aria-hidden="true"></span>
 			</header>
+
+			<div class="amy-agent-email__from-banner" role="status">
+				<p class="amy-agent-email__from-label"><?php echo esc_html__( 'From', 'amy-agent' ); ?></p>
+				<p class="amy-agent-email__from-value" id="amy-agent-email-from-display">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: 1: display name, 2: email */
+							__( '%1$s <%2$s>', 'amy-agent' ),
+							$from_name,
+							$from_email
+						)
+					);
+					?>
+				</p>
+				<p class="amy-agent-email__from-note">
+					<?php echo esc_html__( 'Delivered via WordPress wp_mail → FluentSMTP. hello@ must be verified on the SMTP provider. Never personal Gmail or AgentMail.', 'amy-agent' ); ?>
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG ) ); ?>">
+						<?php echo esc_html__( 'Change in Settings', 'amy-agent' ); ?>
+					</a>
+				</p>
+			</div>
 
 			<div class="amy-agent-email__notice" role="note">
 				<p>
@@ -2368,9 +2404,13 @@ class Amy_Admin_Menu {
 						<?php echo esc_html__( 'Draft follow-up', 'amy-agent' ); ?>
 					</h2>
 					<p class="amy-agent-email__draft-hint">
-						<?php echo esc_html__( 'Select one or more audience emails. Approve stores a local draft only — no campaign is sent automatically. Hostinger Agentic Mail send comes later.', 'amy-agent' ); ?>
+						<?php echo esc_html__( 'Select audience → write draft → Approve → then click Send. Send is never automatic.', 'amy-agent' ); ?>
 					</p>
 
+					<label class="amy-agent-email__field">
+						<span><?php echo esc_html__( 'From', 'amy-agent' ); ?></span>
+						<input type="text" id="amy-agent-email-from" readonly value="<?php echo esc_attr( $from_name . ' <' . $from_email . '>' ); ?>" />
+					</label>
 					<label class="amy-agent-email__field">
 						<span id="amy-agent-email-to-label"><?php echo esc_html__( 'To (selected audience)', 'amy-agent' ); ?></span>
 						<textarea id="amy-agent-email-to" rows="4" readonly placeholder="<?php echo esc_attr__( 'Select audience rows', 'amy-agent' ); ?>"></textarea>
@@ -2389,10 +2429,16 @@ class Amy_Admin_Menu {
 						<button type="button" class="button" id="amy-agent-email-clear">
 							<?php echo esc_html__( 'Clear draft', 'amy-agent' ); ?>
 						</button>
-						<button type="button" class="button button-primary" id="amy-agent-email-approve">
-							<?php echo esc_html__( 'Approve draft (no send)', 'amy-agent' ); ?>
+						<button type="button" class="button" id="amy-agent-email-approve">
+							<?php echo esc_html__( 'Approve draft', 'amy-agent' ); ?>
+						</button>
+						<button type="button" class="button button-primary" id="amy-agent-email-send" disabled>
+							<?php echo esc_html__( 'Send now', 'amy-agent' ); ?>
 						</button>
 					</div>
+					<p class="amy-agent-email__send-hint" id="amy-agent-email-send-hint">
+						<?php echo esc_html__( 'Send stays disabled until you approve the current draft.', 'amy-agent' ); ?>
+					</p>
 				</section>
 			</div>
 		</div>

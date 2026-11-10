@@ -47,8 +47,12 @@ her tools are simple executors.
 - A **webhook** is configured for the `message.received` event, so the moment
   a contacted lead replies, the Python service is notified in real time (no
   polling) and can surface that reply back through Amy / the Dashboard Chat.
-- **Mailbox used:** `contact@ogcnewfinity.com` (existing, already active in
-  hPanel).
+- **Mailbox used (plan target):** `contact@ogcnewfinity.com` (existing in
+  hPanel). **Interim (plugin ≥0.2.37):** admin Email Marketing Send uses
+  WordPress `wp_mail` → **FluentSMTP** From **`hello@ogcnewfinity.com`**
+  (Settings-configurable) until Agentic Mail REST + webhook are wired. See
+  `09-email-marketing-fluentsmtp.md`. Same hard rules: no Gmail / AgentMail;
+  human Approve then explicit Send click.
 
 ### 3.2 Plan / limits
 - **Development phase (now): free plan.** Current limits (~100 sends/day,
