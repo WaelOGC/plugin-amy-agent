@@ -151,7 +151,13 @@
 .amy-agent-analytics__visitor {
 	font-family: var(--amy-font-heading);
 	font-weight: 700;
+	white-space: nowrap;
 }
+
+.amy-agent-analytics__contact a { color: inherit; text-decoration: none; }
+.amy-agent-analytics__contact a:hover { text-decoration: underline; }
+.amy-agent-analytics__contact { overflow-wrap: anywhere; }
+.amy-agent-analytics__muted { opacity: 0.45; }
 
 .amy-agent-analytics__empty {
 	margin: 0;

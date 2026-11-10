@@ -30,6 +30,7 @@ class LeadListItem(BaseModel):
     last_seen_at: float
     lead_status: LeadStatus
     lead_email: str | None = None
+    lead_whatsapp: str | None = None
     signal: str
 
 

@@ -1571,7 +1571,7 @@
 						return null;
 					}
 					return notifyWordPress(result.data.brief).then(function () {
-						trackAmy('submit_idea_completed', { email: email });
+						trackAmy('submit_idea_completed', { email: email, whatsapp: whatsapp || '' });
 						showConfirmation();
 					});
 				})

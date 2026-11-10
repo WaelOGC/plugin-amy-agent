@@ -59,6 +59,18 @@
 			return i18n.statusCold || 'Cold';
 		}
 
+		function emailCell(email) {
+			if (!email) { return '<td class="amy-agent-analytics__muted">—</td>'; }
+			return '<td class="amy-agent-analytics__contact"><a href="mailto:' +
+				escapeHtml(email) + '">' + escapeHtml(email) + '</a></td>';
+		}
+		function phoneCell(phone) {
+			if (!phone) { return '<td class="amy-agent-analytics__muted">—</td>'; }
+			var tel = String(phone).replace(/[^\d+]/g, '');
+			return '<td class="amy-agent-analytics__contact"><a href="tel:' +
+				escapeHtml(tel) + '">' + escapeHtml(phone) + '</a></td>';
+		}
+
 		function render(leads) {
 			$error.attr('hidden', 'hidden').text('');
 			$tbody.empty();
@@ -72,14 +84,13 @@
 			leads.forEach(function (lead) {
 				var status = lead.lead_status || 'cold';
 				var visitor = lead.visitor_label || ('Visitor ' + (lead.session_id_short || ''));
-				if (lead.lead_email) {
-					visitor += ' · ' + lead.lead_email;
-				}
 				var tr = document.createElement('tr');
 				tr.innerHTML =
 					'<td class="amy-agent-analytics__visitor">' +
 					escapeHtml(visitor) +
 					'</td>' +
+					emailCell(lead.lead_email) +
+					phoneCell(lead.lead_whatsapp) +
 					'<td>' +
 					escapeHtml(formatLocation(lead)) +
 					'</td>' +

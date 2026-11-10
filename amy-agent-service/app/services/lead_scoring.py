@@ -131,3 +131,21 @@ def extract_captured_email(event_type: str, event_data: dict[str, Any] | None) -
     if "@" not in email or "." not in email.split("@")[-1]:
         return None
     return email[:254]
+
+
+def extract_captured_whatsapp(event_type: str, event_data: dict[str, Any] | None) -> str | None:
+    """Phone is stored only from the same capture events as the email."""
+    if event_type not in analytics_db.EMAIL_CAPTURE_EVENT_TYPES:
+        return None
+    if not isinstance(event_data, dict):
+        return None
+    raw = event_data.get("whatsapp")
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip()
+    digits = sum(ch.isdigit() for ch in value)
+    if digits < 6 or digits > 20:
+        return None
+    if any(ch not in "+0123456789 -()." for ch in value):
+        return None
+    return value[:32]

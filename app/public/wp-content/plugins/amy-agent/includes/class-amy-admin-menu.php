@@ -1926,6 +1926,8 @@ class Amy_Admin_Menu {
 					<thead>
 						<tr>
 							<th><?php echo esc_html__( 'Visitor', 'amy-agent' ); ?></th>
+							<th><?php echo esc_html__( 'Email', 'amy-agent' ); ?></th>
+							<th><?php echo esc_html__( 'Phone', 'amy-agent' ); ?></th>
 							<th><?php echo esc_html__( 'Location', 'amy-agent' ); ?></th>
 							<th><?php echo esc_html__( 'Last seen', 'amy-agent' ); ?></th>
 							<th><?php echo esc_html__( 'Signal', 'amy-agent' ); ?></th>
