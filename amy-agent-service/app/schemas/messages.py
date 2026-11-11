@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 ProviderSlug = Literal["gemini", "openai", "anthropic", "deepseek"]
 ChatMode = Literal["general", "submit_idea", "support", "admin"]
-MessageRole = Literal["user", "assistant", "system"]
+MessageRole = Literal["user", "assistant", "system", "tool"]
 
 
 class AiConfig(BaseModel):
@@ -39,10 +39,23 @@ class AttachmentRef(BaseModel):
     content_type: str | None = None
 
 
+class ToolCallPart(BaseModel):
+    """Assistant-requested tool call (provider-agnostic)."""
+
+    id: str
+    name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+
+
 class ChatMessage(BaseModel):
     role: MessageRole
-    content: str
+    content: str = ""
     attachments: list[AttachmentRef] = Field(default_factory=list)
+    # Assistant turn that requested tools (P3 tool loop).
+    tool_calls: list[ToolCallPart] = Field(default_factory=list)
+    # Tool-result turn (role=tool).
+    tool_call_id: str | None = None
+    name: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -78,6 +91,7 @@ class ChatReply(BaseModel):
 class ChatMeta(BaseModel):
     provider: ProviderSlug
     model: str
+    tools_used: list[str] = Field(default_factory=list)
 
 
 class ChatSuccessResponse(BaseModel):

@@ -1,11 +1,14 @@
-"""Google Gemini adapter."""
+"""Google Gemini adapter (generateContent + function calling)."""
 
-from typing import Sequence
+from __future__ import annotations
+
+from typing import Any, Sequence
 
 import httpx
 
 from app.providers.base import BaseProvider
 from app.providers.errors import ProviderError
+from app.providers.tool_types import CompletionTurn, ToolCallRequest, ToolSpec
 from app.schemas.messages import ChatMessage
 
 _TIMEOUT = httpx.Timeout(45.0, connect=10.0)
@@ -19,9 +22,71 @@ class GeminiImageResult:
         self.mime_type = mime_type
 
 
+def _tools_payload(tools: Sequence[ToolSpec] | None) -> dict[str, Any] | None:
+    if not tools:
+        return None
+    return {
+        "functionDeclarations": [
+            {
+                "name": t.name,
+                "description": t.description,
+                "parameters": t.parameters,
+            }
+            for t in tools
+        ]
+    }
+
+
+def _gemini_contents(
+    messages: Sequence[ChatMessage],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    system_parts: list[str] = []
+    contents: list[dict[str, Any]] = []
+
+    for msg in messages:
+        if msg.role == "system":
+            system_parts.append(msg.content)
+            continue
+        if msg.role == "tool":
+            contents.append(
+                {
+                    "role": "user",
+                    "parts": [
+                        {
+                            "functionResponse": {
+                                "name": msg.name or "",
+                                "response": {"result": msg.content or ""},
+                            }
+                        }
+                    ],
+                }
+            )
+            continue
+        if msg.role == "assistant" and msg.tool_calls:
+            parts: list[dict[str, Any]] = []
+            if (msg.content or "").strip():
+                parts.append({"text": msg.content})
+            for tc in msg.tool_calls:
+                parts.append(
+                    {
+                        "functionCall": {
+                            "name": tc.name,
+                            "args": tc.arguments or {},
+                        }
+                    }
+                )
+            contents.append({"role": "model", "parts": parts})
+            continue
+        role = "user" if msg.role == "user" else "model"
+        contents.append({"role": role, "parts": [{"text": msg.content}]})
+
+    return system_parts, contents
+
+
 class GeminiProvider(BaseProvider):
     provider_id = "gemini"
     default_model = "gemini-3.6-flash"
+    supports_tools = True
 
     async def complete(
         self,
@@ -29,6 +94,19 @@ class GeminiProvider(BaseProvider):
         api_key: str,
         model: str | None = None,
     ) -> str:
+        turn = await self.complete_turn(messages, api_key=api_key, model=model, tools=None)
+        text = (turn.text or "").strip()
+        if not text:
+            raise ProviderError("Provider returned an empty reply.", code="empty_reply")
+        return text
+
+    async def complete_turn(
+        self,
+        messages: Sequence[ChatMessage],
+        api_key: str,
+        model: str | None = None,
+        tools: Sequence[ToolSpec] | None = None,
+    ) -> CompletionTurn:
         if not (api_key or "").strip():
             raise ProviderError("Missing API key.", code="auth_error")
 
@@ -42,23 +120,18 @@ class GeminiProvider(BaseProvider):
             f"{resolved}:generateContent"
         )
 
-        contents: list[dict] = []
-        system_parts: list[str] = []
-        for msg in messages:
-            if msg.role == "system":
-                system_parts.append(msg.content)
-                continue
-            role = "user" if msg.role == "user" else "model"
-            contents.append({"role": role, "parts": [{"text": msg.content}]})
-
+        system_parts, contents = _gemini_contents(messages)
         if not contents:
             raise ProviderError("No messages to send.", code="invalid_request")
 
-        payload: dict = {"contents": contents}
+        payload: dict[str, Any] = {"contents": contents}
         if system_parts:
             payload["systemInstruction"] = {
                 "parts": [{"text": "\n\n".join(system_parts)}]
             }
+        tools_payload = _tools_payload(tools)
+        if tools_payload:
+            payload["tools"] = [tools_payload]
 
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
@@ -72,9 +145,9 @@ class GeminiProvider(BaseProvider):
         except httpx.HTTPError as exc:
             raise ProviderError("Could not reach provider.", code="network_error") from exc
 
-        return self._parse_response(response)
+        return self._parse_turn(response)
 
-    def _parse_response(self, response: httpx.Response) -> str:
+    def _parse_turn(self, response: httpx.Response) -> CompletionTurn:
         if response.status_code >= 400:
             print(
                 f"[amy-gemini] HTTP {response.status_code}: {response.text}",
@@ -93,11 +166,31 @@ class GeminiProvider(BaseProvider):
             if not candidates:
                 raise ProviderError("Provider returned an empty reply.", code="empty_reply")
             parts = (candidates[0].get("content") or {}).get("parts") or []
-            texts = [p.get("text", "") for p in parts if isinstance(p, dict)]
-            text = "".join(texts).strip()
-            if not text:
+            texts: list[str] = []
+            tool_calls: list[ToolCallRequest] = []
+            for idx, part in enumerate(parts):
+                if not isinstance(part, dict):
+                    continue
+                if "text" in part and part.get("text"):
+                    texts.append(str(part.get("text") or ""))
+                fn = part.get("functionCall")
+                if isinstance(fn, dict):
+                    name = (fn.get("name") or "").strip()
+                    if not name:
+                        continue
+                    raw_args = fn.get("args") or fn.get("arguments") or {}
+                    args = raw_args if isinstance(raw_args, dict) else {}
+                    tool_calls.append(
+                        ToolCallRequest(
+                            id=f"gemini_call_{idx}",
+                            name=name,
+                            arguments=args,
+                        )
+                    )
+            text = "".join(texts).strip() or None
+            if not tool_calls and not text:
                 raise ProviderError("Provider returned an empty reply.", code="empty_reply")
-            return text
+            return CompletionTurn(text=text, tool_calls=tool_calls)
         except ProviderError:
             raise
         except Exception as exc:

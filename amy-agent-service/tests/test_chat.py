@@ -181,6 +181,7 @@ _ERROR_TASK_SNAP = {
 class _FakeProvider(BaseProvider):
     provider_id = "openai"
     default_model = "gpt-4o-mini"
+    supports_tools = False
 
     def __init__(self, reply: str = "Hello from Amy") -> None:
         self._reply = reply
@@ -199,6 +200,7 @@ class _FakeProvider(BaseProvider):
 class _FailingProvider(BaseProvider):
     provider_id = "openai"
     default_model = "gpt-4o-mini"
+    supports_tools = False
 
     async def complete(
         self,
@@ -238,6 +240,7 @@ def test_chat_success_shape(client: TestClient) -> None:
     assert data["actions"] == []
     assert data["meta"]["provider"] == "openai"
     assert data["meta"]["model"] == "gpt-4o-mini"
+    assert data["meta"]["tools_used"] == []
 
 
 def test_chat_with_conversation_persists_on_success(
@@ -441,59 +444,94 @@ def test_chat_rejects_empty_key_cleanly(client: TestClient) -> None:
 
 
 def test_general_mode_system_prompt_unchanged() -> None:
-    messages = _messages_with_system(
+    messages, tools_used = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="general",
     )
+    assert tools_used == []
     assert messages[0].role == "system"
     assert messages[0].content == AMY_SYSTEM_PROMPT
     assert messages[0].content != AMY_ADMIN_SYSTEM_PROMPT
 
 
 def test_support_mode_uses_public_prompt_not_admin() -> None:
-    messages = _messages_with_system(
+    messages, tools_used = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="support",
         wp_user_name="Should Be Ignored",
         wp_user_email="ignore@example.com",
     )
+    assert tools_used == []
     assert messages[0].content == AMY_SYSTEM_PROMPT
     assert len([m for m in messages if m.role == "system"]) == 1
 
 
-def test_admin_mode_uses_admin_prompt() -> None:
-    with (
-        patch(
-            "app.routes.chat.analytics_summary_for_chat",
-            return_value=_EMPTY_ANALYTICS_SNAP,
-        ),
-        patch(
-            "app.routes.chat.seo_review_summary_for_chat",
-            return_value=_EMPTY_SEO_SNAP,
-        ),
-        patch(
-            "app.routes.chat.task_service_summary_for_chat",
-            return_value=_EMPTY_TASK_SNAP,
-        ),
-    ):
-        messages = _messages_with_system(
-            [ChatMessage(role="user", content="hello")],
-            mode="admin",
-        )
+def test_admin_mode_uses_admin_prompt_without_always_on_snapshots() -> None:
+    messages, tools_used = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="admin",
+    )
     assert messages[0].role == "system"
     assert messages[0].content == AMY_ADMIN_SYSTEM_PROMPT
     assert messages[0].content != AMY_SYSTEM_PROMPT
     system_msgs = [m for m in messages if m.role == "system"]
-    assert len(system_msgs) == 4
-    assert "Live Amy Analytics snapshot" in system_msgs[1].content
-    assert "Live SEO Tasks snapshot" in system_msgs[2].content
-    assert "Live Task Service snapshot" in system_msgs[3].content
+    assert len(system_msgs) == 1
+    assert tools_used == []
     assert "you have no live access" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
     assert "connections are not built yet" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
     assert "seo tasks, task service board stats, and live web search are not wired" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
+    assert "analytics_summary" in AMY_ADMIN_SYSTEM_PROMPT
+    assert "seo_summary" in AMY_ADMIN_SYSTEM_PROMPT
+    assert "task_stats" in AMY_ADMIN_SYSTEM_PROMPT
 
 
 def test_admin_mode_appends_identity_when_name_or_email_present() -> None:
+    messages, tools_used = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="admin",
+        wp_user_name="Wael",
+        wp_user_email="wael@example.com",
+    )
+    system_msgs = [m for m in messages if m.role == "system"]
+    assert len(system_msgs) == 2
+    assert tools_used == []
+    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    assert "Wael" in system_msgs[1].content
+    assert "wael@example.com" in system_msgs[1].content
+
+
+def test_admin_mode_intent_auto_invokes_multi_tools() -> None:
+    with (
+        patch(
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
+            return_value=_LIVE_ANALYTICS_SNAP,
+        ),
+        patch(
+            "app.services.admin_chat_tools.seo_review_summary_for_chat",
+            return_value=_LIVE_SEO_SNAP,
+        ),
+        patch(
+            "app.services.admin_chat_tools.task_service_summary_for_chat",
+            return_value=_LIVE_TASK_SNAP,
+        ),
+    ):
+        messages, tools_used = _messages_with_system(
+            [
+                ChatMessage(
+                    role="user",
+                    content="How many visitors and any urgent tasks? Also SEO open count?",
+                )
+            ],
+            mode="admin",
+        )
+    assert tools_used == ["analytics_summary", "seo_summary", "task_stats"]
+    joined = "\n".join(m.content for m in messages if m.role == "system")
+    assert "total_sessions: 5" in joined
+    assert "urgent_tasks: 2" in joined
+    assert "open (pending_approval): 2" in joined
+
+
+def test_admin_mode_can_force_legacy_snapshots() -> None:
     with (
         patch(
             "app.routes.chat.analytics_summary_for_chat",
@@ -508,83 +546,32 @@ def test_admin_mode_appends_identity_when_name_or_email_present() -> None:
             return_value=_EMPTY_TASK_SNAP,
         ),
     ):
-        messages = _messages_with_system(
+        messages, tools_used = _messages_with_system(
             [ChatMessage(role="user", content="hello")],
             mode="admin",
-            wp_user_name="Wael",
-            wp_user_email="wael@example.com",
+            include_analytics_snapshot=True,
+            include_seo_task_snapshots=True,
+            auto_invoke_tools=False,
         )
     system_msgs = [m for m in messages if m.role == "system"]
-    assert len(system_msgs) == 5
-    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    assert tools_used == []
+    assert len(system_msgs) == 4
     assert "Live Amy Analytics snapshot" in system_msgs[1].content
     assert "Live SEO Tasks snapshot" in system_msgs[2].content
     assert "Live Task Service snapshot" in system_msgs[3].content
-    assert "Wael" in system_msgs[4].content
-    assert "wael@example.com" in system_msgs[4].content
 
 
-def test_admin_mode_without_identity_still_has_analytics_snapshot() -> None:
-    with (
-        patch(
-            "app.routes.chat.analytics_summary_for_chat",
-            return_value=_EMPTY_ANALYTICS_SNAP,
-        ),
-        patch(
-            "app.routes.chat.seo_review_summary_for_chat",
-            return_value=_EMPTY_SEO_SNAP,
-        ),
-        patch(
-            "app.routes.chat.task_service_summary_for_chat",
-            return_value=_EMPTY_TASK_SNAP,
-        ),
-    ):
-        messages = _messages_with_system(
-            [ChatMessage(role="user", content="hello")],
-            mode="admin",
-            wp_user_name=None,
-            wp_user_email=None,
-        )
-    system_msgs = [m for m in messages if m.role == "system"]
-    assert len(system_msgs) == 4
-    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
-    assert "EMPTY" in system_msgs[1].content
-    assert "EMPTY" in system_msgs[2].content
-    assert "EMPTY" in system_msgs[3].content
-
-
-def test_admin_mode_can_skip_analytics_snapshot() -> None:
-    with (
-        patch(
-            "app.routes.chat.seo_review_summary_for_chat",
-            return_value=_EMPTY_SEO_SNAP,
-        ),
-        patch(
-            "app.routes.chat.task_service_summary_for_chat",
-            return_value=_EMPTY_TASK_SNAP,
-        ),
-    ):
-        messages = _messages_with_system(
-            [ChatMessage(role="user", content="hello")],
-            mode="admin",
-            include_analytics_snapshot=False,
-        )
-    system_msgs = [m for m in messages if m.role == "system"]
-    assert len(system_msgs) == 3
-    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
-    assert "Live SEO Tasks snapshot" in system_msgs[1].content
-    assert "Live Task Service snapshot" in system_msgs[2].content
-
-
-def test_admin_mode_can_skip_seo_task_snapshots() -> None:
+def test_admin_mode_can_skip_forced_seo_task_snapshots() -> None:
     with patch(
         "app.routes.chat.analytics_summary_for_chat",
         return_value=_EMPTY_ANALYTICS_SNAP,
     ):
-        messages = _messages_with_system(
+        messages, _tools = _messages_with_system(
             [ChatMessage(role="user", content="hello")],
             mode="admin",
+            include_analytics_snapshot=True,
             include_seo_task_snapshots=False,
+            auto_invoke_tools=False,
         )
     system_msgs = [m for m in messages if m.role == "system"]
     assert len(system_msgs) == 2
@@ -600,18 +587,49 @@ def test_chat_admin_mode_sends_admin_prompt_to_provider(client: TestClient) -> N
             captured.extend(messages)
             return await super().complete(messages, api_key, model)
 
+    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                mode="admin",
+                wp_user_name="Wael",
+                wp_user_email="wael@example.com",
+                messages=[{"role": "user", "content": "hello"}],
+            ),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["meta"]["tools_used"] == []
+    system_msgs = [m for m in captured if m.role == "system"]
+    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    assert any("Wael" in m.content for m in system_msgs)
+    assert system_msgs[0].content != AMY_SYSTEM_PROMPT
+    assert "you have no live access" not in system_msgs[0].content.lower()
+    assert "connections are not built yet" not in system_msgs[0].content.lower()
+    assert "analytics_summary" in system_msgs[0].content
+
+
+def test_chat_admin_mode_intent_injects_live_tool_context(client: TestClient) -> None:
+    captured: list = []
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
     with (
         patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
         patch(
-            "app.routes.chat.analytics_summary_for_chat",
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
             return_value=_LIVE_ANALYTICS_SNAP,
         ),
         patch(
-            "app.routes.chat.seo_review_summary_for_chat",
+            "app.services.admin_chat_tools.seo_review_summary_for_chat",
             return_value=_LIVE_SEO_SNAP,
         ),
         patch(
-            "app.routes.chat.task_service_summary_for_chat",
+            "app.services.admin_chat_tools.task_service_summary_for_chat",
             return_value=_LIVE_TASK_SNAP,
         ),
     ):
@@ -620,23 +638,24 @@ def test_chat_admin_mode_sends_admin_prompt_to_provider(client: TestClient) -> N
             headers=HEADERS,
             json=_chat_body(
                 mode="admin",
-                wp_user_name="Wael",
-                wp_user_email="wael@example.com",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "How many visitors and any urgent tasks? SEO open?",
+                    }
+                ],
             ),
         )
 
     assert response.status_code == 200
-    system_msgs = [m for m in captured if m.role == "system"]
-    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
-    assert "total_sessions: 5" in system_msgs[1].content
-    assert "hot: 2" in system_msgs[1].content
-    assert "with_email: 3" in system_msgs[1].content
-    assert "open (pending_approval): 2" in system_msgs[2].content
-    assert "urgent_tasks: 2" in system_msgs[3].content
-    assert "Wael" in system_msgs[4].content
-    assert system_msgs[0].content != AMY_SYSTEM_PROMPT
-    assert "you have no live access" not in system_msgs[0].content.lower()
-    assert "connections are not built yet" not in system_msgs[0].content.lower()
+    data = response.json()
+    assert "analytics_summary" in data["meta"]["tools_used"]
+    assert "task_stats" in data["meta"]["tools_used"]
+    assert "seo_summary" in data["meta"]["tools_used"]
+    joined = "\n".join(m.content for m in captured if m.role == "system")
+    assert "total_sessions: 5" in joined
+    assert "urgent_tasks: 2" in joined
+    assert "open (pending_approval): 2" in joined
 
 
 def test_chat_admin_mode_empty_analytics_honest_fallback(client: TestClient) -> None:
@@ -650,22 +669,30 @@ def test_chat_admin_mode_empty_analytics_honest_fallback(client: TestClient) -> 
     with (
         patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
         patch(
-            "app.routes.chat.analytics_summary_for_chat",
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
             return_value=_EMPTY_ANALYTICS_SNAP,
         ),
         patch(
-            "app.routes.chat.seo_review_summary_for_chat",
+            "app.services.admin_chat_tools.seo_review_summary_for_chat",
             return_value=_EMPTY_SEO_SNAP,
         ),
         patch(
-            "app.routes.chat.task_service_summary_for_chat",
+            "app.services.admin_chat_tools.task_service_summary_for_chat",
             return_value=_EMPTY_TASK_SNAP,
         ),
     ):
         response = client.post(
             "/v1/chat",
             headers=HEADERS,
-            json=_chat_body(mode="admin"),
+            json=_chat_body(
+                mode="admin",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "How many visitors, SEO open count, any urgent tasks?",
+                    }
+                ],
+            ),
         )
 
     assert response.status_code == 200
@@ -691,22 +718,30 @@ def test_chat_admin_mode_analytics_error_honest_fallback(client: TestClient) -> 
     with (
         patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
         patch(
-            "app.routes.chat.analytics_summary_for_chat",
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
             return_value=_ERROR_ANALYTICS_SNAP,
         ),
         patch(
-            "app.routes.chat.seo_review_summary_for_chat",
+            "app.services.admin_chat_tools.seo_review_summary_for_chat",
             return_value=_ERROR_SEO_SNAP,
         ),
         patch(
-            "app.routes.chat.task_service_summary_for_chat",
+            "app.services.admin_chat_tools.task_service_summary_for_chat",
             return_value=_ERROR_TASK_SNAP,
         ),
     ):
         response = client.post(
             "/v1/chat",
             headers=HEADERS,
-            json=_chat_body(mode="admin"),
+            json=_chat_body(
+                mode="admin",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": "visitor traffic, SEO issues, urgent tasks?",
+                    }
+                ],
+            ),
         )
 
     assert response.status_code == 200
@@ -731,15 +766,15 @@ def test_chat_general_mode_sends_public_prompt_to_provider(client: TestClient) -
     with (
         patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
         patch(
-            "app.routes.chat.analytics_summary_for_chat",
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
             side_effect=AssertionError("general mode must not fetch analytics"),
         ),
         patch(
-            "app.routes.chat.seo_review_summary_for_chat",
+            "app.services.admin_chat_tools.seo_review_summary_for_chat",
             side_effect=AssertionError("general mode must not fetch SEO"),
         ),
         patch(
-            "app.routes.chat.task_service_summary_for_chat",
+            "app.services.admin_chat_tools.task_service_summary_for_chat",
             side_effect=AssertionError("general mode must not fetch tasks"),
         ),
     ):
@@ -790,8 +825,12 @@ def test_format_seo_and_task_chat_context_live_and_fallbacks() -> None:
     assert "UNAVAILABLE" in err_tasks
 
 
-def test_admin_prompt_mentions_richer_analytics_fields() -> None:
+def test_admin_prompt_mentions_tools_and_richer_analytics_fields() -> None:
     lower = AMY_ADMIN_SYSTEM_PROMPT.lower()
+    assert "analytics_summary" in lower
+    assert "analytics_leads_query" in lower
+    assert "seo_summary" in lower
+    assert "task_stats" in lower
     assert "with_email" in lower
     assert "last-seen" in lower or "last_seen" in lower
     assert "submit idea" in lower
@@ -800,5 +839,6 @@ def test_admin_prompt_mentions_richer_analytics_fields() -> None:
     assert "urgent" in lower
     assert "pending_approval" in lower or "open" in lower
     assert "report" in lower
+    assert "orchestrator" in lower or "allowlisted" in lower
     assert "you have no live access" not in lower
     assert "seo tasks, task service board stats, and live web search are not wired" not in lower
