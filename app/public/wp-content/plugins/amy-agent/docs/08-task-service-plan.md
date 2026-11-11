@@ -13,7 +13,7 @@ notifications for creators, urgent check-ins + simplified reassignment,
 extension requests (auto-cap for normal / always-approve for urgent), dashboard
 notification bell on Task Service + My Profile, 5-minute background scheduler.
 
-**P0 (plugin 0.2.40 / service 0.2.5):** create/edit modal primary choice
+**P0 (plugin 0.2.41 / service 0.2.5):** create/edit modal primary choice
 **Amy does this** vs **Someone does this** (human picker) wired to
 `assignee_type`; boolean `amy_capable` stored and returned by API; light
 mode + Amy-capable badges on board/list. No outbound channels or Amy

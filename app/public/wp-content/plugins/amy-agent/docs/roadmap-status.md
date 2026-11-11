@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.40 / amy-agent-service v0.2.5 — Task Service P0).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.41 / amy-agent-service v0.2.5 — Task Service P0).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -22,7 +22,9 @@
 > Admin Roles & Social remains an honest coming-soon stub (not started).
 > **Settings (v0.2.39):** dark Amy theme + General / Connection tabs, readiness
 > banner, health check button, marketing From UI validation.
-> **Task Service P0 (v0.2.40 / service 0.2.5):** Amy vs Someone create/edit mode
+> **Telegram Admin Bot (v0.2.40):** Settings → Telegram tab; WP webhook +
+> whitelist; shared admin conversations with Dashboard Chat.
+> **Task Service P0 (v0.2.41 / service 0.2.5):** Amy vs Someone create/edit mode
 > + `amy_capable` + board/list badges. No outbound / Amy execution yet (P1–P4).
 
 ---
@@ -93,7 +95,7 @@
 - WP: Task Service + My Profile notification bell (shared JS/CSS), acknowledge on
   assignee open, Request Extension in edit modal, AJAX proxies for notifications /
   extensions / ack; dashboard user sync for reassignment pool
-- **P0 (plugin 0.2.40 / service 0.2.5):** create/edit **Amy does this** vs
+- **P0 (plugin 0.2.41 / service 0.2.5):** create/edit **Amy does this** vs
   **Someone does this** (human picker) → `assignee_type`; boolean `amy_capable`
   on create/update/list/get; light mode + Amy-capable badges on board/list.
   Amy assigned = honest queue only (no fake complete / no execution yet).
@@ -209,11 +211,10 @@
 
 Given the agreed priority order and what's already live:
 
-- **Priority #3 — Dashboard Chat** (default next): WP admin chat + Telegram Admin
-  Bot → Amy the Leader, multi-conversation memory on Python side, `mode: "admin"`.
-  Spec: `docs/03-dashboard-chat-plan.md`. Still open before a Cursor prompt:
-  BotFather setup + admin User ID whitelist storage, conversation schema,
-  website→Telegram link-code expiry. No working `/` specialists in this phase.
+- **Priority #3 — Dashboard Chat**: WP admin chat is live; **Telegram Admin Bot**
+  shipped in plugin **0.2.40** (see `docs/03-dashboard-chat-plan.md` §7).
+  Still open: Support Bot, News Channel, website→Telegram link-code expiry.
+  No working `/` specialists in this phase.
 - **Theme-side Analytics Task 2** (does not block the plugin/service pipeline):
   Clarity script tag + Contact form `window.amyTrack(...)` hooks so
   `contact_form_*` events actually fire. Cookie-policy copy update
