@@ -436,15 +436,18 @@ async def run_admin_tool_loop(
                 raise ValueError("empty_reply")
             return text, tools_used
 
-        working.append(_assistant_tool_call_message(turn))
-        for raw in turn.tool_calls:
-            call = _normalize_tool_call(raw)
-            if call.name not in ADMIN_TOOL_NAMES:
-                result = execute_admin_tool(call.name, call.arguments)
-            else:
-                result = execute_admin_tool(call.name, call.arguments)
-                if call.name not in tools_used:
-                    tools_used.append(call.name)
+        # Normalize IDs before recording the assistant tool_calls message so
+        # tool_result tool_call_id values always match (OpenAI/Anthropic require it).
+        normalized = [_normalize_tool_call(raw) for raw in turn.tool_calls]
+        working.append(
+            _assistant_tool_call_message(
+                CompletionTurn(text=turn.text, tool_calls=normalized)
+            )
+        )
+        for call in normalized:
+            result = execute_admin_tool(call.name, call.arguments)
+            if call.name in ADMIN_TOOL_NAMES and call.name not in tools_used:
+                tools_used.append(call.name)
             working.append(tool_result_message(call, result))
 
     # Exhausted rounds — ask for a final text-only answer without tools.

@@ -203,3 +203,66 @@ def test_run_admin_tool_loop_executes_model_tool_calls() -> None:
     text, used = asyncio.run(_run())
     assert text == "3 visitors, 1 urgent task."
     assert used == ["analytics_summary", "task_stats"]
+
+
+def test_run_admin_tool_loop_normalizes_empty_tool_call_ids() -> None:
+    """Assistant tool_calls and tool results must share the same non-empty id."""
+
+    class _EmptyIdProvider(BaseProvider):
+        provider_id = "openai"
+        default_model = "gpt-4o-mini"
+        supports_tools = True
+
+        def __init__(self) -> None:
+            self.calls = 0
+            self.seen_ids: list[tuple[str, str]] = []
+
+        async def complete(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+        ) -> str:
+            return "fallback"
+
+        async def complete_turn(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+            tools: Sequence[ToolSpec] | None = None,
+        ) -> CompletionTurn:
+            self.calls += 1
+            if self.calls == 1:
+                return CompletionTurn(
+                    text=None,
+                    tool_calls=[
+                        ToolCallRequest(id="", name="seo_summary", arguments={}),
+                    ],
+                )
+            assistant = next(m for m in messages if m.role == "assistant" and m.tool_calls)
+            tool_msg = next(m for m in messages if m.role == "tool")
+            self.seen_ids.append((assistant.tool_calls[0].id, tool_msg.tool_call_id or ""))
+            return CompletionTurn(text="1 open SEO check.")
+
+    async def _run() -> tuple[str, list[str], list[tuple[str, str]]]:
+        provider = _EmptyIdProvider()
+        with patch(
+            "app.services.admin_chat_tools.seo_review_summary_for_chat",
+            return_value=_LIVE_SEO,
+        ):
+            text, used = await run_admin_tool_loop(
+                provider,
+                [ChatMessage(role="user", content="SEO open?")],
+                api_key="sk-test",
+                model=None,
+            )
+        return text, used, provider.seen_ids
+
+    text, used, seen = asyncio.run(_run())
+    assert text == "1 open SEO check."
+    assert used == ["seo_summary"]
+    assert len(seen) == 1
+    assistant_id, tool_id = seen[0]
+    assert assistant_id
+    assert assistant_id == tool_id
