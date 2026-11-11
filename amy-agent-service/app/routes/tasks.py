@@ -92,6 +92,7 @@ async def create_task(body: TaskCreateRequest) -> TaskResponse | JSONResponse:
             priority=body.priority,
             status=body.status,
             due_date=body.due_date,
+            amy_capable=body.amy_capable,
         )
     except ValueError as exc:
         return _error("invalid_task", str(exc), status.HTTP_400_BAD_REQUEST)

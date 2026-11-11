@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.39
+Stable tag: 0.2.40
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,11 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 5. For Email Marketing: set Marketing From (default hello@ogcnewfinity.com) and verify that address in FluentSMTP / Hostinger DNS (SPF/DKIM).
 
 == Changelog ==
+
+= 0.2.40 =
+* Task Service P0: create/edit modal uses clear **Amy does this** vs **Someone does this** (human picker) wired to `assignee_type`.
+* Task Service: `amy_capable` boolean on tasks (create/update/list/get); light Amy/Human + Amy-capable badges on board/list. No Amy execution yet — honest status only.
+* Service 0.2.5: persist `amy_capable` on `tasks.db` (migrated).
 
 = 0.2.39 =
 * Settings: dark Amy admin theme (Space Grotesk / Inter) matching Overview / Email Marketing.

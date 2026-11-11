@@ -437,20 +437,53 @@
 	line-height: 1.35;
 }
 
-.amy-agent-task-service__urgent-badge {
+.amy-agent-task-service__card-badges {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.3rem;
+	flex-shrink: 0;
+	max-width: 55%;
+}
+
+.amy-agent-task-service__urgent-badge,
+.amy-agent-task-service__mode-badge,
+.amy-agent-task-service__capable-badge {
 	flex-shrink: 0;
 	display: inline-flex;
 	align-items: center;
 	padding: 0.15rem 0.45rem;
 	border-radius: 999px;
-	background: rgba(227, 93, 106, 0.2);
-	border: 1px solid rgba(227, 93, 106, 0.65);
-	color: #ffb4bc;
 	font-size: 0.625rem;
 	font-weight: 700;
 	letter-spacing: 0.05em;
 	line-height: 1.2;
 	text-transform: uppercase;
+}
+
+.amy-agent-task-service__urgent-badge {
+	background: rgba(227, 93, 106, 0.2);
+	border: 1px solid rgba(227, 93, 106, 0.65);
+	color: #ffb4bc;
+}
+
+.amy-agent-task-service__mode-badge.is-amy {
+	background: rgba(255, 122, 24, 0.18);
+	border: 1px solid rgba(255, 122, 24, 0.55);
+	color: #ffb07a;
+}
+
+.amy-agent-task-service__mode-badge.is-human {
+	background: rgba(61, 139, 255, 0.16);
+	border: 1px solid rgba(61, 139, 255, 0.5);
+	color: #9ec5ff;
+}
+
+.amy-agent-task-service__capable-badge {
+	background: rgba(34, 197, 94, 0.14);
+	border: 1px solid rgba(34, 197, 94, 0.5);
+	color: #86efac;
 }
 
 .amy-agent-task-service__card-meta {
@@ -726,14 +759,16 @@
 	box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.35);
 }
 
-.amy-agent-task-service__field--priority {
+.amy-agent-task-service__field--priority,
+.amy-agent-task-service__field--mode {
 	flex-direction: row;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.75rem 1rem;
 }
 
-.amy-agent-task-service__field--priority .amy-agent-task-service__field-label {
+.amy-agent-task-service__field--priority .amy-agent-task-service__field-label,
+.amy-agent-task-service__field--mode .amy-agent-task-service__field-label {
 	flex: 0 0 100%;
 }
 
@@ -744,6 +779,33 @@
 	color: var(--amy-text);
 	font-size: 0.875rem;
 	cursor: pointer;
+}
+
+.amy-agent-task-service__check {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5rem;
+	margin: 0;
+	color: var(--amy-text);
+	font-size: 0.875rem;
+	line-height: 1.4;
+	cursor: pointer;
+}
+
+.amy-agent-task-service__check input {
+	margin-top: 0.2rem;
+}
+
+.amy-agent-task-service__field-hint {
+	margin: -0.15rem 0 0;
+	color: var(--amy-text-muted);
+	font-size: 0.75rem;
+	line-height: 1.4;
+}
+
+.amy-agent-task-service__field[hidden],
+.amy-agent-task-service__field-hint[hidden] {
+	display: none !important;
 }
 
 .amy-agent-task-service__modal-actions {
