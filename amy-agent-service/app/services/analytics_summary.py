@@ -301,7 +301,12 @@ def format_analytics_chat_context(snapshot: dict[str, Any]) -> str:
         )
         for item in hot_sample:
             email = item.get("lead_email")
-            email_bit = email if email else "(no email)"
+            if email:
+                email_bit = str(email)
+            elif item.get("has_email"):
+                email_bit = "(email on file)"
+            else:
+                email_bit = "(no email)"
             geo_parts = [
                 p for p in (item.get("ip_city"), item.get("ip_country")) if p
             ]
