@@ -13,8 +13,9 @@ import logging
 from typing import Any, Callable, Literal
 
 from app import config_task_rules as rules
-from app.db import analytics_db, notifications_db, progress_notes_db, seo_tasks_db, tasks_db
+from app.db import notifications_db, progress_notes_db, seo_tasks_db, tasks_db
 from app.services import task_owner
+from app.services.analytics_summary import build_analytics_summary
 
 logger = logging.getLogger(__name__)
 
@@ -122,35 +123,26 @@ def _write_audit(task_id: str, note: str) -> dict[str, Any]:
 
 
 def _run_analytics_summary(task: dict[str, Any]) -> dict[str, Any]:
-    leads = analytics_db.list_leads()
-    counts = {"hot": 0, "warm": 0, "cold": 0, "other": 0}
-    for lead in leads:
-        status = str(lead.get("lead_status") or "other")
-        if status in counts:
-            counts[status] += 1
-        else:
-            counts["other"] += 1
-    sample = []
-    for lead in leads[:5]:
-        sample.append(
-            {
-                "session_id": lead.get("session_id"),
-                "lead_status": lead.get("lead_status"),
-                "has_email": bool(lead.get("lead_email")),
-            }
-        )
-    summary = (
-        f"Analytics summary: {len(leads)} lead sessions "
-        f"(hot={counts['hot']}, warm={counts['warm']}, cold={counts['cold']}"
-        f"{f', other={counts['other']}' if counts['other'] else ''})."
-    )
+    snap = build_analytics_summary(include_sample=True)
+    if not snap.get("ok"):
+        summary = snap.get("summary") or "Analytics unavailable."
+        note = _write_audit(task["id"], summary)
+        return {
+            "capability": "analytics_summary",
+            "ok": False,
+            "summary": summary,
+            "counts": snap.get("counts") or {},
+            "sample_count": 0,
+            "audit_note_id": note["id"],
+        }
+    summary = str(snap["summary"])
     note = _write_audit(task["id"], summary)
     return {
         "capability": "analytics_summary",
         "ok": True,
         "summary": summary,
-        "counts": counts,
-        "sample_count": len(sample),
+        "counts": snap["counts"],
+        "sample_count": int(snap.get("sample_count") or 0),
         "audit_note_id": note["id"],
     }
 

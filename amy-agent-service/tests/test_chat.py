@@ -16,10 +16,44 @@ from app.providers.base import BaseProvider  # noqa: E402
 from app.providers.errors import ProviderError  # noqa: E402
 from app.routes.chat import _messages_with_system  # noqa: E402
 from app.schemas.messages import ChatMessage  # noqa: E402
+from app.services.analytics_summary import (  # noqa: E402
+    format_analytics_chat_context,
+)
 
 get_settings.cache_clear()
 
 HEADERS = {"X-Amy-Secret": "test-secret-phase1"}
+
+_EMPTY_ANALYTICS_SNAP = {
+    "ok": True,
+    "total": 0,
+    "counts": {"hot": 0, "warm": 0, "cold": 0, "other": 0},
+    "with_email": 0,
+    "empty": True,
+    "summary": "Analytics summary: 0 lead sessions (hot=0, warm=0, cold=0; with_email=0).",
+}
+
+_LIVE_ANALYTICS_SNAP = {
+    "ok": True,
+    "total": 5,
+    "counts": {"hot": 2, "warm": 1, "cold": 2, "other": 0},
+    "with_email": 3,
+    "empty": False,
+    "summary": (
+        "Analytics summary: 5 lead sessions "
+        "(hot=2, warm=1, cold=2; with_email=3)."
+    ),
+}
+
+_ERROR_ANALYTICS_SNAP = {
+    "ok": False,
+    "error": "boom",
+    "summary": "Analytics unavailable: could not read visitor lead sessions (service/connection).",
+    "total": 0,
+    "counts": {"hot": 0, "warm": 0, "cold": 0, "other": 0},
+    "with_email": 0,
+    "empty": True,
+}
 
 
 class _FakeProvider(BaseProvider):
@@ -306,39 +340,69 @@ def test_support_mode_uses_public_prompt_not_admin() -> None:
 
 
 def test_admin_mode_uses_admin_prompt() -> None:
-    messages = _messages_with_system(
-        [ChatMessage(role="user", content="hello")],
-        mode="admin",
-    )
+    with patch(
+        "app.routes.chat.analytics_summary_for_chat",
+        return_value=_EMPTY_ANALYTICS_SNAP,
+    ):
+        messages = _messages_with_system(
+            [ChatMessage(role="user", content="hello")],
+            mode="admin",
+        )
     assert messages[0].role == "system"
     assert messages[0].content == AMY_ADMIN_SYSTEM_PROMPT
     assert messages[0].content != AMY_SYSTEM_PROMPT
-    assert len([m for m in messages if m.role == "system"]) == 1
+    system_msgs = [m for m in messages if m.role == "system"]
+    assert len(system_msgs) == 2
+    assert "Live Amy Analytics snapshot" in system_msgs[1].content
+    assert "you have no live access" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
+    assert "connections are not built yet" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
 
 
 def test_admin_mode_appends_identity_when_name_or_email_present() -> None:
-    messages = _messages_with_system(
-        [ChatMessage(role="user", content="hello")],
-        mode="admin",
-        wp_user_name="Wael",
-        wp_user_email="wael@example.com",
-    )
+    with patch(
+        "app.routes.chat.analytics_summary_for_chat",
+        return_value=_EMPTY_ANALYTICS_SNAP,
+    ):
+        messages = _messages_with_system(
+            [ChatMessage(role="user", content="hello")],
+            mode="admin",
+            wp_user_name="Wael",
+            wp_user_email="wael@example.com",
+        )
+    system_msgs = [m for m in messages if m.role == "system"]
+    assert len(system_msgs) == 3
+    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    assert "Live Amy Analytics snapshot" in system_msgs[1].content
+    assert "Wael" in system_msgs[2].content
+    assert "wael@example.com" in system_msgs[2].content
+
+
+def test_admin_mode_without_identity_still_has_analytics_snapshot() -> None:
+    with patch(
+        "app.routes.chat.analytics_summary_for_chat",
+        return_value=_EMPTY_ANALYTICS_SNAP,
+    ):
+        messages = _messages_with_system(
+            [ChatMessage(role="user", content="hello")],
+            mode="admin",
+            wp_user_name=None,
+            wp_user_email=None,
+        )
     system_msgs = [m for m in messages if m.role == "system"]
     assert len(system_msgs) == 2
     assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
-    assert "Wael" in system_msgs[1].content
-    assert "wael@example.com" in system_msgs[1].content
+    assert "EMPTY" in system_msgs[1].content
 
 
-def test_admin_mode_without_identity_has_no_extra_system_message() -> None:
+def test_admin_mode_can_skip_analytics_snapshot() -> None:
     messages = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="admin",
-        wp_user_name=None,
-        wp_user_email=None,
+        include_analytics_snapshot=False,
     )
-    assert [m.role for m in messages if m.role == "system"] == ["system"]
-    assert messages[0].content == AMY_ADMIN_SYSTEM_PROMPT
+    system_msgs = [m for m in messages if m.role == "system"]
+    assert len(system_msgs) == 1
+    assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
 
 
 def test_chat_admin_mode_sends_admin_prompt_to_provider(client: TestClient) -> None:
@@ -349,7 +413,13 @@ def test_chat_admin_mode_sends_admin_prompt_to_provider(client: TestClient) -> N
             captured.extend(messages)
             return await super().complete(messages, api_key, model)
 
-    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")):
+    with (
+        patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
+        patch(
+            "app.routes.chat.analytics_summary_for_chat",
+            return_value=_LIVE_ANALYTICS_SNAP,
+        ),
+    ):
         response = client.post(
             "/v1/chat",
             headers=HEADERS,
@@ -363,8 +433,73 @@ def test_chat_admin_mode_sends_admin_prompt_to_provider(client: TestClient) -> N
     assert response.status_code == 200
     system_msgs = [m for m in captured if m.role == "system"]
     assert system_msgs[0].content == AMY_ADMIN_SYSTEM_PROMPT
-    assert "Wael" in system_msgs[1].content
+    assert "total_sessions: 5" in system_msgs[1].content
+    assert "hot: 2" in system_msgs[1].content
+    assert "with_email: 3" in system_msgs[1].content
+    assert "Wael" in system_msgs[2].content
     assert system_msgs[0].content != AMY_SYSTEM_PROMPT
+    assert "you have no live access" not in system_msgs[0].content.lower()
+    assert "connections are not built yet" not in system_msgs[0].content.lower()
+
+
+def test_chat_admin_mode_empty_analytics_honest_fallback(client: TestClient) -> None:
+    captured: list = []
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
+    with (
+        patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
+        patch(
+            "app.routes.chat.analytics_summary_for_chat",
+            return_value=_EMPTY_ANALYTICS_SNAP,
+        ),
+    ):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(mode="admin"),
+        )
+
+    assert response.status_code == 200
+    system_msgs = [m for m in captured if m.role == "system"]
+    assert any("EMPTY" in m.content for m in system_msgs)
+    assert any("No visitor sessions recorded yet" in m.content for m in system_msgs)
+    joined = "\n".join(m.content.lower() for m in system_msgs)
+    assert "you have no live access" not in joined
+    assert "connections are not built yet" not in joined
+
+
+def test_chat_admin_mode_analytics_error_honest_fallback(client: TestClient) -> None:
+    captured: list = []
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
+    with (
+        patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
+        patch(
+            "app.routes.chat.analytics_summary_for_chat",
+            return_value=_ERROR_ANALYTICS_SNAP,
+        ),
+    ):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(mode="admin"),
+        )
+
+    assert response.status_code == 200
+    system_msgs = [m for m in captured if m.role == "system"]
+    assert any("UNAVAILABLE" in m.content for m in system_msgs)
+    assert any("could not reach Analytics" in m.content for m in system_msgs)
+    joined = "\n".join(m.content.lower() for m in system_msgs)
+    assert "you have no live access" not in joined
+    assert "connections are not built yet" not in joined
 
 
 def test_chat_general_mode_sends_public_prompt_to_provider(client: TestClient) -> None:
@@ -375,10 +510,29 @@ def test_chat_general_mode_sends_public_prompt_to_provider(client: TestClient) -
             captured.extend(messages)
             return await super().complete(messages, api_key, model)
 
-    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")):
+    with (
+        patch("app.routes.chat.get_provider", return_value=_CaptureProvider("Hi")),
+        patch(
+            "app.routes.chat.analytics_summary_for_chat",
+            side_effect=AssertionError("general mode must not fetch analytics"),
+        ),
+    ):
         response = client.post("/v1/chat", headers=HEADERS, json=_chat_body(mode="general"))
 
     assert response.status_code == 200
     system_msgs = [m for m in captured if m.role == "system"]
     assert len(system_msgs) == 1
     assert system_msgs[0].content == AMY_SYSTEM_PROMPT
+    assert "Live Amy Analytics snapshot" not in system_msgs[0].content
+
+
+def test_format_analytics_chat_context_live_and_fallbacks() -> None:
+    live = format_analytics_chat_context(_LIVE_ANALYTICS_SNAP)
+    assert "total_sessions: 5" in live
+    assert "with_email: 3" in live
+    empty = format_analytics_chat_context(_EMPTY_ANALYTICS_SNAP)
+    assert "EMPTY" in empty
+    assert "No visitor sessions recorded yet" in empty
+    err = format_analytics_chat_context(_ERROR_ANALYTICS_SNAP)
+    assert "UNAVAILABLE" in err
+    assert "could not reach Analytics" in err
