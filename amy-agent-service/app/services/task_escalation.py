@@ -8,6 +8,7 @@ from typing import Any
 
 from app import config_task_rules as rules
 from app.db import notifications_db, tasks_db
+from app.services import task_notify
 
 logger = logging.getLogger(__name__)
 
@@ -88,30 +89,11 @@ def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> li
         # TODO(amy-execution): once Amy can autonomously complete digital/in-system
         # work, offer that as a fourth choice here. For now notify-only — never
         # fake auto-completion.
+        # TODO(P3): route expiry to owner/backup instead of creator-only.
         _set_stage(task["id"], "expired")
-        creator = int(task["created_by_wp_user_id"])
-        notifications.append(
-            notifications_db.create_notification(
-                task_id=task["id"],
-                wp_user_id=creator,
-                type="task_expired",
-                message=(
-                    f'"{title}" is past its due date without completion. '
-                    "Choose how to proceed: reassign to the same person (reset due date), "
-                    "reassign to someone else, or acknowledge and handle it manually."
-                ),
-                requires_action=True,
-                action_payload={
-                    "choices": [
-                        "reassign_same",
-                        "reassign_other",
-                        "acknowledge_manual",
-                    ],
-                    "task_id": task["id"],
-                    # Auto Amy-completion intentionally omitted — see TODO above.
-                },
-            )
-        )
+        dispatched = task_notify.dispatch_task_notify("expiry", task)
+        if dispatched.get("dashboard"):
+            notifications.append(dispatched["dashboard"])
         return notifications
 
     if now >= due_ts:
@@ -139,18 +121,12 @@ def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> li
         _set_stage(task["id"], "final_warning_sent")
         return notifications
 
-    # Midpoint reminder.
+    # Midpoint → progress-report ask (P1 adapters; P2 may rename stage).
     if now >= midpoint and stage == "none":
         if assignee:
-            notifications.append(
-                notifications_db.create_notification(
-                    task_id=task["id"],
-                    wp_user_id=assignee,
-                    type="reminder_midpoint",
-                    message=f'Reminder: you\'re halfway to the deadline for "{title}".',
-                    requires_action=False,
-                )
-            )
+            dispatched = task_notify.dispatch_task_notify("mid_progress", task)
+            if dispatched.get("dashboard"):
+                notifications.append(dispatched["dashboard"])
         _set_stage(task["id"], "midpoint_sent")
         return notifications
 
@@ -267,7 +243,7 @@ def check_urgent_task(task: dict[str, Any], *, now: float | None = None) -> list
 
         new_assignee = candidates[0]
         previous = assignee
-        tasks_db.update_task(
+        updated = tasks_db.update_task(
             task["id"],
             {
                 "assignee_type": "human",
@@ -277,6 +253,7 @@ def check_urgent_task(task: dict[str, Any], *, now: float | None = None) -> list
                 "escalation_stage_updated_at": now,
             },
         )
+        # Dashboard action notice (legacy type) + assign template outbound.
         notifications.append(
             notifications_db.create_notification(
                 task_id=task["id"],
@@ -287,6 +264,13 @@ def check_urgent_task(task: dict[str, Any], *, now: float | None = None) -> list
                 action_payload={"task_id": task["id"]},
             )
         )
+        if updated is not None:
+            task_notify.dispatch_task_notify(
+                "assign",
+                updated,
+                wp_user_id=new_assignee,
+                create_dashboard=False,
+            )
         for uid in {previous, int(task["created_by_wp_user_id"])}:
             if uid == new_assignee:
                 continue

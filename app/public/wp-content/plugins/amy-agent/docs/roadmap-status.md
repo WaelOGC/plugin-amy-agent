@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.41 / amy-agent-service v0.2.5 — Task Service P0).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.42 / amy-agent-service v0.2.6 — Task Service P1 outbound).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -23,9 +23,14 @@
 > **Settings (v0.2.39):** dark Amy theme + General / Connection tabs, readiness
 > banner, health check button, marketing From UI validation.
 > **Telegram Admin Bot (v0.2.40):** Settings → Telegram tab; WP webhook +
-> whitelist; shared admin conversations with Dashboard Chat.
+> whitelist; shared admin conversations with Dashboard Chat — **reused** by
+> Task Service outbound (no second bot).
 > **Task Service P0 (v0.2.41 / service 0.2.5):** Amy vs Someone create/edit mode
-> + `amy_capable` + board/list badges. No outbound / Amy execution yet (P1–P4).
+> + `amy_capable` + board/list badges.
+> **Task Service P1 (v0.2.42 / service 0.2.6):** assign/mid/expiry templates;
+> email via FluentSMTP/`wp_mail` From Settings hello@; Telegram via Admin Bot;
+> My Profile chat-id link; progress notes on mid Telegram reply; dashboard bell
+> kept. Scheduler rename / owner-backup / Amy run = P2–P4.
 
 ---
 
@@ -99,8 +104,13 @@
   **Someone does this** (human picker) → `assignee_type`; boolean `amy_capable`
   on create/update/list/get; light mode + Amy-capable badges on board/list.
   Amy assigned = honest queue only (no fake complete / no execution yet).
-  Escalation epic P1–P4 (outbound, scheduler mid-report, owner/backup, Amy run)
-  tracked separately.
+- **P1 (plugin 0.2.42 / service 0.2.6):** outbound assign/mid/expiry templates
+  (dashboard + email + Telegram). Email = FluentSMTP/`wp_mail` From Settings
+  (hello@ — not AgentMail/Gmail). Telegram = same Admin Bot token/webhook as
+  Settings → Telegram; assignees connect chat id from My Profile. Mid free-text
+  Telegram reply → `task_progress_notes`. Service needs `WORDPRESS_BASE_URL`
+  for channel relay. Escalation P2–P4 (scheduler rename, owner/backup, Amy run)
+  still open.
 
 ### 5. Analytics — complete (Task 1: plugin + service)
 - Backend: persistent SQLite at `data/analytics.db` (90-day retention, purged by

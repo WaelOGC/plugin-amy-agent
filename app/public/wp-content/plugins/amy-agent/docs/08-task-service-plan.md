@@ -2,7 +2,7 @@
 
 > Priority #6 in `roadmap-status.md`.
 
-## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0 create UX (2026-11-11)
+## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0/P1 escalation (2026-11-11)
 
 **Task 1:** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats,
 WordPress API client + admin-ajax proxies, real assignees, board/list CRUD,
@@ -16,17 +16,22 @@ notification bell on Task Service + My Profile, 5-minute background scheduler.
 **P0 (plugin 0.2.41 / service 0.2.5):** create/edit modal primary choice
 **Amy does this** vs **Someone does this** (human picker) wired to
 `assignee_type`; boolean `amy_capable` stored and returned by API; light
-mode + Amy-capable badges on board/list. No outbound channels or Amy
-execution in P0 — see store multiplan / escalation epic for P1–P4.
+mode + Amy-capable badges on board/list.
+
+**P1 (plugin 0.2.42 / service 0.2.6):** outbound notify — assign / mid-progress
+ask / expiry templates; email via FluentSMTP/`wp_mail` From Settings hello@;
+Telegram via Admin Bot (#11) reused (Settings → Telegram token + webhook);
+My Profile chat-id connect; progress notes on mid Telegram reply; dashboard
+bell kept. Set service env `WORDPRESS_BASE_URL` to the WP site origin for
+channel relay. P2–P4 (scheduler rename, owner/backup, Amy execution) remain.
 
 ## Implementation notes (scoping vs original plan)
 
 Built for Task 2 with these intentional simplifications (so future work knows
 what still differs from §3–§6 above):
 
-1. **Notifications are dashboard-only.** Telegram (and other channels in §6)
-   are not in the codebase yet (priority #4 / Admin Roles & Social Publishing).
-   No Telegram hooks or placeholders were added.
+1. **Notifications were dashboard-only until P1.** P1 adds email + Telegram
+   outbound via the existing Admin Bot (not a second bot / not Admin Roles #4).
 2. **No department/section system yet.** Urgent auto-reassignment offers the
    task to any other synced dashboard user (`manage_options` pool pushed from
    WordPress), not department-scoped. Code comments mark where

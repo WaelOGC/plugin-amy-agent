@@ -68,3 +68,34 @@ class TaskStatsResponse(BaseModel):
     urgent_tasks: int
     completed_this_week: int
     team_completion_rate: int
+
+
+class ProgressNoteCreateRequest(BaseModel):
+    wp_user_id: int
+    note: str = Field(min_length=1)
+    source: Literal["telegram", "dashboard", "api"] = "api"
+
+
+class TelegramProgressReplyRequest(BaseModel):
+    """Inbound free-text reply from the Admin Bot webhook (WP)."""
+
+    wp_user_id: int
+    note: str = Field(min_length=1)
+
+
+class ProgressNoteResponse(BaseModel):
+    id: str
+    task_id: str
+    wp_user_id: int
+    source: str
+    note: str
+    created_at: float
+
+
+class ProgressNoteListResponse(BaseModel):
+    notes: list[ProgressNoteResponse]
+
+
+class TelegramProgressReplyResponse(BaseModel):
+    saved: bool
+    note: ProgressNoteResponse | None = None

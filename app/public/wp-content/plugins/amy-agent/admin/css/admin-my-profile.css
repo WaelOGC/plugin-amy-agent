@@ -692,6 +692,64 @@ a.amy-agent-my-profile__btn--accent:focus-visible {
 	}
 }
 
+.amy-agent-my-profile__panel--telegram {
+	margin: 0 0 1.25rem;
+	padding: 1.25rem 1.35rem;
+	background: var(--amy-panel);
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 14px;
+}
+
+.amy-agent-my-profile__telegram-copy {
+	margin: 0 0 0.85rem;
+	color: var(--amy-text-muted);
+	font-size: 0.95rem;
+	line-height: 1.5;
+	max-width: 48rem;
+}
+
+.amy-agent-my-profile__telegram-status {
+	margin: 0 0 0.85rem;
+	color: var(--amy-text-muted);
+	font-size: 0.92rem;
+	line-height: 1.45;
+}
+
+.amy-agent-my-profile__telegram-status.is-linked {
+	color: var(--amy-text);
+}
+
+.amy-agent-my-profile__telegram-status a {
+	color: var(--amy-grad-start);
+	margin-left: 0.35rem;
+}
+
+.amy-agent-my-profile__telegram-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.65rem;
+	align-items: center;
+}
+
+.amy-agent-my-profile__telegram-deep {
+	margin: 0.85rem 0 0;
+	color: var(--amy-text);
+	font-size: 0.92rem;
+}
+
+.amy-agent-my-profile__telegram-deep a {
+	color: var(--amy-grad-start);
+	font-weight: 600;
+}
+
+.amy-agent-my-profile__telegram-deep code {
+	margin-left: 0.5rem;
+	padding: 0.15rem 0.4rem;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.06);
+	font-size: 0.85rem;
+}
+
 @media (max-width: 720px) {
 	.amy-agent-my-profile {
 		margin-right: 0;

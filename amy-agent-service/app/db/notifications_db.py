@@ -15,6 +15,8 @@ _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 VALID_NOTIFICATION_TYPES = frozenset(
     {
+        "task_assigned",
+        "mid_progress_ask",
         "reminder_midpoint",
         "reminder_final",
         "urgent_checkin",

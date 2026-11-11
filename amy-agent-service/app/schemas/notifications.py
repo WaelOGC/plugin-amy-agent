@@ -5,6 +5,8 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 NotificationType = Literal[
+    "task_assigned",
+    "mid_progress_ask",
     "reminder_midpoint",
     "reminder_final",
     "urgent_checkin",

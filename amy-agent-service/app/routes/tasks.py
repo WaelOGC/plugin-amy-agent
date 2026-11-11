@@ -6,19 +6,25 @@ from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 
 from app.auth import require_amy_secret
-from app.db import tasks_db
+from app.db import progress_notes_db, tasks_db
 from app.schemas.messages import ErrorBody
 from app.schemas.tasks import (
+    ProgressNoteCreateRequest,
+    ProgressNoteListResponse,
+    ProgressNoteResponse,
     TaskCreateRequest,
     TaskListResponse,
     TaskResponse,
     TaskStatsResponse,
     TaskUpdateRequest,
+    TelegramProgressReplyRequest,
+    TelegramProgressReplyResponse,
 )
 from app.schemas.notifications import (
     DashboardUserSyncRequest,
     DashboardUserSyncResponse,
 )
+from app.services import task_notify
 
 router = APIRouter(tags=["tasks"])
 
@@ -96,6 +102,8 @@ async def create_task(body: TaskCreateRequest) -> TaskResponse | JSONResponse:
         )
     except ValueError as exc:
         return _error("invalid_task", str(exc), status.HTTP_400_BAD_REQUEST)
+    if row.get("assignee_type") == "human" and row.get("assignee_wp_user_id"):
+        task_notify.dispatch_task_notify("assign", row)
     return _to_response(row)
 
 
@@ -121,13 +129,84 @@ async def update_task(
 ) -> TaskResponse | JSONResponse:
     # exclude_unset so omitted fields are not treated as explicit nulls
     fields = body.model_dump(exclude_unset=True)
+    previous = tasks_db.get_task(task_id)
     try:
         row = tasks_db.update_task(task_id, fields)
     except ValueError as exc:
         return _error("invalid_task", str(exc), status.HTTP_400_BAD_REQUEST)
     if row is None:
         return _error("not_found", "Task not found.", status.HTTP_404_NOT_FOUND)
+    if _assignee_changed(previous, row) and row.get("assignee_type") == "human":
+        task_notify.dispatch_task_notify("assign", row)
     return _to_response(row)
+
+
+def _assignee_changed(previous: dict | None, current: dict) -> bool:
+    if previous is None:
+        return True
+    return (
+        previous.get("assignee_type") != current.get("assignee_type")
+        or previous.get("assignee_wp_user_id") != current.get("assignee_wp_user_id")
+    )
+
+
+@router.get(
+    "/v1/tasks/{task_id}/progress-notes",
+    response_model=ProgressNoteListResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def list_progress_notes(task_id: str) -> ProgressNoteListResponse | JSONResponse:
+    if tasks_db.get_task(task_id) is None:
+        return _error("not_found", "Task not found.", status.HTTP_404_NOT_FOUND)
+    rows = progress_notes_db.list_progress_notes(task_id)
+    return ProgressNoteListResponse(
+        notes=[ProgressNoteResponse(**row) for row in rows]
+    )
+
+
+@router.post(
+    "/v1/tasks/{task_id}/progress-notes",
+    response_model=ProgressNoteResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def create_progress_note(
+    task_id: str, body: ProgressNoteCreateRequest
+) -> ProgressNoteResponse | JSONResponse:
+    if tasks_db.get_task(task_id) is None:
+        return _error("not_found", "Task not found.", status.HTTP_404_NOT_FOUND)
+    try:
+        row = progress_notes_db.create_progress_note(
+            task_id=task_id,
+            wp_user_id=body.wp_user_id,
+            note=body.note,
+            source=body.source,
+        )
+    except ValueError as exc:
+        return _error("invalid_note", str(exc), status.HTTP_400_BAD_REQUEST)
+    return ProgressNoteResponse(**row)
+
+
+@router.post(
+    "/v1/tasks/progress-notes/from-telegram",
+    response_model=TelegramProgressReplyResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def consume_telegram_progress_reply(
+    body: TelegramProgressReplyRequest,
+) -> TelegramProgressReplyResponse | JSONResponse:
+    """Webhook hook: save free-text as progress note when a mid ask is pending."""
+    try:
+        saved = progress_notes_db.consume_telegram_progress_reply(
+            wp_user_id=body.wp_user_id,
+            note=body.note,
+        )
+    except ValueError as exc:
+        return _error("invalid_note", str(exc), status.HTTP_400_BAD_REQUEST)
+    if saved is None:
+        return TelegramProgressReplyResponse(saved=False, note=None)
+    return TelegramProgressReplyResponse(
+        saved=True, note=ProgressNoteResponse(**saved)
+    )
 
 
 @router.delete(

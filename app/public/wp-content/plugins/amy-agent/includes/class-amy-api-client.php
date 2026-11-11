@@ -708,6 +708,24 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST /v1/tasks/progress-notes/from-telegram — mid-progress free-text reply.
+	 *
+	 * @param int    $wp_user_id WP user id.
+	 * @param string $note       Free-text progress update.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function consume_telegram_progress_reply( $wp_user_id, $note ) {
+		return $this->request(
+			'POST',
+			'/v1/tasks/progress-notes/from-telegram',
+			array(
+				'wp_user_id' => (int) $wp_user_id,
+				'note'       => (string) $note,
+			)
+		);
+	}
+
+	/**
 	 * POST /v1/tasks/{id}/extension-request.
 	 *
 	 * @param string $id                Task UUID.

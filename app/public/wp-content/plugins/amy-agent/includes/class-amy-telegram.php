@@ -22,9 +22,11 @@ class Amy_Telegram {
 	const TRANSIENT_RATE_USER    = 'amy_tg_rate_';
 	const TRANSIENT_DENY_NOTICE  = 'amy_tg_deny_';
 	const TRANSIENT_SLOW_NOTICE  = 'amy_tg_slow_';
+	const TRANSIENT_CONNECT_CODE = 'amy_tg_connect_';
 
 	const MAX_MESSAGE_LENGTH = 4000;
 	const RATE_LIMIT_PER_MIN = 20;
+	const CONNECT_CODE_TTL   = 900; // 15 minutes.
 
 	/**
 	 * @var Amy_Settings
@@ -54,6 +56,8 @@ class Amy_Telegram {
 		add_action( 'wp_ajax_amy_telegram_disconnect', array( $this, 'ajax_disconnect' ) );
 		add_action( 'wp_ajax_amy_telegram_status', array( $this, 'ajax_status' ) );
 		add_action( 'wp_ajax_amy_telegram_test', array( $this, 'ajax_test' ) );
+		add_action( 'wp_ajax_amy_telegram_user_link_start', array( $this, 'ajax_user_link_start' ) );
+		add_action( 'wp_ajax_amy_telegram_user_unlink', array( $this, 'ajax_user_unlink' ) );
 	}
 
 	/**
@@ -356,6 +360,76 @@ class Amy_Telegram {
 	}
 
 	/**
+	 * My Profile: mint a short-lived /start connect_<code> link for assignees.
+	 */
+	public function ajax_user_link_start() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'You do not have permission.', 'amy-agent' ) ),
+				403
+			);
+		}
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+
+		if ( ! $this->is_telegram_enabled() || '' === $this->get_bot_token() ) {
+			wp_send_json_error(
+				array(
+					'message' => __( 'Telegram bot is not enabled. Ask an admin to configure Amy → Settings → Telegram.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$username = (string) get_option( self::OPTION_BOT_USERNAME, '' );
+		if ( '' === $username ) {
+			$me = $this->telegram_api_request( 'getMe' );
+			if ( $me['ok'] && is_array( $me['data'] ) && ! empty( $me['data']['result']['username'] ) ) {
+				$username = sanitize_text_field( (string) $me['data']['result']['username'] );
+				update_option( self::OPTION_BOT_USERNAME, $username, false );
+			}
+		}
+		if ( '' === $username ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Connect the bot webhook in Settings → Telegram first.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$code = strtolower( wp_generate_password( 10, false, false ) );
+		$user_id = get_current_user_id();
+		set_transient( self::TRANSIENT_CONNECT_CODE . $code, (int) $user_id, self::CONNECT_CODE_TTL );
+
+		$deep_link = 'https://t.me/' . rawurlencode( $username ) . '?start=connect_' . rawurlencode( $code );
+
+		wp_send_json_success(
+			array(
+				'code'      => $code,
+				'username'  => $username,
+				'deep_link' => $deep_link,
+				'expires'   => self::CONNECT_CODE_TTL,
+				'message'   => __( 'Open the bot link and tap Start (or send the /start command shown).', 'amy-agent' ),
+			)
+		);
+	}
+
+	/**
+	 * My Profile: clear assignee chat-id link.
+	 */
+	public function ajax_user_unlink() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'You do not have permission.', 'amy-agent' ) ),
+				403
+			);
+		}
+		check_ajax_referer( self::NONCE_ACTION, 'nonce' );
+		Amy_Task_Notify::unlink_user_chat( get_current_user_id() );
+		wp_send_json_success(
+			array( 'message' => __( 'Telegram unlinked for task alerts.', 'amy-agent' ) )
+		);
+	}
+
+	/**
 	 * Send test message to each whitelisted admin.
 	 */
 	public function ajax_test() {
@@ -426,16 +500,22 @@ class Amy_Telegram {
 			return new WP_REST_Response( array( 'ok' => true ), 200 );
 		}
 
-		$chat_id        = (int) $chat['id'];
-		$telegram_id    = (int) $from['id'];
-		$whitelist_row  = $this->find_whitelist_row( $telegram_id );
+		$chat_id     = (int) $chat['id'];
+		$telegram_id = (int) $from['id'];
+		$text        = isset( $message['text'] ) ? (string) $message['text'] : '';
 
-		if ( null === $whitelist_row ) {
+		// Self-serve assignee connect: /start connect_<code> (before whitelist gate).
+		if ( '' !== $text && $this->maybe_handle_connect_start( $chat_id, $telegram_id, $text ) ) {
+			return new WP_REST_Response( array( 'ok' => true ), 200 );
+		}
+
+		$identity = $this->resolve_inbound_identity( $telegram_id );
+		if ( null === $identity ) {
 			$this->maybe_send_unlisted_notice( $chat_id, $telegram_id );
 			return new WP_REST_Response( array( 'ok' => true ), 200 );
 		}
 
-		$wp_user = get_userdata( $whitelist_row['wp_user_id'] );
+		$wp_user = get_userdata( $identity['wp_user_id'] );
 		if ( ! $wp_user || ! user_can( $wp_user, 'manage_options' ) ) {
 			$this->send_message(
 				$chat_id,
@@ -444,6 +524,12 @@ class Amy_Telegram {
 			);
 			return new WP_REST_Response( array( 'ok' => true ), 200 );
 		}
+
+		$whitelist_row = array(
+			'telegram_id' => $telegram_id,
+			'label'       => $identity['label'],
+			'wp_user_id'  => (int) $wp_user->ID,
+		);
 
 		if ( $this->is_rate_limited( $telegram_id ) ) {
 			$slow_key = self::TRANSIENT_SLOW_NOTICE . $telegram_id;
@@ -455,7 +541,6 @@ class Amy_Telegram {
 		}
 		$this->bump_rate_limit( $telegram_id );
 
-		$text = isset( $message['text'] ) ? (string) $message['text'] : '';
 		if ( '' === $text ) {
 			$this->send_message(
 				$chat_id,
@@ -470,9 +555,144 @@ class Amy_Telegram {
 			return new WP_REST_Response( array( 'ok' => true ), 200 );
 		}
 
+		// Mid-progress free-text reply → progress note (P1); else Admin Bot chat.
+		if ( $this->maybe_save_progress_note( $chat_id, $text, $wp_user ) ) {
+			return new WP_REST_Response( array( 'ok' => true ), 200 );
+		}
+
+		if ( ! $identity['admin_chat'] ) {
+			$this->send_message(
+				$chat_id,
+				__( 'Thanks — your message was received. For Amy chat, ask an admin to add you to the Telegram whitelist in Settings.', 'amy-agent' ),
+				false
+			);
+			return new WP_REST_Response( array( 'ok' => true ), 200 );
+		}
+
 		$this->handle_plain_text( $chat_id, $text, $whitelist_row, $wp_user );
 
 		return new WP_REST_Response( array( 'ok' => true ), 200 );
+	}
+
+	/**
+	 * Whitelist admin row or assignee user-meta link.
+	 *
+	 * @param int $telegram_id Telegram user id.
+	 * @return array{wp_user_id:int,label:string,admin_chat:bool}|null
+	 */
+	private function resolve_inbound_identity( $telegram_id ) {
+		$row = $this->find_whitelist_row( $telegram_id );
+		if ( null !== $row ) {
+			return array(
+				'wp_user_id'  => (int) $row['wp_user_id'],
+				'label'       => (string) $row['label'],
+				'admin_chat'  => true,
+			);
+		}
+
+		$users = get_users(
+			array(
+				'meta_key'   => Amy_Task_Notify::USER_META_CHAT_ID,
+				'meta_value' => (string) (int) $telegram_id,
+				'number'     => 1,
+				'fields'     => array( 'ID', 'display_name' ),
+			)
+		);
+		if ( empty( $users ) ) {
+			return null;
+		}
+		$user = $users[0];
+		return array(
+			'wp_user_id' => (int) $user->ID,
+			'label'      => (string) $user->display_name,
+			'admin_chat' => false,
+		);
+	}
+
+	/**
+	 * @param int    $chat_id     Chat id.
+	 * @param int    $telegram_id Telegram user id.
+	 * @param string $text        Message text.
+	 * @return bool True if handled as connect.
+	 */
+	private function maybe_handle_connect_start( $chat_id, $telegram_id, $text ) {
+		$parts = preg_split( '/\s+/', trim( $text ), 2 );
+		$cmd   = strtolower( (string) ( $parts[0] ?? '' ) );
+		$arg   = isset( $parts[1] ) ? trim( (string) $parts[1] ) : '';
+
+		// Deep link: /start connect_<code>
+		if ( '/start' === $cmd && str_starts_with( $arg, 'connect_' ) ) {
+			$code = substr( $arg, strlen( 'connect_' ) );
+			return $this->complete_connect_code( $chat_id, $telegram_id, $code );
+		}
+		return false;
+	}
+
+	/**
+	 * @param int    $chat_id     Chat id.
+	 * @param int    $telegram_id Telegram user id.
+	 * @param string $code        Connect code.
+	 * @return bool
+	 */
+	private function complete_connect_code( $chat_id, $telegram_id, $code ) {
+		$code = strtolower( preg_replace( '/[^a-z0-9]/i', '', (string) $code ) );
+		if ( '' === $code ) {
+			return false;
+		}
+		$key     = self::TRANSIENT_CONNECT_CODE . $code;
+		$user_id = (int) get_transient( $key );
+		if ( $user_id < 1 ) {
+			$this->send_message(
+				$chat_id,
+				__( 'That connect link expired or is invalid. Generate a new one from Amy → My Profile.', 'amy-agent' ),
+				false
+			);
+			return true;
+		}
+		delete_transient( $key );
+		Amy_Task_Notify::link_user_chat( $user_id, $telegram_id );
+		$wp_user = get_userdata( $user_id );
+		$name    = $wp_user ? $wp_user->display_name : ( 'user #' . $user_id );
+		$this->send_message(
+			$chat_id,
+			sprintf(
+				/* translators: %s: WordPress display name */
+				__( 'Linked to %s. You will receive task assign / progress / expiry alerts here when the bot is enabled.', 'amy-agent' ),
+				$name
+			),
+			false
+		);
+		return true;
+	}
+
+	/**
+	 * If a mid-progress ask is pending for this user, store free text as a note.
+	 *
+	 * @param int     $chat_id Chat id.
+	 * @param string  $text    Reply text.
+	 * @param WP_User $wp_user Linked user.
+	 * @return bool True when consumed as progress note.
+	 */
+	private function maybe_save_progress_note( $chat_id, $text, $wp_user ) {
+		if ( ! $this->settings->is_service_configured() ) {
+			return false;
+		}
+		$result = $this->api_client->consume_telegram_progress_reply(
+			(int) $wp_user->ID,
+			$text
+		);
+		if ( ! $result['ok'] || ! is_array( $result['body'] ) ) {
+			return false;
+		}
+		if ( empty( $result['body']['saved'] ) ) {
+			return false;
+		}
+		$this->send_message(
+			$chat_id,
+			__( 'Thanks — your progress update was saved on the task.', 'amy-agent' ),
+			false
+		);
+		return true;
 	}
 
 	/**
@@ -837,6 +1057,18 @@ class Amy_Telegram {
 			$out .= '</' . array_pop( $stack ) . '>';
 		}
 		return $out;
+	}
+
+	/**
+	 * Public send for Task Service outbound (reuses Admin Bot token).
+	 *
+	 * @param int    $chat_id    Chat id.
+	 * @param string $text       Message body.
+	 * @param bool   $allow_html Whether to use HTML parse mode.
+	 * @return array{ok:bool,error:string|null}
+	 */
+	public function send_message_to_chat( $chat_id, $text, $allow_html = true ) {
+		return $this->send_message( (int) $chat_id, (string) $text, (bool) $allow_html );
 	}
 
 	/**

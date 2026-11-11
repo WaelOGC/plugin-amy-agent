@@ -235,14 +235,23 @@ class Amy_Admin_Menu {
 				true
 			);
 
-			$user = wp_get_current_user();
+			$user            = wp_get_current_user();
+			$tg_chat_id      = (int) get_user_meta( $user->ID, Amy_Task_Notify::USER_META_CHAT_ID, true );
+			$tg_bot_username = (string) get_option( Amy_Telegram::OPTION_BOT_USERNAME, '' );
 			wp_localize_script(
 				'amy-agent-admin-my-profile',
 				'amyAgentMyProfile',
 				array(
 					'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
 					'nonce'       => wp_create_nonce( 'amy_agent_save_my_profile' ),
+					'telegramNonce' => wp_create_nonce( Amy_Telegram::NONCE_ACTION ),
 					'gravatarUrl' => esc_url_raw( get_avatar_url( $user->ID, array( 'size' => 144 ) ) ),
+					'telegram'    => array(
+						'linked'      => $tg_chat_id > 0,
+						'chatId'      => $tg_chat_id > 0 ? $tg_chat_id : null,
+						'botUsername' => $tg_bot_username,
+						'settingsUrl' => admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG . '&tab=telegram' ),
+					),
 					'i18n'        => array(
 						'mediaTitle'   => __( 'Select profile photo', 'amy-agent' ),
 						'mediaButton'  => __( 'Use this image', 'amy-agent' ),
@@ -251,6 +260,12 @@ class Amy_Admin_Menu {
 						'saving'       => __( 'Saving…', 'amy-agent' ),
 						'save'         => __( 'Save changes', 'amy-agent' ),
 						'error'        => __( 'Could not save profile. Please try again.', 'amy-agent' ),
+						'tgLinking'    => __( 'Generating link…', 'amy-agent' ),
+						'tgLink'       => __( 'Connect Telegram', 'amy-agent' ),
+						'tgUnlink'     => __( 'Unlink Telegram', 'amy-agent' ),
+						'tgUnlinking'  => __( 'Unlinking…', 'amy-agent' ),
+						'tgLinked'     => __( 'Telegram linked for task alerts.', 'amy-agent' ),
+						'tgOpenBot'    => __( 'Open bot & tap Start', 'amy-agent' ),
 					),
 				)
 			);
@@ -1842,6 +1857,79 @@ class Amy_Admin_Menu {
 					</div>
 				<?php endforeach; ?>
 			</div>
+
+			<?php
+			$tg_chat_id      = (int) get_user_meta( (int) $user->ID, Amy_Task_Notify::USER_META_CHAT_ID, true );
+			$tg_bot_username = (string) get_option( Amy_Telegram::OPTION_BOT_USERNAME, '' );
+			$tg_enabled      = $this->settings->is_telegram_enabled();
+			?>
+			<section class="amy-agent-my-profile__panel amy-agent-my-profile__panel--telegram" aria-label="<?php echo esc_attr__( 'Telegram task alerts', 'amy-agent' ); ?>">
+				<h2 class="amy-agent-my-profile__panel-title">
+					<span class="amy-agent-my-profile__panel-title-icon" aria-hidden="true">
+						<span class="dashicons dashicons-format-chat"></span>
+					</span>
+					<?php echo esc_html__( 'Telegram task alerts', 'amy-agent' ); ?>
+				</h2>
+				<p class="amy-agent-my-profile__telegram-copy">
+					<?php
+					echo esc_html__(
+						'Link your Telegram account to receive assign, progress-check, and expiry alerts from the same Admin Bot configured in Amy → Settings → Telegram (no second bot). Email still uses FluentSMTP From hello@ in Settings → General.',
+						'amy-agent'
+					);
+					?>
+				</p>
+				<?php if ( ! $tg_enabled ) : ?>
+					<p class="amy-agent-my-profile__telegram-status" role="status">
+						<?php echo esc_html__( 'Telegram bot is disabled. An admin must enable it under Amy → Settings → Telegram.', 'amy-agent' ); ?>
+						<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG . '&tab=telegram' ) ); ?>">
+							<?php echo esc_html__( 'Open Settings', 'amy-agent' ); ?>
+						</a>
+					</p>
+				<?php elseif ( $tg_chat_id > 0 ) : ?>
+					<p class="amy-agent-my-profile__telegram-status is-linked" id="amy-my-profile-tg-status" role="status">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: %d: Telegram chat id */
+								__( 'Linked (chat id %d). Task alerts will use this chat when the bot is connected.', 'amy-agent' ),
+								$tg_chat_id
+							)
+						);
+						?>
+					</p>
+					<button type="button" class="amy-agent-my-profile__btn amy-agent-my-profile__btn--outline" id="amy-my-profile-tg-unlink">
+						<?php echo esc_html__( 'Unlink Telegram', 'amy-agent' ); ?>
+					</button>
+				<?php else : ?>
+					<p class="amy-agent-my-profile__telegram-status" id="amy-my-profile-tg-status" role="status">
+						<?php
+						if ( $tg_bot_username ) {
+							echo esc_html(
+								sprintf(
+									/* translators: %s: bot username */
+									__( 'Not linked yet. Connect to @%s with a one-time link.', 'amy-agent' ),
+									$tg_bot_username
+								)
+							);
+						} else {
+							echo esc_html__( 'Not linked yet. Generate a connect link after the site bot is connected in Settings.', 'amy-agent' );
+						}
+						?>
+					</p>
+					<div class="amy-agent-my-profile__telegram-actions">
+						<button type="button" class="amy-agent-my-profile__btn amy-agent-my-profile__btn--accent" id="amy-my-profile-tg-link">
+							<?php echo esc_html__( 'Connect Telegram', 'amy-agent' ); ?>
+						</button>
+						<a
+							class="amy-agent-my-profile__btn amy-agent-my-profile__btn--outline"
+							href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG . '&tab=telegram' ) ); ?>"
+						>
+							<?php echo esc_html__( 'Settings path', 'amy-agent' ); ?>
+						</a>
+					</div>
+					<p class="amy-agent-my-profile__telegram-deep" id="amy-my-profile-tg-deep" hidden></p>
+				<?php endif; ?>
+			</section>
 
 			<div class="amy-agent-my-profile__layout">
 				<section class="amy-agent-my-profile__panel amy-agent-my-profile__panel--open">

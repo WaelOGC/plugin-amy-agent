@@ -175,5 +175,88 @@
 					$saveBtn.prop('disabled', false).text((cfg.i18n && cfg.i18n.save) || 'Save changes');
 				});
 		});
+
+		var $tgLink = $('#amy-my-profile-tg-link');
+		var $tgUnlink = $('#amy-my-profile-tg-unlink');
+		var $tgStatus = $('#amy-my-profile-tg-status');
+		var $tgDeep = $('#amy-my-profile-tg-deep');
+		var tgNonce = cfg.telegramNonce || '';
+
+		$tgLink.on('click', function (event) {
+			event.preventDefault();
+			var $btn = $(this);
+			$btn.prop('disabled', true).text((cfg.i18n && cfg.i18n.tgLinking) || 'Generating link…');
+			$.post(cfg.ajaxUrl, {
+				action: 'amy_telegram_user_link_start',
+				nonce: tgNonce,
+			})
+				.done(function (response) {
+					if (!response || !response.success || !response.data) {
+						var fail =
+							response && response.data && response.data.message
+								? response.data.message
+								: cfg.i18n && cfg.i18n.error
+									? cfg.i18n.error
+									: 'Error';
+						if ($tgStatus.length) {
+							$tgStatus.text(fail);
+						}
+						return;
+					}
+					var data = response.data;
+					if ($tgDeep.length && data.deep_link) {
+						$tgDeep
+							.prop('hidden', false)
+							.html(
+								'<a href="' +
+									String(data.deep_link).replace(/"/g, '&quot;') +
+									'" target="_blank" rel="noopener noreferrer">' +
+									((cfg.i18n && cfg.i18n.tgOpenBot) || 'Open bot & tap Start') +
+									'</a>' +
+									(data.code
+										? ' <code>/start connect_' + String(data.code) + '</code>'
+										: '')
+							);
+					}
+					if ($tgStatus.length) {
+						$tgStatus.text(data.message || '');
+					}
+				})
+				.fail(function (xhr) {
+					var msg = cfg.i18n && cfg.i18n.error ? cfg.i18n.error : 'Error';
+					if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+						msg = xhr.responseJSON.data.message;
+					}
+					if ($tgStatus.length) {
+						$tgStatus.text(msg);
+					}
+				})
+				.always(function () {
+					$btn.prop('disabled', false).text((cfg.i18n && cfg.i18n.tgLink) || 'Connect Telegram');
+				});
+		});
+
+		$tgUnlink.on('click', function (event) {
+			event.preventDefault();
+			var $btn = $(this);
+			$btn.prop('disabled', true).text((cfg.i18n && cfg.i18n.tgUnlinking) || 'Unlinking…');
+			$.post(cfg.ajaxUrl, {
+				action: 'amy_telegram_user_unlink',
+				nonce: tgNonce,
+			})
+				.done(function () {
+					window.location.reload();
+				})
+				.fail(function (xhr) {
+					var msg = cfg.i18n && cfg.i18n.error ? cfg.i18n.error : 'Error';
+					if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+						msg = xhr.responseJSON.data.message;
+					}
+					if ($tgStatus.length) {
+						$tgStatus.text(msg);
+					}
+					$btn.prop('disabled', false).text((cfg.i18n && cfg.i18n.tgUnlink) || 'Unlink Telegram');
+				});
+		});
 	});
 })(jQuery);

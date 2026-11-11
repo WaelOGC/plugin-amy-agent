@@ -8,6 +8,7 @@
 defined( 'ABSPATH' ) || exit;
 
 require_once AMY_AGENT_PATH . 'includes/class-amy-telegram.php';
+require_once AMY_AGENT_PATH . 'includes/class-amy-task-notify.php';
 
 /**
  * Boots Amy Agent subsystems.
@@ -102,6 +103,11 @@ class Amy_Plugin {
 	public $telegram;
 
 	/**
+	 * @var Amy_Task_Notify
+	 */
+	public $task_notify;
+
+	/**
 	 * Returns the singleton instance.
 	 *
 	 * @return Amy_Plugin
@@ -128,6 +134,7 @@ class Amy_Plugin {
 		$this->seo_taxonomy_meta    = new Amy_Seo_Taxonomy_Meta();
 		$this->seo_batches_ajax     = new Amy_Seo_Batches_Ajax( $this->api_client );
 		$this->telegram             = new Amy_Telegram( $this->settings, $this->api_client );
+		$this->task_notify          = new Amy_Task_Notify( $this->settings, $this->telegram );
 		$this->rest                 = new Amy_Rest( $this->api_client, $this->settings );
 		$this->theme_bridge         = new Amy_Theme_Bridge( $this->settings );
 		$this->assets               = new Amy_Assets( $this->settings );
@@ -144,6 +151,7 @@ class Amy_Plugin {
 		$this->seo_taxonomy_meta->register();
 		$this->seo_batches_ajax->register();
 		$this->telegram->register();
+		$this->task_notify->register();
 		$this->rest->register();
 		$this->theme_bridge->register();
 		$this->assets->register();

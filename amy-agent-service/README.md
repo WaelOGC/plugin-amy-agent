@@ -31,6 +31,7 @@ Edit `.env`:
 - `AMY_SHARED_SECRET` — must match WordPress **Settings → Amy Agent → Shared secret**
 - `PORT` — default `8765`
 - `PUBLIC_BASE_URL` — public origin of this service (no trailing slash), used for Submit Idea upload links in emails. Local: `http://127.0.0.1:8765`. On Dokploy, use the publicly reachable HTTPS URL of this service (not an internal Docker hostname).
+- `WORDPRESS_BASE_URL` — WordPress site origin (no trailing slash), e.g. `https://ogcnewfinity.com`. Used by Task Service P1 to relay assign/mid/expiry **email + Telegram** through `/wp-json/amy-agent/v1/task-notify` (FluentSMTP + Admin Bot). When unset, dashboard notifications still work; channels soft-skip.
 
 **Do not put AI provider API keys in `.env`.** Keys live in WordPress Options and are sent per request in the `ai` payload.
 
@@ -61,11 +62,14 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | POST | `/v1/config/validate` | Schema check only |
 | POST | `/v1/chat` | Calls selected provider; `200` / `502` |
 | GET | `/v1/tasks` | List tasks (optional `status`, `priority`, `assignee_wp_user_id`) |
-| POST | `/v1/tasks` | Create task |
+| POST | `/v1/tasks` | Create task (human assign → dashboard + outbound notify) |
 | GET | `/v1/tasks/stats` | Aggregate counts for Task Service stat cards |
 | GET | `/v1/tasks/{id}` | Fetch one task |
-| PATCH | `/v1/tasks/{id}` | Partial update |
+| PATCH | `/v1/tasks/{id}` | Partial update (reassign → assign notify) |
 | DELETE | `/v1/tasks/{id}` | Delete task |
+| GET | `/v1/tasks/{id}/progress-notes` | List progress notes |
+| POST | `/v1/tasks/{id}/progress-notes` | Add a progress note |
+| POST | `/v1/tasks/progress-notes/from-telegram` | Consume mid free-text reply when pending |
 | POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set) |
 | GET | `/v1/analytics/leads` | Lead list for the admin page (optional `status`) |
 | GET | `/v1/analytics/leads/{session_id}/events` | Event timeline for one session |
