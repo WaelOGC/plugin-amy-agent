@@ -9,7 +9,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app import config_task_rules as rules
+from app import __version__, config_task_rules as rules
 from app.db import analytics_db, conversations_db
 from app.routes import (
     analytics,
@@ -133,7 +133,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Amy Agent Service",
-    version="0.2.12",
+    version=__version__,
     description="Intelligence layer for the Amy Agent WordPress plugin (Phase 1 scaffold).",
     lifespan=lifespan,
 )
