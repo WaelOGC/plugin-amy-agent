@@ -19,6 +19,8 @@ class TaskCreateRequest(BaseModel):
     status: TaskStatus = "todo"
     due_date: str | None = None
     amy_capable: bool = False
+    owner_wp_user_id: int | None = None
+    backup_wp_user_id: int | None = None
 
 
 class TaskUpdateRequest(BaseModel):
@@ -32,6 +34,8 @@ class TaskUpdateRequest(BaseModel):
     status: TaskStatus | None = None
     due_date: str | None = None
     amy_capable: bool | None = None
+    owner_wp_user_id: int | None = None
+    backup_wp_user_id: int | None = None
 
 
 class TaskResponse(BaseModel):
@@ -41,6 +45,8 @@ class TaskResponse(BaseModel):
     assignee_type: AssigneeType
     assignee_wp_user_id: int | None = None
     created_by_wp_user_id: int
+    owner_wp_user_id: int
+    backup_wp_user_id: int | None = None
     priority: Priority
     status: TaskStatus
     due_date: str | None = None
@@ -51,6 +57,26 @@ class TaskResponse(BaseModel):
     escalation_stage_updated_at: float | None = None
     acknowledged_at: float | None = None
     extension_total_seconds: float = 0
+
+
+class ExpiryActionRequest(BaseModel):
+    """Owner/backup actions after a task expires (P3)."""
+
+    actor_wp_user_id: int
+    action: Literal[
+        "reassign_same",
+        "reassign_other",
+        "acknowledge_manual",
+        "amy_take",
+    ]
+    assignee_wp_user_id: int | None = None
+    due_date: str | None = None
+
+
+class ExpiryActionResponse(BaseModel):
+    outcome: str
+    task: TaskResponse
+    amy_execution_enabled: bool = False
 
 
 class TaskListResponse(BaseModel):

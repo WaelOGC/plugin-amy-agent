@@ -2,7 +2,7 @@
 
 > Priority #6 in `roadmap-status.md`.
 
-## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0/P1/P2 escalation (2026-11-11)
+## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0–P3 escalation (2026-11-11)
 
 **Task 1:** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats,
 WordPress API client + admin-ajax proxies, real assignees, board/list CRUD,
@@ -29,8 +29,11 @@ channel relay.
 locked decisions — **one** mid progress ask at **50%** of `created_at`→due,
 then **expiry** (final warning deferred). Stage `mid_report_asked` (legacy
 `midpoint_sent` / `final_warning_sent` still recognized for idempotency).
-Expiry reuses P1 notify; `amy_capable` leaves a P4 handoff hook only (never
-fake Amy completion). P3 owner/backup UX + P4 Amy execution remain.
+
+**P3 (plugin 0.2.44 / service 0.2.8):** expiry notifies resolved **owner**
+(creator; if no Telegram / gone → site default owner; else backup). Bell +
+modal reassign UX; `amy_capable` shows honest disabled “Let Amy take it”
+until P4 (`AMY_EXECUTION_ENABLED=False`). Never fake Amy completion.
 
 ## Implementation notes (scoping vs original plan)
 

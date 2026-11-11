@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.43 / amy-agent-service v0.2.7 — Task Service P2 scheduler).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.44 / amy-agent-service v0.2.8 — Task Service P3 owner/backup).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -34,7 +34,9 @@
 > **Task Service P2 (v0.2.43 / service 0.2.7):** APScheduler state machine
 > `none` → `mid_report_asked` (50% of created→due) → `expired`; one mid ask
 > (final warning deferred); P1 notify reused; `amy_capable` expiry hook only.
-> Owner/backup UX + Amy run = P3–P4.
+> **Task Service P3 (v0.2.44 / service 0.2.8):** owner/backup escalate on
+> expiry (creator → site default → backup); reassign UX in bell + modal;
+> Amy-take CTA gated off until P4.
 
 ---
 
@@ -93,17 +95,19 @@
   soft with `—` / connection hint (never fake zeros). **Admin Roles & Social**
   card remains honest coming-soon (tool not started).
 
-### 4. Task Service — complete (Task 1 + Task 2) + P0 create UX
+### 4. Task Service — complete (Task 1 + Task 2) + P0–P3 escalation
 - Backend: persistent SQLite at `data/tasks.db` (no TTL), FastAPI CRUD + stats,
-  escalation schema (`escalation_stage`, `acknowledged_at`, extensions),
-  `notifications` + `extension_requests` tables, APScheduler every 5 minutes
+  escalation schema (`escalation_stage`, `acknowledged_at`, extensions,
+  `owner_wp_user_id` / `backup_wp_user_id`), `notifications` +
+  `extension_requests` tables, APScheduler every 5 minutes
 - Behavior: standard **mid@50% progress ask → expiry** (P2; final warning
-  deferred); creator expiry actions; urgent 60m check-ins / any-available-user
-  reassignment / `no_one_available`; extension auto-cap (24h normal) vs
-  always-approve (urgent)
+  deferred); P3 owner escalate on expiry; urgent 60m check-ins /
+  any-available-user reassignment / `no_one_available`; extension auto-cap
+  (24h normal) vs always-approve (urgent)
 - WP: Task Service + My Profile notification bell (shared JS/CSS), acknowledge on
   assignee open, Request Extension in edit modal, AJAX proxies for notifications /
-  extensions / ack; dashboard user sync for reassignment pool
+  extensions / ack / expiry-action; dashboard user sync (Telegram + backup +
+  site default owner)
 - **P0 (plugin 0.2.41 / service 0.2.5):** create/edit **Amy does this** vs
   **Someone does this** (human picker) → `assignee_type`; boolean `amy_capable`
   on create/update/list/get; light mode + Amy-capable badges on board/list.
@@ -116,9 +120,11 @@
   for channel relay.
 - **P2 (plugin 0.2.43 / service 0.2.7):** scheduler stages
   `none` → `mid_report_asked` → `expired` from `created_at`→`due_date`;
-  idempotent mid (legacy `midpoint_sent` / `final_warning_sent` skip re-fire);
-  expiry notify + `amy_capable` P4 hook (no fake complete). P3 owner/backup +
-  P4 Amy execution still open.
+  idempotent mid (legacy `midpoint_sent` / `final_warning_sent` skip re-fire).
+- **P3 (plugin 0.2.44 / service 0.2.8):** expiry → resolved owner (creator if
+  Telegram-linked + present, else site default owner, else backup); Settings
+  site default owner + My Profile backup; bell/modal reassign UX; Amy-take
+  CTA disabled until P4 (`AMY_EXECUTION_ENABLED=False`). P4 Amy execution open.
 
 ### 5. Analytics — complete (Task 1: plugin + service)
 - Backend: persistent SQLite at `data/analytics.db` (90-day retention, purged by

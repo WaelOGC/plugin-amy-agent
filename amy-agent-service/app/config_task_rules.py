@@ -4,6 +4,9 @@ Tune these in one place — do not scatter magic numbers through the engine.
 
 P2 standard path (locked): assign → one mid progress ask at 50% of
 created_at → due window → expiry. Final warning is deferred (P2.1).
+
+P3: on expiry notify resolved owner (creator → site default → backup);
+human reassign UX. Amy execution remains gated by AMY_EXECUTION_ENABLED (P4).
 """
 
 # Standard (non-urgent) task reminders — mid-only + expiry (P2)
@@ -21,6 +24,12 @@ URGENT_REASSIGN_ACK_WINDOW_SECONDS = 60 * 60  # second failure window after reas
 
 # Extension rules
 EXTENSION_CAP_SECONDS = 24 * 60 * 60  # 24-hour total auto-extension cap (normal only)
+
+# P3 expiry reassign: bump past-due tasks so the mid/expiry machine can run again
+EXPIRY_REASSIGN_GRACE_SECONDS = 24 * 60 * 60
+
+# P4 readiness — when False, "Let Amy take it" stays disabled with honest copy
+AMY_EXECUTION_ENABLED = False
 
 # Background scheduler
 ESCALATION_JOB_INTERVAL_SECONDS = 5 * 60  # run checks every 5 minutes

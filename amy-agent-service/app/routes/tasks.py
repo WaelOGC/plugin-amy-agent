@@ -9,6 +9,8 @@ from app.auth import require_amy_secret
 from app.db import progress_notes_db, tasks_db
 from app.schemas.messages import ErrorBody
 from app.schemas.tasks import (
+    ExpiryActionRequest,
+    ExpiryActionResponse,
     ProgressNoteCreateRequest,
     ProgressNoteListResponse,
     ProgressNoteResponse,
@@ -24,7 +26,8 @@ from app.schemas.notifications import (
     DashboardUserSyncRequest,
     DashboardUserSyncResponse,
 )
-from app.services import task_notify
+from app.services import task_escalation, task_notify
+from app import config_task_rules as rules
 
 router = APIRouter(tags=["tasks"])
 
@@ -57,8 +60,15 @@ async def task_stats() -> TaskStatsResponse:
 async def sync_dashboard_users(
     body: DashboardUserSyncRequest,
 ) -> DashboardUserSyncResponse:
-    count = tasks_db.sync_dashboard_users([u.model_dump() for u in body.users])
-    return DashboardUserSyncResponse(ok=True, count=count)
+    count = tasks_db.sync_dashboard_users(
+        [u.model_dump() for u in body.users],
+        site_default_owner_wp_user_id=body.site_default_owner_wp_user_id,
+    )
+    return DashboardUserSyncResponse(
+        ok=True,
+        count=count,
+        site_default_owner_wp_user_id=tasks_db.get_site_default_owner(),
+    )
 
 
 @router.get(
@@ -99,6 +109,8 @@ async def create_task(body: TaskCreateRequest) -> TaskResponse | JSONResponse:
             status=body.status,
             due_date=body.due_date,
             amy_capable=body.amy_capable,
+            owner_wp_user_id=body.owner_wp_user_id,
+            backup_wp_user_id=body.backup_wp_user_id,
         )
     except ValueError as exc:
         return _error("invalid_task", str(exc), status.HTTP_400_BAD_REQUEST)
@@ -117,6 +129,34 @@ async def get_task(task_id: str) -> TaskResponse | JSONResponse:
     if row is None:
         return _error("not_found", "Task not found.", status.HTTP_404_NOT_FOUND)
     return _to_response(row)
+
+
+@router.post(
+    "/v1/tasks/{task_id}/expiry-action",
+    response_model=ExpiryActionResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def expiry_action(
+    task_id: str, body: ExpiryActionRequest
+) -> ExpiryActionResponse | JSONResponse:
+    """P3: owner/backup reassign or acknowledge after expiry (Amy take gated)."""
+    try:
+        result = task_escalation.handle_expiry_action(
+            task_id,
+            actor_wp_user_id=body.actor_wp_user_id,
+            action=body.action,
+            assignee_wp_user_id=body.assignee_wp_user_id,
+            due_date=body.due_date,
+        )
+    except ValueError as exc:
+        return _error("invalid_action", str(exc), status.HTTP_400_BAD_REQUEST)
+    return ExpiryActionResponse(
+        outcome=result["outcome"],
+        task=_to_response(result["task"]),
+        amy_execution_enabled=bool(
+            result.get("amy_execution_enabled", rules.AMY_EXECUTION_ENABLED)
+        ),
+    )
 
 
 @router.patch(

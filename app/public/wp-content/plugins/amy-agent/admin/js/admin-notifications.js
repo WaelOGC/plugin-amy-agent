@@ -9,6 +9,7 @@
 	window.AmyAgentNotifications.init = function (cfg) {
 		cfg = cfg || window.amyAgentNotifications || {};
 		var i18n = cfg.i18n || {};
+		var assignees = Array.isArray(cfg.assignees) ? cfg.assignees : [];
 		var $root = $('#amy-agent-notifications');
 		if (!$root.length) {
 			return;
@@ -45,6 +46,24 @@
 			}
 		}
 
+		function assigneeOptionsHtml(selectedId) {
+			var html =
+				'<option value="">' +
+				escapeHtml(i18n.selectAssignee || 'Select someone…') +
+				'</option>';
+			assignees.forEach(function (a) {
+				html +=
+					'<option value="' +
+					escapeHtml(String(a.id)) +
+					'"' +
+					(String(a.id) === String(selectedId || '') ? ' selected' : '') +
+					'>' +
+					escapeHtml(a.label) +
+					'</option>';
+			});
+			return html;
+		}
+
 		function itemHtml(n) {
 			var actions = '';
 			var payload = n.action_payload || {};
@@ -63,17 +82,56 @@
 					'</button>' +
 					'</div>';
 			} else if (n.requires_action && n.type === 'task_expired' && payload.task_id) {
+				var choices = Array.isArray(payload.choices) ? payload.choices : [];
+				var amyCapable = !!payload.amy_capable;
+				var amyEnabled = !!payload.amy_execution_enabled;
+				var showAmy = choices.indexOf('amy_take') !== -1 || amyCapable;
 				actions =
-					'<div class="amy-agent-notifications__actions">' +
-					'<button type="button" class="amy-agent-notifications__action" data-amy-open-task="' +
+					'<div class="amy-agent-notifications__actions amy-agent-notifications__actions--expiry">' +
+					'<button type="button" class="amy-agent-notifications__action" data-amy-expiry-same="' +
+					escapeHtml(payload.task_id) +
+					'">' +
+					escapeHtml(i18n.reassignSame || 'Reassign same') +
+					'</button>' +
+					'<button type="button" class="amy-agent-notifications__action" data-amy-expiry-other-toggle="' +
+					escapeHtml(payload.task_id) +
+					'">' +
+					escapeHtml(i18n.reassignOther || 'Reassign…') +
+					'</button>' +
+					'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-expiry-ack="' +
+					escapeHtml(payload.task_id) +
+					'">' +
+					escapeHtml(i18n.acknowledge || 'Acknowledge') +
+					'</button>';
+				if (showAmy) {
+					actions +=
+						'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-expiry-amy="' +
+						escapeHtml(payload.task_id) +
+						'"' +
+						(amyEnabled ? '' : ' disabled') +
+						' title="' +
+						escapeHtml(i18n.amyTakeDisabled || 'Amy execution is not live yet.') +
+						'">' +
+						escapeHtml(i18n.amyTake || 'Let Amy take it') +
+						'</button>';
+				}
+				actions +=
+					'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-open-task="' +
 					escapeHtml(payload.task_id) +
 					'">' +
 					escapeHtml(i18n.openTask || 'Open task') +
 					'</button>' +
-					'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-dismiss="' +
-					escapeHtml(n.id) +
+					'</div>' +
+					'<div class="amy-agent-notifications__reassign" data-amy-reassign-for="' +
+					escapeHtml(payload.task_id) +
+					'" hidden>' +
+					'<select class="amy-agent-notifications__reassign-select">' +
+					assigneeOptionsHtml() +
+					'</select>' +
+					'<button type="button" class="amy-agent-notifications__action" data-amy-expiry-other-confirm="' +
+					escapeHtml(payload.task_id) +
 					'">' +
-					escapeHtml(i18n.acknowledge || 'Acknowledge') +
+					escapeHtml(i18n.confirmReassign || 'Confirm reassign') +
 					'</button>' +
 					'</div>';
 			} else if (n.requires_action && payload.task_id) {
@@ -144,6 +202,44 @@
 			$toggle.attr('aria-expanded', open ? 'true' : 'false');
 		}
 
+		function runExpiryAction(taskId, action, extra, $item) {
+			var data = $.extend(
+				{
+					id: taskId,
+					expiry_action: action,
+				},
+				extra || {}
+			);
+			return ajax('amy_task_expiry_action', data)
+				.done(function (response) {
+					if (!response || !response.success) {
+						window.alert(
+							(response && response.data && response.data.message) ||
+								i18n.reassignError ||
+								'Could not reassign.'
+						);
+						return;
+					}
+					if ($item && $item.data('id')) {
+						markRead($item.data('id'));
+					}
+					if (window.AmyAgentTaskService && window.AmyAgentTaskService.reload) {
+						window.AmyAgentTaskService.reload();
+					}
+				})
+				.fail(function (xhr) {
+					var msg =
+						xhr &&
+						xhr.responseJSON &&
+						xhr.responseJSON.data &&
+						xhr.responseJSON.data.message
+							? xhr.responseJSON.data.message
+							: i18n.reassignError || 'Could not reassign.';
+					window.alert(msg);
+				})
+				.always(load);
+		}
+
 		$toggle.on('click', function (event) {
 			event.preventDefault();
 			setOpen(!open);
@@ -188,6 +284,50 @@
 					}
 				})
 				.always(load);
+		});
+
+		$list.on('click', '[data-amy-expiry-same]', function (event) {
+			event.preventDefault();
+			var taskId = String($(this).data('amy-expiry-same') || '');
+			var $item = $(this).closest('.amy-agent-notifications__item');
+			runExpiryAction(taskId, 'reassign_same', {}, $item);
+		});
+
+		$list.on('click', '[data-amy-expiry-other-toggle]', function (event) {
+			event.preventDefault();
+			var taskId = String($(this).data('amy-expiry-other-toggle') || '');
+			var $box = $list.find('[data-amy-reassign-for="' + taskId + '"]');
+			$box.prop('hidden', !$box.prop('hidden'));
+		});
+
+		$list.on('click', '[data-amy-expiry-other-confirm]', function (event) {
+			event.preventDefault();
+			var taskId = String($(this).data('amy-expiry-other-confirm') || '');
+			var $item = $(this).closest('.amy-agent-notifications__item');
+			var uid = parseInt($item.find('.amy-agent-notifications__reassign-select').val(), 10) || 0;
+			if (!uid) {
+				window.alert(i18n.selectAssignee || 'Select someone…');
+				return;
+			}
+			runExpiryAction(taskId, 'reassign_other', { assignee_wp_user_id: uid }, $item);
+		});
+
+		$list.on('click', '[data-amy-expiry-ack]', function (event) {
+			event.preventDefault();
+			var taskId = String($(this).data('amy-expiry-ack') || '');
+			var $item = $(this).closest('.amy-agent-notifications__item');
+			runExpiryAction(taskId, 'acknowledge_manual', {}, $item);
+		});
+
+		$list.on('click', '[data-amy-expiry-amy]', function (event) {
+			event.preventDefault();
+			if ($(this).prop('disabled')) {
+				window.alert(i18n.amyTakeDisabled || 'Amy execution is not live yet.');
+				return;
+			}
+			var taskId = String($(this).data('amy-expiry-amy') || '');
+			var $item = $(this).closest('.amy-agent-notifications__item');
+			runExpiryAction(taskId, 'amy_take', {}, $item);
 		});
 
 		$list.on('click', '[data-amy-open-task]', function (event) {

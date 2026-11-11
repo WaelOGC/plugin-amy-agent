@@ -31,7 +31,7 @@ Edit `.env`:
 - `AMY_SHARED_SECRET` — must match WordPress **Settings → Amy Agent → Shared secret**
 - `PORT` — default `8765`
 - `PUBLIC_BASE_URL` — public origin of this service (no trailing slash), used for Submit Idea upload links in emails. Local: `http://127.0.0.1:8765`. On Dokploy, use the publicly reachable HTTPS URL of this service (not an internal Docker hostname).
-- `WORDPRESS_BASE_URL` — WordPress site origin (no trailing slash), e.g. `https://ogcnewfinity.com`. Used by Task Service to relay assign/mid/expiry **email + Telegram** through `/wp-json/amy-agent/v1/task-notify` (FluentSMTP + Admin Bot). Required on Dokploy for real-world channels; when unset, dashboard notifications still work and channels soft-skip. P2 scheduler: open human tasks follow `none` → `mid_report_asked` (50% of created→due) → `expired` via the 5-minute APScheduler job.
+- `WORDPRESS_BASE_URL` — WordPress site origin (no trailing slash), e.g. `https://ogcnewfinity.com`. Used by Task Service to relay assign/mid/expiry **email + Telegram** through `/wp-json/amy-agent/v1/task-notify` (FluentSMTP + Admin Bot). Required on Dokploy for real-world channels; when unset, dashboard notifications still work and channels soft-skip. P2/P3 scheduler: open human tasks follow `none` → `mid_report_asked` (50% of created→due) → `expired` (notify resolved owner: creator → site default → backup) via the 5-minute APScheduler job.
 
 **Do not put AI provider API keys in `.env`.** Keys live in WordPress Options and are sent per request in the `ai` payload.
 
@@ -66,6 +66,7 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | GET | `/v1/tasks/stats` | Aggregate counts for Task Service stat cards |
 | GET | `/v1/tasks/{id}` | Fetch one task |
 | PATCH | `/v1/tasks/{id}` | Partial update (reassign → assign notify) |
+| POST | `/v1/tasks/{id}/expiry-action` | P3 owner/backup reassign / acknowledge (Amy take gated) |
 | DELETE | `/v1/tasks/{id}` | Delete task |
 | GET | `/v1/tasks/{id}/progress-notes` | List progress notes |
 | POST | `/v1/tasks/{id}/progress-notes` | Add a progress note |

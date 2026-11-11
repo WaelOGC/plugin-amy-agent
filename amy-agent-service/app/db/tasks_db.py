@@ -55,7 +55,17 @@ _TASK_COLUMN_DEFAULTS: dict[str, str] = {
     "acknowledged_at": "REAL",
     "extension_total_seconds": "REAL NOT NULL DEFAULT 0",
     "amy_capable": "INTEGER NOT NULL DEFAULT 0",
+    # P3: owner defaults to creator; backup is optional task override.
+    "owner_wp_user_id": "INTEGER",
+    "backup_wp_user_id": "INTEGER",
 }
+
+_DASHBOARD_USER_COLUMN_DEFAULTS: dict[str, str] = {
+    "telegram_linked": "INTEGER NOT NULL DEFAULT 0",
+    "backup_wp_user_id": "INTEGER",
+}
+
+_SITE_SETTING_DEFAULT_OWNER = "site_default_owner_wp_user_id"
 
 
 def _connect() -> sqlite3.Connection:
@@ -91,24 +101,61 @@ def _connect() -> sqlite3.Connection:
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS task_site_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
     _migrate_tasks_columns(conn)
+    _migrate_dashboard_user_columns(conn)
     return conn
 
 
 def _migrate_tasks_columns(conn: sqlite3.Connection) -> None:
-    """Add Task-2 columns safely against an existing Task-1 tasks.db."""
+    """Add Task-2/P0/P3 columns safely against an existing Task-1 tasks.db."""
     existing = {
         row[1] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()
     }
     for name, decl in _TASK_COLUMN_DEFAULTS.items():
         if name not in existing:
             conn.execute(f"ALTER TABLE tasks ADD COLUMN {name} {decl}")
+    # Backfill owner from creator when null (P3 migration).
+    if "owner_wp_user_id" in existing or "owner_wp_user_id" in _TASK_COLUMN_DEFAULTS:
+        conn.execute(
+            """
+            UPDATE tasks
+            SET owner_wp_user_id = created_by_wp_user_id
+            WHERE owner_wp_user_id IS NULL
+            """
+        )
+
+
+def _migrate_dashboard_user_columns(conn: sqlite3.Connection) -> None:
+    existing = {
+        row[1] for row in conn.execute("PRAGMA table_info(dashboard_users)").fetchall()
+    }
+    for name, decl in _DASHBOARD_USER_COLUMN_DEFAULTS.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE dashboard_users ADD COLUMN {name} {decl}")
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     keys = set(row.keys())
     amy_capable_raw = (
         row["amy_capable"] if "amy_capable" in keys and row["amy_capable"] is not None else 0
+    )
+    owner_raw = (
+        row["owner_wp_user_id"]
+        if "owner_wp_user_id" in keys and row["owner_wp_user_id"] is not None
+        else row["created_by_wp_user_id"]
+    )
+    backup_raw = (
+        row["backup_wp_user_id"]
+        if "backup_wp_user_id" in keys and row["backup_wp_user_id"] is not None
+        else None
     )
     return {
         "id": row["id"],
@@ -117,6 +164,8 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "assignee_type": row["assignee_type"],
         "assignee_wp_user_id": row["assignee_wp_user_id"],
         "created_by_wp_user_id": row["created_by_wp_user_id"],
+        "owner_wp_user_id": int(owner_raw),
+        "backup_wp_user_id": int(backup_raw) if backup_raw is not None else None,
         "priority": row["priority"],
         "status": row["status"],
         "due_date": row["due_date"],
@@ -153,6 +202,8 @@ def create_task(
     status: TaskStatus = "todo",
     due_date: str | None = None,
     amy_capable: bool = False,
+    owner_wp_user_id: int | None = None,
+    backup_wp_user_id: int | None = None,
 ) -> dict[str, Any]:
     """Insert a new task and return the full row dict."""
     title = (title or "").strip()
@@ -172,6 +223,9 @@ def create_task(
     now = time.time()
     task_id = str(uuid.uuid4())
     amy_capable_int = 1 if amy_capable else 0
+    creator = int(created_by_wp_user_id)
+    owner = int(owner_wp_user_id) if owner_wp_user_id is not None else creator
+    backup = int(backup_wp_user_id) if backup_wp_user_id is not None else None
     conn = _connect()
     try:
         with conn:
@@ -179,11 +233,12 @@ def create_task(
                 """
                 INSERT INTO tasks (
                     id, title, description, assignee_type, assignee_wp_user_id,
-                    created_by_wp_user_id, priority, status, due_date, amy_capable,
+                    created_by_wp_user_id, owner_wp_user_id, backup_wp_user_id,
+                    priority, status, due_date, amy_capable,
                     created_at, updated_at,
                     escalation_stage, escalation_stage_updated_at,
                     acknowledged_at, extension_total_seconds
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'none', NULL, NULL, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'none', NULL, NULL, 0)
                 """,
                 (
                     task_id,
@@ -191,7 +246,9 @@ def create_task(
                     description,
                     assignee_type,
                     assignee_wp_user_id,
-                    int(created_by_wp_user_id),
+                    creator,
+                    owner,
+                    backup,
                     priority,
                     status,
                     due_date,
@@ -267,6 +324,8 @@ def update_task(task_id: str, fields: dict[str, Any]) -> dict[str, Any] | None:
         "status",
         "due_date",
         "amy_capable",
+        "owner_wp_user_id",
+        "backup_wp_user_id",
         "escalation_stage",
         "escalation_stage_updated_at",
         "acknowledged_at",
@@ -295,6 +354,10 @@ def update_task(task_id: str, fields: dict[str, Any]) -> dict[str, Any] | None:
         raise ValueError("invalid escalation_stage")
     if "amy_capable" in updates:
         updates["amy_capable"] = 1 if updates["amy_capable"] else 0
+    if "owner_wp_user_id" in updates and updates["owner_wp_user_id"] is not None:
+        updates["owner_wp_user_id"] = int(updates["owner_wp_user_id"])
+    if "backup_wp_user_id" in updates and updates["backup_wp_user_id"] is not None:
+        updates["backup_wp_user_id"] = int(updates["backup_wp_user_id"])
 
     existing = get_task(task_id)
     if existing is None:
@@ -351,11 +414,16 @@ def acknowledge_task(task_id: str) -> dict[str, Any] | None:
     return update_task(task_id, {"acknowledged_at": time.time()})
 
 
-def sync_dashboard_users(users: list[dict[str, Any]]) -> int:
+def sync_dashboard_users(
+    users: list[dict[str, Any]],
+    *,
+    site_default_owner_wp_user_id: int | None = None,
+) -> int:
     """Replace the cached WP dashboard-user pool used for reassignment.
 
     WordPress pushes manage_options users here because the Python service
-    has no direct WP user directory.
+    has no direct WP user directory. P3 also syncs Telegram link + per-owner
+    backup and the site default owner.
     """
     now = time.time()
     conn = _connect()
@@ -366,14 +434,116 @@ def sync_dashboard_users(users: list[dict[str, Any]]) -> int:
                 uid = int(user.get("wp_user_id") or 0)
                 if uid < 1:
                     continue
+                telegram_linked = 1 if user.get("telegram_linked") else 0
+                backup_raw = user.get("backup_wp_user_id")
+                backup = int(backup_raw) if backup_raw is not None and int(backup_raw) > 0 else None
                 conn.execute(
                     """
-                    INSERT INTO dashboard_users (wp_user_id, display_name, synced_at)
-                    VALUES (?, ?, ?)
+                    INSERT INTO dashboard_users (
+                        wp_user_id, display_name, synced_at,
+                        telegram_linked, backup_wp_user_id
+                    )
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (uid, str(user.get("display_name") or ""), now),
+                    (
+                        uid,
+                        str(user.get("display_name") or ""),
+                        now,
+                        telegram_linked,
+                        backup,
+                    ),
+                )
+            if site_default_owner_wp_user_id is not None:
+                _set_site_setting(
+                    conn,
+                    _SITE_SETTING_DEFAULT_OWNER,
+                    str(int(site_default_owner_wp_user_id))
+                    if int(site_default_owner_wp_user_id) > 0
+                    else "",
                 )
         return conn.execute("SELECT COUNT(*) FROM dashboard_users").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def _set_site_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO task_site_settings (key, value) VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (key, value),
+    )
+
+
+def get_site_default_owner() -> int | None:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT value FROM task_site_settings WHERE key = ?",
+            (_SITE_SETTING_DEFAULT_OWNER,),
+        ).fetchone()
+        if row is None:
+            return None
+        raw = str(row[0] or "").strip()
+        if not raw:
+            return None
+        uid = int(raw)
+        return uid if uid > 0 else None
+    finally:
+        conn.close()
+
+
+def set_site_default_owner(wp_user_id: int | None) -> None:
+    conn = _connect()
+    try:
+        with conn:
+            _set_site_setting(
+                conn,
+                _SITE_SETTING_DEFAULT_OWNER,
+                str(int(wp_user_id)) if wp_user_id and int(wp_user_id) > 0 else "",
+            )
+    finally:
+        conn.close()
+
+
+def is_dashboard_user(wp_user_id: int) -> bool:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT 1 FROM dashboard_users WHERE wp_user_id = ?",
+            (int(wp_user_id),),
+        ).fetchone()
+        return row is not None
+    finally:
+        conn.close()
+
+
+def is_telegram_linked(wp_user_id: int) -> bool:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT telegram_linked FROM dashboard_users WHERE wp_user_id = ?",
+            (int(wp_user_id),),
+        ).fetchone()
+        if row is None:
+            return False
+        return bool(int(row[0] or 0))
+    finally:
+        conn.close()
+
+
+def get_dashboard_user_backup(wp_user_id: int) -> int | None:
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT backup_wp_user_id FROM dashboard_users WHERE wp_user_id = ?",
+            (int(wp_user_id),),
+        ).fetchone()
+        if row is None or row[0] is None:
+            return None
+        uid = int(row[0])
+        return uid if uid > 0 else None
     finally:
         conn.close()
 

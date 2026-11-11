@@ -660,11 +660,44 @@ class Amy_Api_Client {
 	/**
 	 * POST /v1/tasks/sync-dashboard-users — cache manage_options user pool for reassignment.
 	 *
-	 * @param array<int, array{wp_user_id: int, display_name: string}> $users Users.
+	 * @param array<int, array{wp_user_id: int, display_name: string, telegram_linked?: bool, backup_wp_user_id?: int|null}> $users Users.
+	 * @param int|null                                                                                                                                   $site_default_owner_wp_user_id Site default owner (P3).
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
 	 */
-	public function sync_dashboard_users( array $users ) {
-		return $this->request( 'POST', '/v1/tasks/sync-dashboard-users', array( 'users' => $users ) );
+	public function sync_dashboard_users( array $users, $site_default_owner_wp_user_id = null ) {
+		$payload = array( 'users' => $users );
+		if ( null !== $site_default_owner_wp_user_id ) {
+			$payload['site_default_owner_wp_user_id'] = (int) $site_default_owner_wp_user_id;
+		}
+		return $this->request( 'POST', '/v1/tasks/sync-dashboard-users', $payload );
+	}
+
+	/**
+	 * POST /v1/tasks/{id}/expiry-action — owner/backup reassign after timeout (P3).
+	 *
+	 * @param string   $id                   Task UUID.
+	 * @param int      $actor_wp_user_id     Acting WP user.
+	 * @param string   $action               reassign_same|reassign_other|acknowledge_manual|amy_take.
+	 * @param int|null $assignee_wp_user_id  Required for reassign_other.
+	 * @param string|null $due_date          Optional new due date.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function task_expiry_action( $id, $actor_wp_user_id, $action, $assignee_wp_user_id = null, $due_date = null ) {
+		$body = array(
+			'actor_wp_user_id' => (int) $actor_wp_user_id,
+			'action'           => (string) $action,
+		);
+		if ( null !== $assignee_wp_user_id && (int) $assignee_wp_user_id > 0 ) {
+			$body['assignee_wp_user_id'] = (int) $assignee_wp_user_id;
+		}
+		if ( null !== $due_date && '' !== (string) $due_date ) {
+			$body['due_date'] = (string) $due_date;
+		}
+		return $this->request(
+			'POST',
+			'/v1/tasks/' . rawurlencode( (string) $id ) . '/expiry-action',
+			$body
+		);
 	}
 
 	/**

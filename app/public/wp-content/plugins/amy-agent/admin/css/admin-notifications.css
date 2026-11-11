@@ -130,6 +130,31 @@
 	color: rgba(247, 243, 238, 0.75);
 }
 
+.amy-agent-notifications__action:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.amy-agent-notifications__reassign {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	align-items: center;
+	margin-top: 0.45rem;
+}
+
+.amy-agent-notifications__reassign-select {
+	flex: 1 1 8rem;
+	min-width: 0;
+	max-width: 100%;
+	padding: 0.3rem 0.45rem;
+	border: 1px solid rgba(247, 148, 29, 0.4);
+	border-radius: 6px;
+	background: rgba(0, 0, 0, 0.35);
+	color: #f7f3ee;
+	font-size: 0.75rem;
+}
+
 .amy-agent-notifications__dismiss {
 	appearance: none;
 	position: absolute;

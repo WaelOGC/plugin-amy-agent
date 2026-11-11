@@ -71,12 +71,16 @@ class ExtensionActionResponse(BaseModel):
 class DashboardUserSyncItem(BaseModel):
     wp_user_id: int
     display_name: str = ""
+    telegram_linked: bool = False
+    backup_wp_user_id: int | None = None
 
 
 class DashboardUserSyncRequest(BaseModel):
     users: list[DashboardUserSyncItem]
+    site_default_owner_wp_user_id: int | None = None
 
 
 class DashboardUserSyncResponse(BaseModel):
     ok: bool
     count: int
+    site_default_owner_wp_user_id: int | None = None
