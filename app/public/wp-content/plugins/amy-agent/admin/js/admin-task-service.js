@@ -14,6 +14,8 @@
 		var $list = $('#amy-agent-task-list');
 		var $listBody = $('#amy-agent-task-list-body');
 		var $empty = $('#amy-agent-task-empty');
+		var $help = $('#amy-agent-task-help');
+		var $helpText = $('#amy-agent-task-help-text');
 		var $modal = $('#amy-agent-task-modal');
 		var $form = $('#amy-agent-task-form');
 		var $formError = $('#amy-agent-task-form-error');
@@ -39,6 +41,7 @@
 		var noticeTimer = null;
 		var defaultStatus = 'todo';
 		var currentUserId = parseInt(cfg.currentUserId, 10) || 0;
+		var loadFailed = false;
 
 		assignees.forEach(function (a) {
 			assigneeByKey[a.key] = a;
@@ -352,8 +355,27 @@
 
 			if (!filtered.length) {
 				$listBody.empty();
-				$empty.text(i18n.noResults || 'No tasks match your filters.').prop('hidden', false);
+				if (!tasks.length) {
+					$empty.prop('hidden', true).text('');
+					if (loadFailed) {
+						setHelp(
+							i18n.loadError ||
+								'Could not load tasks. Check Amy → Settings → Connection (service URL + shared secret). Telegram alerts: Settings → Telegram + My Profile → Telegram.',
+							true
+						);
+					} else {
+						setHelp(
+							i18n.emptyBoard ||
+								'No tasks yet. Create one with + New Task. If the board will not load, check Amy → Settings → Connection. For Telegram alerts: Settings → Telegram, then My Profile → Telegram.',
+							true
+						);
+					}
+				} else {
+					setHelp('', false);
+					$empty.text(i18n.noResults || 'No tasks match your filters.').prop('hidden', false);
+				}
 			} else {
+				setHelp('', false);
 				$empty.prop('hidden', true).text('');
 				$listBody.html(filtered.map(rowHtml).join(''));
 			}
@@ -368,6 +390,23 @@
 				var active = $btn.data('amy-view') === view;
 				$btn.toggleClass('is-active', active).attr('aria-selected', active ? 'true' : 'false');
 			});
+		}
+
+		function setHelp(message, visible) {
+			if (!$help.length) {
+				return;
+			}
+			if (!visible) {
+				$help.prop('hidden', true);
+				$helpText.text('');
+				return;
+			}
+			$helpText.text(
+				message ||
+					i18n.emptyBoard ||
+					'No tasks yet. Check Settings → Connection and Telegram + My Profile for alerts.'
+			);
+			$help.prop('hidden', false);
 		}
 
 		function showNotice(message, isError) {
@@ -641,12 +680,15 @@
 						var msg =
 							response && response.data && response.data.message
 								? response.data.message
-								: i18n.loadError || 'Could not load tasks.';
+								: i18n.loadError ||
+								  'Could not load tasks. Check Amy → Settings → Connection.';
 						showNotice(msg, true);
+						loadFailed = true;
 						tasks = [];
 						render();
 						return;
 					}
+					loadFailed = false;
 					var rawList =
 						response.data && Array.isArray(response.data.tasks) ? response.data.tasks : [];
 					tasks = rawList.map(enrichTask);
@@ -654,7 +696,12 @@
 					render();
 				})
 				.fail(function () {
-					showNotice(i18n.loadError || 'Could not load tasks.', true);
+					showNotice(
+						i18n.loadError ||
+							'Could not load tasks. Check Amy → Settings → Connection.',
+						true
+					);
+					loadFailed = true;
 					tasks = [];
 					render();
 				});

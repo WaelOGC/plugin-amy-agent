@@ -14,9 +14,10 @@ class Amy_Telegram {
 
 	const NONCE_ACTION = 'amy_agent_telegram';
 
-	const OPTION_WEBHOOK_SECRET = 'amy_agent_telegram_webhook_secret';
-	const OPTION_BOT_USERNAME   = 'amy_agent_telegram_bot_username';
-	const OPTION_CHATS          = 'amy_agent_telegram_chats';
+	const OPTION_WEBHOOK_SECRET    = 'amy_agent_telegram_webhook_secret';
+	const OPTION_BOT_USERNAME      = 'amy_agent_telegram_bot_username';
+	const OPTION_WEBHOOK_CONNECTED = 'amy_agent_telegram_webhook_connected';
+	const OPTION_CHATS             = 'amy_agent_telegram_chats';
 
 	const TRANSIENT_UPDATES     = 'amy_tg_update_ids';
 	const TRANSIENT_RATE_USER    = 'amy_tg_rate_';
@@ -269,11 +270,14 @@ class Amy_Telegram {
 		);
 
 		if ( ! $set['ok'] ) {
+			update_option( self::OPTION_WEBHOOK_CONNECTED, '0', false );
 			wp_send_json_error(
 				array( 'message' => $set['error'] ? $set['error'] : __( 'setWebhook failed.', 'amy-agent' ) ),
 				502
 			);
 		}
+
+		update_option( self::OPTION_WEBHOOK_CONNECTED, '1', false );
 
 		wp_send_json_success(
 			array(
@@ -292,12 +296,22 @@ class Amy_Telegram {
 
 		$this->telegram_api_request( 'deleteWebhook', array( 'drop_pending_updates' => true ) );
 		update_option( self::OPTION_CHATS, array(), false );
+		update_option( self::OPTION_WEBHOOK_CONNECTED, '0', false );
 
 		wp_send_json_success(
 			array(
 				'message' => __( 'Telegram webhook disconnected and chat mappings cleared.', 'amy-agent' ),
 			)
 		);
+	}
+
+	/**
+	 * Whether Connect last succeeded (local flag; no live Telegram probe).
+	 *
+	 * @return bool
+	 */
+	public static function is_webhook_connected() {
+		return '1' === (string) get_option( self::OPTION_WEBHOOK_CONNECTED, '0' );
 	}
 
 	/**
@@ -311,6 +325,7 @@ class Amy_Telegram {
 		$username = (string) get_option( self::OPTION_BOT_USERNAME, '' );
 
 		if ( '' === $token ) {
+			update_option( self::OPTION_WEBHOOK_CONNECTED, '0', false );
 			wp_send_json_success(
 				array(
 					'enabled'       => $enabled,
@@ -349,6 +364,12 @@ class Amy_Telegram {
 				$webhook_state = 'error';
 			}
 		}
+
+		update_option(
+			self::OPTION_WEBHOOK_CONNECTED,
+			'connected' === $webhook_state ? '1' : '0',
+			false
+		);
 
 		wp_send_json_success(
 			array(
