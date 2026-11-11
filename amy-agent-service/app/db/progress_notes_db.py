@@ -60,7 +60,7 @@ def create_progress_note(
     text = (note or "").strip()
     if not text:
         raise ValueError("note is required")
-    if source not in {"telegram", "dashboard", "api"}:
+    if source not in {"telegram", "dashboard", "api", "amy"}:
         raise ValueError("invalid source")
     now = time.time()
     note_id = str(uuid.uuid4())

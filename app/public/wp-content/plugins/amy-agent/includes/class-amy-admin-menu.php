@@ -330,22 +330,25 @@ class Amy_Admin_Menu {
 						'error'            => __( 'Something went wrong. Please try again.', 'amy-agent' ),
 						'titleRequired'    => __( 'Title is required.', 'amy-agent' ),
 						'assigneeRequired' => __( 'Please select who should do this.', 'amy-agent' ),
-						'statusTodo'       => __( 'To Do', 'amy-agent' ),
-						'statusInProgress' => __( 'In Progress', 'amy-agent' ),
-						'statusWaiting'    => __( 'Waiting on Extension', 'amy-agent' ),
-						'statusDone'       => __( 'Done', 'amy-agent' ),
-						'amy'              => __( 'Amy', 'amy-agent' ),
-						'noDue'            => __( 'No due date', 'amy-agent' ),
-						'extensionHours'   => __( 'Hours to request', 'amy-agent' ),
-						'extensionSubmit'  => __( 'Request Extension', 'amy-agent' ),
-						'extensionAuto'    => __( 'Extension granted automatically. Due date updated.', 'amy-agent' ),
-						'extensionPending' => __( 'Extension request sent — awaiting creator approval.', 'amy-agent' ),
-						'extensionInvalid' => __( 'Enter a positive number of hours.', 'amy-agent' ),
+						'statusTodo'           => __( 'To Do', 'amy-agent' ),
+						'statusRunning'        => __( 'Amy Running', 'amy-agent' ),
+						'statusInProgress'     => __( 'In Progress', 'amy-agent' ),
+						'statusWaiting'        => __( 'Waiting on Extension', 'amy-agent' ),
+						'statusFailed'         => __( 'Failed', 'amy-agent' ),
+						'statusDone'           => __( 'Done', 'amy-agent' ),
+						'amy'                  => __( 'Amy', 'amy-agent' ),
+						'noDue'                => __( 'No due date', 'amy-agent' ),
+						'extensionHours'       => __( 'Hours to request', 'amy-agent' ),
+						'extensionSubmit'      => __( 'Request Extension', 'amy-agent' ),
+						'extensionAuto'        => __( 'Extension granted automatically. Due date updated.', 'amy-agent' ),
+						'extensionPending'     => __( 'Extension request sent — awaiting creator approval.', 'amy-agent' ),
+						'extensionInvalid'     => __( 'Enter a positive number of hours.', 'amy-agent' ),
 						'modeAmy'              => __( 'Amy', 'amy-agent' ),
 						'modeHuman'            => __( 'Human', 'amy-agent' ),
 						'amyCapableBadge'      => __( 'Amy-capable', 'amy-agent' ),
 						'expiryActionSuccess'  => __( 'Expiry action saved.', 'amy-agent' ),
-						'amyTakeDisabled'      => __( 'Amy execution is not live yet. Reassign a human instead.', 'amy-agent' ),
+						'amyTakeDisabled'      => __( 'Only Amy-capable (digital / in-system) tasks can be handed to Amy.', 'amy-agent' ),
+						'amyExecutionLive'     => __( 'Amy execution is live for digital / in-system work.', 'amy-agent' ),
 					),
 				)
 			);
@@ -1051,8 +1054,10 @@ class Amy_Admin_Menu {
 
 		$columns = array(
 			'todo'              => __( 'To Do', 'amy-agent' ),
+			'running'           => __( 'Amy Running', 'amy-agent' ),
 			'in_progress'       => __( 'In Progress', 'amy-agent' ),
 			'waiting_extension' => __( 'Waiting on Extension', 'amy-agent' ),
+			'failed'            => __( 'Failed', 'amy-agent' ),
 			'done'              => __( 'Done', 'amy-agent' ),
 		);
 
@@ -1260,7 +1265,7 @@ class Amy_Admin_Menu {
 							<span><?php echo esc_html__( 'Amy can do this work (digital / in-system)', 'amy-agent' ); ?></span>
 						</label>
 						<p class="amy-agent-task-service__field-hint">
-							<?php echo esc_html__( 'On timeout the owner is notified. If capable, “Let Amy take it” appears (disabled until Amy execution ships); otherwise reassign a human.', 'amy-agent' ); ?>
+							<?php echo esc_html__( 'On timeout, Amy runs capable digital/in-system work automatically. You can also use “Let Amy take it”. Otherwise reassign a human.', 'amy-agent' ); ?>
 						</p>
 
 						<label class="amy-agent-task-service__field" for="amy-agent-task-status" id="amy-agent-task-status-field" hidden>
@@ -1308,7 +1313,7 @@ class Amy_Admin_Menu {
 						<div class="amy-agent-task-service__expiry" id="amy-agent-task-expiry" hidden>
 							<p class="amy-agent-task-service__expiry-title"><?php echo esc_html__( 'Past due — owner actions', 'amy-agent' ); ?></p>
 							<p class="amy-agent-task-service__field-hint" id="amy-agent-task-expiry-hint">
-								<?php echo esc_html__( 'Reassign a human. If this task is Amy-capable, “Let Amy take it” stays disabled until Amy execution ships.', 'amy-agent' ); ?>
+								<?php echo esc_html__( 'Reassign a human, or if this task is Amy-capable, let Amy take the digital/in-system work.', 'amy-agent' ); ?>
 							</p>
 							<label class="amy-agent-task-service__field" for="amy-agent-task-expiry-assignee">
 								<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Reassign to', 'amy-agent' ); ?></span>
@@ -1339,7 +1344,7 @@ class Amy_Admin_Menu {
 									class="amy-agent-task-service__btn amy-agent-task-service__btn--ghost"
 									id="amy-agent-task-expiry-amy-take"
 									disabled
-									title="<?php echo esc_attr__( 'Amy execution is not live yet (coming in a later phase).', 'amy-agent' ); ?>"
+									title="<?php echo esc_attr__( 'Available when this task is marked Amy-capable (digital / in-system).', 'amy-agent' ); ?>"
 								>
 									<?php echo esc_html__( 'Let Amy take it', 'amy-agent' ); ?>
 								</button>
@@ -1489,7 +1494,7 @@ class Amy_Admin_Menu {
 					'confirmReassign'  => __( 'Confirm reassign', 'amy-agent' ),
 					'selectAssignee'   => __( 'Select someone…', 'amy-agent' ),
 					'amyTake'          => __( 'Let Amy take it', 'amy-agent' ),
-					'amyTakeDisabled'  => __( 'Amy execution is not live yet (coming in a later phase). Reassign a human instead.', 'amy-agent' ),
+					'amyTakeDisabled'  => __( 'Only Amy-capable (digital / in-system) tasks can be handed to Amy.', 'amy-agent' ),
 					'dismiss'          => __( 'Dismiss', 'amy-agent' ),
 					'empty'            => __( 'No unread notifications.', 'amy-agent' ),
 					'reassignError'    => __( 'Could not reassign. Please try again.', 'amy-agent' ),

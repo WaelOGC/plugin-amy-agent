@@ -28,6 +28,9 @@ VALID_NOTIFICATION_TYPES = frozenset(
         "extension_approved",
         "extension_denied",
         "no_one_available",
+        # P4 Amy execution outcomes
+        "amy_execution_done",
+        "amy_execution_failed",
     }
 )
 

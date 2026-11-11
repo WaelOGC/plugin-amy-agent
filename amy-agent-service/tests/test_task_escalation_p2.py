@@ -148,20 +148,15 @@ def test_no_final_warning_near_due(client: TestClient) -> None:
 
 
 def test_expiry_marks_expired_and_notifies_creator(client: TestClient) -> None:
-    created = _human_task(client, amy_capable=True)
+    # Not amy_capable → owner escalate only; clock must never invent done.
+    created = _human_task(client, amy_capable=False)
     now = 2_000_000.0
-    task = tasks_db.get_task(created["id"])
-    assert task is not None
-    task["created_at"] = now - 200_000
-    task["due_date"] = format_due_timestamp(now - 10)
-    task["escalation_stage"] = "mid_report_asked"
-    task["amy_capable"] = True
     tasks_db.update_task(
         created["id"],
         {
-            "due_date": task["due_date"],
+            "due_date": format_due_timestamp(now - 10),
             "escalation_stage": "mid_report_asked",
-            "amy_capable": True,
+            "amy_capable": False,
         },
     )
     task = tasks_db.get_task(created["id"])
@@ -177,17 +172,19 @@ def test_expiry_marks_expired_and_notifies_creator(client: TestClient) -> None:
     refreshed = tasks_db.get_task(created["id"])
     assert refreshed is not None
     assert refreshed["escalation_stage"] == "expired"
-    # Never fake Amy completion.
     assert refreshed["status"] != "done"
 
     # Idempotent: second expiry pass is a no-op.
     assert check_standard_task(refreshed | {"created_at": now - 200_000}, now=now) == []
 
 
-def test_amy_capable_expiry_logs_hook_does_not_complete(
-    client: TestClient, caplog: pytest.LogCaptureFixture
+def test_amy_capable_expiry_runs_amy_when_p4_enabled(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    created = _human_task(client, amy_capable=True, title="Capable expiry")
+    from app import config_task_rules as rules
+
+    monkeypatch.setattr(rules, "AMY_EXECUTION_ENABLED", True)
+    created = _human_task(client, amy_capable=True, title="Capable expiry analytics")
     now = 3_000_000.0
     tasks_db.update_task(
         created["id"],
@@ -201,14 +198,14 @@ def test_amy_capable_expiry_logs_hook_does_not_complete(
     assert task is not None
     task["created_at"] = now - 50_000
 
-    with caplog.at_level(logging.INFO, logger="app.services.task_escalation"):
-        check_standard_task(task, now=now)
+    check_standard_task(task, now=now)
 
-    assert any("amy_capable=True" in r.message for r in caplog.records)
     refreshed = tasks_db.get_task(created["id"])
     assert refreshed is not None
-    assert refreshed["status"] == "todo"
     assert refreshed["escalation_stage"] == "expired"
+    # P4: amy_capable expiry runs Amy — done only after verified tools (not the clock).
+    assert refreshed["status"] == "done"
+    assert refreshed["assignee_type"] == "amy"
 
 
 def test_run_escalation_pass_drives_mid_then_expiry(client: TestClient) -> None:

@@ -90,14 +90,14 @@ def render_expiry(task: dict[str, Any]) -> dict[str, str]:
     subject = f"Task past due: {title}"
     if amy_capable and rules.AMY_EXECUTION_ENABLED:
         proceed = (
-            "Amy can take this digital/in-system work, or you can reassign a human "
-            "in the Amy dashboard notification."
+            "This task is Amy-capable. Amy may already be running it, or you can "
+            'use “Let Amy take it” / reassign a human in the Amy dashboard.'
         )
     elif amy_capable:
         proceed = (
             "This task is marked Amy-capable, but Amy execution is not live yet — "
             "please reassign a human (or acknowledge and handle it) in the Amy dashboard. "
-            '"Let Amy take it" stays disabled until P4.'
+            '"Let Amy take it" stays disabled until execution is enabled.'
         )
     else:
         proceed = (

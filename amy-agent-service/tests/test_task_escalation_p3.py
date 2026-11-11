@@ -111,7 +111,7 @@ def test_expiry_notifies_reachable_owner(client: TestClient) -> None:
         "acknowledge_manual",
     ]
     assert payload["amy_capable"] is False
-    assert payload["amy_execution_enabled"] is False
+    assert payload["amy_execution_enabled"] is True
     assert payload["escalatee_role"] == "owner"
 
 
@@ -182,16 +182,44 @@ def test_expiry_owner_gone_uses_site_default(client: TestClient) -> None:
     assert notes[0]["wp_user_id"] == 9
 
 
-def test_amy_capable_expiry_includes_amy_take_choice_but_does_not_complete(
-    client: TestClient, caplog: pytest.LogCaptureFixture
+def test_amy_capable_expiry_runs_amy_when_enabled(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from app import config_task_rules as rules
+
+    monkeypatch.setattr(rules, "AMY_EXECUTION_ENABLED", True)
+    _sync_pool(
+        client,
+        [{"wp_user_id": 1, "display_name": "Owner", "telegram_linked": True}],
+        site_default=1,
+    )
+    created = _human_task(client, amy_capable=True, title="Digital analytics digest")
+    now = 2_400_000.0
+    task = _expire_now(created["id"], now=now, amy_capable=True)
+
+    notes = check_standard_task(task, now=now)
+    refreshed = tasks_db.get_task(created["id"])
+    assert refreshed is not None
+    assert refreshed["escalation_stage"] == "expired"
+    assert refreshed["status"] == "done"
+    assert refreshed["assignee_type"] == "amy"
+    # Successful Amy run skips expiry reassign CTA.
+    assert notes == []
+
+
+def test_amy_capable_expiry_includes_amy_take_when_execution_off(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from app import config_task_rules as rules
+
+    monkeypatch.setattr(rules, "AMY_EXECUTION_ENABLED", False)
     _sync_pool(
         client,
         [{"wp_user_id": 1, "display_name": "Owner", "telegram_linked": True}],
         site_default=1,
     )
     created = _human_task(client, amy_capable=True)
-    now = 2_400_000.0
+    now = 2_450_000.0
     task = _expire_now(created["id"], now=now, amy_capable=True)
 
     with caplog.at_level(logging.INFO, logger="app.services.task_escalation"):
@@ -203,7 +231,6 @@ def test_amy_capable_expiry_includes_amy_take_choice_but_does_not_complete(
     assert refreshed is not None
     assert refreshed["status"] == "todo"
     assert refreshed["escalation_stage"] == "expired"
-    assert any("amy_capable=True" in r.message for r in caplog.records)
 
 
 def test_reassign_other_resets_stage_and_notifies(client: TestClient) -> None:
@@ -238,7 +265,12 @@ def test_reassign_other_resets_stage_and_notifies(client: TestClient) -> None:
     assert any(n["type"] == "task_assigned" and n["task_id"] == created["id"] for n in notes)
 
 
-def test_expiry_action_api_rejects_amy_take_while_p4_off(client: TestClient) -> None:
+def test_expiry_action_api_rejects_amy_take_while_p4_off(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import config_task_rules as rules
+
+    monkeypatch.setattr(rules, "AMY_EXECUTION_ENABLED", False)
     created = _human_task(client, amy_capable=True)
     response = client.post(
         f"/v1/tasks/{created['id']}/expiry-action",
@@ -250,6 +282,29 @@ def test_expiry_action_api_rejects_amy_take_while_p4_off(client: TestClient) -> 
     )
     assert response.status_code == 400
     assert "not enabled" in response.json()["message"].lower()
+
+
+def test_expiry_action_api_amy_take_when_p4_on(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app import config_task_rules as rules
+
+    monkeypatch.setattr(rules, "AMY_EXECUTION_ENABLED", True)
+    created = _human_task(client, amy_capable=True, title="Analytics lead summary")
+    response = client.post(
+        f"/v1/tasks/{created['id']}/expiry-action",
+        headers=AUTH,
+        json={
+            "actor_wp_user_id": 1,
+            "action": "amy_take",
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["amy_execution_enabled"] is True
+    assert body["outcome"].startswith("amy_take_")
+    assert body["task"]["status"] == "done"
+    assert body["task"]["assignee_type"] == "amy"
 
 
 def test_acknowledge_manual_via_api(client: TestClient) -> None:
@@ -266,4 +321,4 @@ def test_acknowledge_manual_via_api(client: TestClient) -> None:
     body = response.json()
     assert body["outcome"] == "acknowledged_manual"
     assert body["task"]["status"] == "in_progress"
-    assert body["amy_execution_enabled"] is False
+    assert body["amy_execution_enabled"] is True

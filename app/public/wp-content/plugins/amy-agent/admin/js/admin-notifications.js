@@ -108,9 +108,14 @@
 						'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-expiry-amy="' +
 						escapeHtml(payload.task_id) +
 						'"' +
-						(amyEnabled ? '' : ' disabled') +
+						(amyEnabled && amyCapable ? '' : ' disabled') +
 						' title="' +
-						escapeHtml(i18n.amyTakeDisabled || 'Amy execution is not live yet.') +
+						escapeHtml(
+							amyEnabled && amyCapable
+								? i18n.amyTake || 'Let Amy take it'
+								: i18n.amyTakeDisabled ||
+										'Only Amy-capable (digital / in-system) tasks can be handed to Amy.'
+						) +
 						'">' +
 						escapeHtml(i18n.amyTake || 'Let Amy take it') +
 						'</button>';

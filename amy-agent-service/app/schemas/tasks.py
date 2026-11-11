@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field
 
 AssigneeType = Literal["amy", "human"]
 Priority = Literal["normal", "urgent"]
-TaskStatus = Literal["todo", "in_progress", "waiting_extension", "done"]
+TaskStatus = Literal[
+    "todo", "in_progress", "running", "waiting_extension", "done", "failed"
+]
 
 
 class TaskCreateRequest(BaseModel):
@@ -99,7 +101,7 @@ class TaskStatsResponse(BaseModel):
 class ProgressNoteCreateRequest(BaseModel):
     wp_user_id: int
     note: str = Field(min_length=1)
-    source: Literal["telegram", "dashboard", "api"] = "api"
+    source: Literal["telegram", "dashboard", "api", "amy"] = "api"
 
 
 class TelegramProgressReplyRequest(BaseModel):

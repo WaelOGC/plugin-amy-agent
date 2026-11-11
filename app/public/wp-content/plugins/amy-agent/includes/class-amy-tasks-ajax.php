@@ -154,7 +154,7 @@ class Amy_Tasks_Ajax {
 		}
 
 		$status_val = isset( $_POST['status'] ) ? sanitize_text_field( wp_unslash( $_POST['status'] ) ) : 'todo';
-		$allowed_status = array( 'todo', 'in_progress', 'waiting_extension', 'done' );
+		$allowed_status = array( 'todo', 'in_progress', 'running', 'waiting_extension', 'done', 'failed' );
 		if ( ! in_array( $status_val, $allowed_status, true ) ) {
 			$status_val = 'todo';
 		}
@@ -258,7 +258,7 @@ class Amy_Tasks_Ajax {
 
 		if ( isset( $_POST['status'] ) ) {
 			$status_val = sanitize_text_field( wp_unslash( $_POST['status'] ) );
-			$allowed    = array( 'todo', 'in_progress', 'waiting_extension', 'done' );
+			$allowed    = array( 'todo', 'in_progress', 'running', 'waiting_extension', 'done', 'failed' );
 			if ( in_array( $status_val, $allowed, true ) ) {
 				$payload['status'] = $status_val;
 			}

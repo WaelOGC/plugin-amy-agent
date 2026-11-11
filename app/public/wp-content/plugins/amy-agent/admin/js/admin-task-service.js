@@ -56,8 +56,10 @@
 		function statusLabel(status) {
 			var map = {
 				todo: i18n.statusTodo || 'To Do',
+				running: i18n.statusRunning || 'Amy Running',
 				in_progress: i18n.statusInProgress || 'In Progress',
 				waiting_extension: i18n.statusWaiting || 'Waiting on Extension',
+				failed: i18n.statusFailed || 'Failed',
 				done: i18n.statusDone || 'Done',
 			};
 			return map[status] || status;
@@ -328,8 +330,10 @@
 			var filtered = getFilteredTasks();
 			var byStatus = {
 				todo: [],
+				running: [],
 				in_progress: [],
 				waiting_extension: [],
+				failed: [],
 				done: [],
 			};
 
@@ -465,7 +469,10 @@
 		}
 
 		function showExpiryFor(task) {
-			var isExpired = task.escalationStage === 'expired' && task.status !== 'done';
+			var isExpired =
+				(task.escalationStage === 'expired' || task.status === 'failed') &&
+				task.status !== 'done' &&
+				task.status !== 'running';
 			$expiry.prop('hidden', !isExpired);
 			$expiryResult.prop('hidden', true).text('');
 			if (!isExpired) {
@@ -476,8 +483,16 @@
 			} else {
 				$expiryAssignee.val('');
 			}
-			// P4 not live — keep disabled with honest title even when amy_capable.
-			$expiryAmyTake.prop('disabled', true);
+			// P4 live — enable Amy-take only for amy_capable digital/in-system tasks.
+			var canAmyTake = !!task.amyCapable && task.status !== 'done' && task.status !== 'running';
+			$expiryAmyTake.prop('disabled', !canAmyTake);
+			$expiryAmyTake.attr(
+				'title',
+				canAmyTake
+					? i18n.amyExecutionLive || 'Amy will run digital/in-system work for this task.'
+					: i18n.amyTakeDisabled ||
+							'Only Amy-capable (digital / in-system) tasks can be handed to Amy.'
+			);
 		}
 
 		function runExpiryAction(action, extra) {
@@ -517,7 +532,11 @@
 		}
 
 		function openCreateModal(presetStatus) {
-			resetForm(presetStatus || 'todo');
+			var status = presetStatus || 'todo';
+			if (status === 'running' || status === 'failed') {
+				status = 'todo';
+			}
+			resetForm(status);
 			$modal.prop('hidden', false);
 			$('#amy-agent-task-title').trigger('focus');
 		}
