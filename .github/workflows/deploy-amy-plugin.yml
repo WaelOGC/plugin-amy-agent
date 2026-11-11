@@ -84,7 +84,7 @@ jobs:
           rsync -az --delete \
             --exclude '.git/' \
             --exclude '.DS_Store' \
-            -e "ssh -p ${port} -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes" \
+            -e "ssh -p ${port} -o StrictHostKeyChecking=yes" \
             "$src" "$dest"
 
           echo "Plugin deploy finished."
