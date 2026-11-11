@@ -131,7 +131,7 @@ class Amy_Email_Marketing_Ajax {
 		if ( ! $this->is_allowed_from( $from_email ) ) {
 			wp_send_json_error(
 				array(
-					'message' => __( 'From address must be a verified ogcnewfinity.com mailbox (default hello@ogcnewfinity.com). Personal Gmail and AgentMail are never used.', 'amy-agent' ),
+					'message' => __( 'From address must be your domain mailbox set in Amy → Settings → General (example default: hello@ogcnewfinity.com). Personal Gmail and AgentMail are never used.', 'amy-agent' ),
 				),
 				400
 			);
@@ -171,7 +171,13 @@ class Amy_Email_Marketing_Ajax {
 				);
 			} else {
 				++$failed;
-				$err       = $this->last_mail_error ? $this->last_mail_error : __( 'wp_mail returned false (check FluentSMTP logs).', 'amy-agent' );
+				$err = $this->last_mail_error
+					? $this->last_mail_error
+					: sprintf(
+						/* translators: %s: Marketing From email */
+						__( 'wp_mail returned false for From %s. Open FluentSMTP → Connections / logs, confirm mailbox + SPF/DKIM, then retry.', 'amy-agent' ),
+						$from_email
+					);
 				$results[] = array(
 					'email' => $to,
 					'ok'    => false,
@@ -189,11 +195,15 @@ class Amy_Email_Marketing_Ajax {
 		if ( 0 === $sent ) {
 			wp_send_json_error(
 				array(
-					'message'     => __( 'No messages were sent. Verify FluentSMTP can send as the From address (hello@ must be verified).', 'amy-agent' ),
-					'from_email'  => $from_email,
-					'sent'        => 0,
-					'failed'      => $failed,
-					'results'     => $results,
+					'message'    => sprintf(
+						/* translators: %s: Marketing From email */
+						__( 'No messages were sent. Verify FluentSMTP can send as %s (Amy → Settings → General). Check FluentSMTP → Connections and SPF/DKIM.', 'amy-agent' ),
+						$from_email
+					),
+					'from_email' => $from_email,
+					'sent'       => 0,
+					'failed'     => $failed,
+					'results'    => $results,
 				),
 				500
 			);

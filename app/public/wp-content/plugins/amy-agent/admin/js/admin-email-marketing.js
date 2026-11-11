@@ -928,7 +928,7 @@
 						var failMsg =
 							(res && res.data && res.data.message) ||
 							i18n.sendError ||
-							'Send failed. Check FluentSMTP and that hello@ is verified.';
+							('Send failed. Check FluentSMTP logs and that ' + fromEmail + ' is authorized on the connection.');
 						showSendError(failMsg);
 						showStatus('');
 						return;
@@ -948,7 +948,7 @@
 							xhr.responseJSON.data &&
 							xhr.responseJSON.data.message) ||
 						i18n.sendError ||
-						'Send failed. Check FluentSMTP and that hello@ is verified.';
+						('Send failed. Check FluentSMTP logs and that ' + fromEmail + ' is authorized on the connection.');
 					showSendError(msg);
 					showStatus('');
 				})

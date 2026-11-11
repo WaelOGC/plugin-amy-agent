@@ -524,7 +524,11 @@ class Amy_Admin_Menu {
 						'approvedNotice'    => __( 'Draft approved. Click Send to deliver via wp_mail / FluentSMTP From the address shown above. Nothing was sent yet.', 'amy-agent' ),
 						'confirmSend'       => __( 'Send this approved draft to %1$d recipient(s) From %2$s via FluentSMTP (wp_mail)? This cannot be undone.', 'amy-agent' ),
 						'sending'           => __( 'Sending…', 'amy-agent' ),
-						'sendError'         => __( 'Send failed. Check FluentSMTP and that hello@ is verified.', 'amy-agent' ),
+						'sendError'         => sprintf(
+							/* translators: %s: Marketing From email */
+							__( 'Send failed. Check FluentSMTP logs and that %s is authorized on the connection.', 'amy-agent' ),
+							$from_email
+						),
 						'cleared'           => __( 'Draft cleared.', 'amy-agent' ),
 						'leadOnly'          => __( 'Lead capture', 'amy-agent' ),
 						'audienceCount'     => __( '%d shown', 'amy-agent' ),
@@ -1992,14 +1996,14 @@ class Amy_Admin_Menu {
 				<p class="amy-agent-my-profile__telegram-copy">
 					<?php
 					echo esc_html__(
-						'Link your Telegram account to receive assign, progress-check, and expiry alerts from the same Admin Bot configured in Amy → Settings → Telegram (no second bot). Email still uses FluentSMTP From hello@ in Settings → General.',
+						'Link your Telegram account to receive assign, progress-check, and expiry alerts from the same Admin Bot configured in Amy → Settings → Telegram (no second bot). Email still uses FluentSMTP From the Marketing From address in Settings → General.',
 						'amy-agent'
 					);
 					?>
 				</p>
 				<?php if ( ! $tg_enabled ) : ?>
 					<p class="amy-agent-my-profile__telegram-status" role="status">
-						<?php echo esc_html__( 'Telegram bot is disabled. An admin must enable it under Amy → Settings → Telegram.', 'amy-agent' ); ?>
+						<?php echo esc_html__( 'Telegram bot is disabled. Amy → Settings → Telegram → Enable Telegram Admin Bot, then Connect.', 'amy-agent' ); ?>
 						<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG . '&tab=telegram' ) ); ?>">
 							<?php echo esc_html__( 'Open Settings', 'amy-agent' ); ?>
 						</a>
@@ -2031,7 +2035,7 @@ class Amy_Admin_Menu {
 								)
 							);
 						} else {
-							echo esc_html__( 'Not linked yet. Generate a connect link after the site bot is connected in Settings.', 'amy-agent' );
+							echo esc_html__( 'Your Telegram is not linked. Amy → Settings → Telegram → Connect the bot (HTTPS required), then return here and generate a connect link.', 'amy-agent' );
 						}
 						?>
 					</p>
@@ -2772,9 +2776,21 @@ class Amy_Admin_Menu {
 					?>
 				</p>
 				<p class="amy-agent-email__from-note">
-					<?php echo esc_html__( 'Delivered via WordPress wp_mail → FluentSMTP. hello@ must be verified on the SMTP provider. Never personal Gmail or AgentMail.', 'amy-agent' ); ?>
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %s: Marketing From email */
+							__( '%s must be authorized in FluentSMTP on a verified domain. Never personal Gmail or AgentMail.', 'amy-agent' ),
+							$from_email
+						)
+					);
+					?>
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG ) ); ?>">
 						<?php echo esc_html__( 'Change in Settings', 'amy-agent' ); ?>
+					</a>
+					·
+					<a href="<?php echo esc_url( admin_url( 'admin.php?page=fluent-mail' ) ); ?>">
+						<?php echo esc_html__( 'FluentSMTP → Connections', 'amy-agent' ); ?>
 					</a>
 				</p>
 			</div>

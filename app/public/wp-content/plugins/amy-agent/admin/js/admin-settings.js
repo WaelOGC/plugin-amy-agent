@@ -209,6 +209,11 @@
 			stateLabel +
 			'</span>' +
 			(data.pending !== null && data.pending !== undefined ? ' · pending: ' + data.pending : '');
+
+		var nextSteps = qs('#amy-settings-telegram-next-steps');
+		if (nextSteps) {
+			nextSteps.hidden = state === 'connected';
+		}
 	}
 
 	function loadTelegramStatus() {
@@ -222,9 +227,15 @@
 					renderTelegramStatus(result.data.data);
 				} else {
 					showTelegramFeedback(
-						(result.data && result.data.data && result.data.data.message) || 'Status request failed.',
+						(result.data && result.data.data && result.data.data.message) ||
+							i18n.tgStatusFailed ||
+							'Status request failed. Save settings, then reload Amy → Settings → Telegram.',
 						true
 					);
+					var nextSteps = qs('#amy-settings-telegram-next-steps');
+					if (nextSteps) {
+						nextSteps.hidden = false;
+					}
 				}
 			})
 			.catch(function () {
@@ -254,7 +265,9 @@
 							loadTelegramStatus();
 						} else {
 							showTelegramFeedback(
-								(result.data && result.data.data && result.data.data.message) || 'Connect failed.',
+								(result.data && result.data.data && result.data.data.message) ||
+									i18n.tgConnectFailed ||
+									'Connect failed. Check token, Enable Telegram Admin Bot, HTTPS, then Connect again under Settings → Telegram.',
 								true
 							);
 						}
@@ -299,7 +312,9 @@
 							showTelegramFeedback(lines.join(' · ') || 'Done.', false);
 						} else {
 							showTelegramFeedback(
-								(result.data && result.data.data && result.data.data.message) || 'Test failed.',
+								(result.data && result.data.data && result.data.data.message) ||
+									i18n.tgTestFailed ||
+									'Test failed. Enable the bot, save a BotFather token, add at least one numeric admin ID, then Send test message under Settings → Telegram.',
 								true
 							);
 						}
@@ -346,7 +361,7 @@
 			if (blocked) {
 				err.textContent =
 					i18n.fromBlocked ||
-					'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use a domain mailbox such as hello@ogcnewfinity.com.';
+					'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your domain mailbox in Settings → General (example: hello@ogcnewfinity.com).';
 				err.hidden = false;
 			} else {
 				err.textContent = '';
