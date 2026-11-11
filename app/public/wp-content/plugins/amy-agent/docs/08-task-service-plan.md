@@ -2,7 +2,7 @@
 
 > Priority #6 in `roadmap-status.md`.
 
-## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0–P3 escalation (2026-11-11)
+## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0–P4 escalation (2026-11-11)
 
 **Task 1:** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats,
 WordPress API client + admin-ajax proxies, real assignees, board/list CRUD,
@@ -32,8 +32,26 @@ then **expiry** (final warning deferred). Stage `mid_report_asked` (legacy
 
 **P3 (plugin 0.2.44 / service 0.2.8):** expiry notifies resolved **owner**
 (creator; if no Telegram / gone → site default owner; else backup). Bell +
-modal reassign UX; `amy_capable` shows honest disabled “Let Amy take it”
-until P4 (`AMY_EXECUTION_ENABLED=False`). Never fake Amy completion.
+modal reassign UX; `amy_capable` showed honest disabled “Let Amy take it”
+until P4.
+
+**P4 (plugin 0.2.45 / service 0.2.9):** Amy execution engine with a
+**capability matrix** (`task_amy_execution.py`). Amy-at-create runs in
+background (`todo` → `running` → `done`/`failed`). Expiry + `amy_capable`
+(or “Let Amy take it”) runs allowlisted digital/in-system tools only —
+analytics summary, SEO review summary, attested digital close — and marks
+`done` only after verified audit progress notes. Failures stay `failed` for
+owner/backup reassign. `AMY_EXECUTION_ENABLED=True`. Never fake complete
+from the deadline alone.
+
+### Amy capability matrix (P4)
+
+| Amy **can** | Amy **cannot** |
+| --- | --- |
+| Analytics lead summary (in-system DB) | Contact leads / send marketing mail |
+| SEO checks summary (stored SEO Tasks) | Write meta to WP / approve checks |
+| Digital close when `amy_capable` (audit notes) | Physical / off-site / human-only work |
+| Mark done only after verified tool success | Claim complete because deadline passed |
 
 ## Implementation notes (scoping vs original plan)
 
@@ -46,11 +64,9 @@ what still differs from §3–§6 above):
    task to any other synced dashboard user (`manage_options` pool pushed from
    WordPress), not department-scoped. Code comments mark where
    `docs/05-admin-roles-and-social-publishing-plan.md` should narrow this.
-3. **No autonomous Amy task execution.** Where §3 / §5 say Amy would complete
-   the task herself, the implementation notifies the creator (and for urgent
-   exhaustion, all dashboard admins as an owner stand-in) with
-   `no_one_available` / expired actions — never fakes auto-completion. Code
-   comments mark the wire-up point for a future execution engine.
+3. **Amy execution (P4)** is allowlist-only — not a general agent
+   orchestrator. Expand `CAPABILITY_MATRIX` / executors for more in-system
+   tools; urgent `no_one_available` still does not auto-run Amy.
 
 Default timings live in `amy-agent-service/app/config_task_rules.py`
 (midpoint 50% progress ask; final warning 4h knob present but **disabled** in

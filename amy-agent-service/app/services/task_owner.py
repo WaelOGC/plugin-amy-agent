@@ -74,8 +74,11 @@ def resolve_expiry_escalatee(task: dict[str, Any]) -> dict[str, Any]:
 
 
 def expiry_action_choices(task: dict[str, Any]) -> list[str]:
-    """Dashboard action choices for an expired task."""
-    choices = ["reassign_same", "reassign_other", "acknowledge_manual"]
+    """Dashboard action choices for an expired / Amy-failed task."""
+    choices: list[str] = []
+    if task.get("assignee_type") == "human" and task.get("assignee_wp_user_id") is not None:
+        choices.append("reassign_same")
+    choices.extend(["reassign_other", "acknowledge_manual"])
     if task.get("amy_capable"):
         choices.append("amy_take")
     return choices

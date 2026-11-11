@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 AssigneeType = Literal["amy", "human"]
 Priority = Literal["normal", "urgent"]
-TaskStatus = Literal["todo", "in_progress", "waiting_extension", "done"]
+TaskStatus = Literal["todo", "in_progress", "running", "waiting_extension", "done", "failed"]
 EscalationStage = Literal[
     "none",
     "mid_report_asked",
@@ -24,7 +24,9 @@ EscalationStage = Literal[
 
 VALID_ASSIGNEE_TYPES = frozenset({"amy", "human"})
 VALID_PRIORITIES = frozenset({"normal", "urgent"})
-VALID_STATUSES = frozenset({"todo", "in_progress", "waiting_extension", "done"})
+VALID_STATUSES = frozenset(
+    {"todo", "in_progress", "running", "waiting_extension", "done", "failed"}
+)
 VALID_ESCALATION_STAGES = frozenset(
     {
         "none",

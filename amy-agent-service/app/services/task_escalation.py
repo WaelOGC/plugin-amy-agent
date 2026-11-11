@@ -4,7 +4,10 @@ P2 standard state machine (APScheduler every 5 min + SQLite stages):
   none → mid_report_asked (50% of created_at→due) → expired (past due)
 
 P3: expiry notifies resolved owner (creator → site default → backup) and
-exposes human reassign / honest Amy-take CTA (disabled until P4).
+exposes human reassign / Amy-take CTA.
+
+P4: when amy_capable + AMY_EXECUTION_ENABLED, Amy runs real digital work on
+expiry (todo→running→done/failed). Amy-take CTA enabled.
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ from typing import Any
 
 from app import config_task_rules as rules
 from app.db import notifications_db, tasks_db
-from app.services import task_notify, task_owner
+from app.services import task_amy_execution, task_notify, task_owner
 
 logger = logging.getLogger(__name__)
 
@@ -95,37 +98,13 @@ def _normalize_standard_stage(stage: str) -> str:
     return stage
 
 
-def _amy_capable_expiry_hook(task: dict[str, Any]) -> None:
-    """P4 handoff stub — log only; never mark done or invent Amy work.
-
-    When ``amy_capable`` is true *and* ``AMY_EXECUTION_ENABLED``, P4 should
-    queue real in-system execution. Until then we always notify the owner and
-    leave human reassign as the working path.
-    """
-    if not task.get("amy_capable"):
-        return
-    if rules.AMY_EXECUTION_ENABLED:
-        # TODO(P4 / amy-execution): hand off digital/in-system work to Amy here
-        # (status in_progress → tool allowlist → done/failed with audit).
-        logger.info(
-            "Task %s expired with amy_capable=True — Amy execution flag on; "
-            "P4 handoff still pending (no fake completion)",
-            task.get("id"),
-        )
-        return
-    logger.info(
-        "Task %s expired with amy_capable=True — Amy handoff deferred to P4 "
-        "(owner notified; no fake completion)",
-        task.get("id"),
-    )
-
-
 def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> list[dict[str, Any]]:
-    """P2/P3: mid progress ask @ 50% then owner expiry escalate."""
+    """P2/P3/P4: mid progress ask @ 50% then owner expiry escalate / Amy run."""
     now = time_now(now)
     if task.get("priority") == "urgent":
         return []
-    if task.get("status") == "done":
+    # Terminal / in-flight Amy statuses — do not mid-ask or re-expire.
+    if task.get("status") in {"done", "running", "failed"}:
         return []
 
     due_ts = parse_due_timestamp(task.get("due_date"))
@@ -137,10 +116,35 @@ def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> li
     notifications: list[dict[str, Any]] = []
     assignee = _assignee_id(task)
 
-    # Past due → expire + always notify resolved owner (do not auto-complete).
+    # Past due → expire. If amy_capable + P4 on, Amy runs real work (no fake done).
     if now >= due_ts and stage != "expired":
         _set_stage(task["id"], "expired")
-        _amy_capable_expiry_hook(task)
+        if task.get("amy_capable") and rules.AMY_EXECUTION_ENABLED:
+            try:
+                result = task_amy_execution.run_amy_task(
+                    task["id"], trigger="expiry"
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Amy expiry execution crashed for task %s", task.get("id")
+                )
+                result = {"outcome": "failed", "task": tasks_db.get_task(task["id"])}
+            refreshed = result.get("task") or tasks_db.get_task(task["id"]) or task
+            if result.get("outcome") == "done":
+                # Amy already notified owner on success; no reassign CTA needed.
+                return notifications
+            # Failed — fall through to owner escalate with human reassign.
+            task = refreshed
+            logger.info(
+                "Task %s expired amy_capable=True — Amy run failed; owner escalate",
+                task.get("id"),
+            )
+        elif task.get("amy_capable"):
+            logger.info(
+                "Task %s expired with amy_capable=True — Amy execution disabled; "
+                "owner notified (no fake completion)",
+                task.get("id"),
+            )
         escalatee = task_owner.resolve_expiry_escalatee(task)
         dispatched = task_notify.dispatch_task_notify(
             "expiry",
@@ -373,11 +377,13 @@ def handle_expiry_action(
 
     actor = int(actor_wp_user_id)
     if action == "acknowledge_manual":
-        # Owner keeps ownership; mark in_progress so work is visibly claimed.
+        # Owner keeps ownership; claim visible work (including after Amy failed).
+        prev = task.get("status") or "todo"
+        next_status = "in_progress" if prev in {"todo", "failed", "running"} else prev
         updated = tasks_db.update_task(
             task_id,
             {
-                "status": "in_progress" if task.get("status") == "todo" else task["status"],
+                "status": next_status,
             },
         )
         return {
@@ -393,8 +399,16 @@ def handle_expiry_action(
             raise ValueError(
                 "Amy execution is not enabled yet (P4). Reassign a human instead."
             )
-        # P4 will replace this with a real handoff; refuse silent fake success.
-        raise ValueError("Amy execution handoff is not implemented yet (P4)")
+        result = task_amy_execution.run_amy_task(
+            task_id, trigger="amy_take", actor_wp_user_id=actor
+        )
+        return {
+            "outcome": f"amy_take_{result.get('outcome', 'failed')}",
+            "task": result.get("task") or task,
+            "amy_execution_enabled": True,
+            "capabilities": result.get("capabilities") or [],
+            "reason": result.get("reason"),
+        }
 
     if action not in {"reassign_same", "reassign_other"}:
         raise ValueError("Unknown expiry action")
@@ -409,13 +423,19 @@ def handle_expiry_action(
         new_assignee = int(assignee_wp_user_id)
 
     now = time_now()
+    prev_status = task.get("status") or "todo"
+    # Re-open terminal Amy outcomes so the human mid/expiry machine can run again.
+    if prev_status in {"done", "failed", "running"}:
+        next_status = "todo"
+    else:
+        next_status = prev_status
     fields: dict[str, Any] = {
         "assignee_type": "human",
         "assignee_wp_user_id": new_assignee,
         "acknowledged_at": None,
         "escalation_stage": "none",
         "escalation_stage_updated_at": now,
-        "status": "todo" if task.get("status") == "done" else task.get("status") or "todo",
+        "status": next_status,
     }
     if due_date is not None and str(due_date).strip():
         fields["due_date"] = str(due_date).strip()

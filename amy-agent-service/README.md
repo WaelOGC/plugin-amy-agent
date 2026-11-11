@@ -66,7 +66,7 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | GET | `/v1/tasks/stats` | Aggregate counts for Task Service stat cards |
 | GET | `/v1/tasks/{id}` | Fetch one task |
 | PATCH | `/v1/tasks/{id}` | Partial update (reassign → assign notify) |
-| POST | `/v1/tasks/{id}/expiry-action` | P3 owner/backup reassign / acknowledge (Amy take gated) |
+| POST | `/v1/tasks/{id}/expiry-action` | P3/P4 owner/backup reassign / acknowledge / Amy take (capability matrix) |
 | DELETE | `/v1/tasks/{id}` | Delete task |
 | GET | `/v1/tasks/{id}/progress-notes` | List progress notes |
 | POST | `/v1/tasks/{id}/progress-notes` | Add a progress note |

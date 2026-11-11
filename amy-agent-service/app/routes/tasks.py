@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from fastapi.responses import JSONResponse
 
 from app.auth import require_amy_secret
@@ -26,7 +26,7 @@ from app.schemas.notifications import (
     DashboardUserSyncRequest,
     DashboardUserSyncResponse,
 )
-from app.services import task_escalation, task_notify
+from app.services import task_amy_execution, task_escalation, task_notify
 from app import config_task_rules as rules
 
 router = APIRouter(tags=["tasks"])
@@ -97,7 +97,9 @@ async def list_tasks(
     response_model=TaskResponse,
     dependencies=[Depends(require_amy_secret)],
 )
-async def create_task(body: TaskCreateRequest) -> TaskResponse | JSONResponse:
+async def create_task(
+    body: TaskCreateRequest, background_tasks: BackgroundTasks
+) -> TaskResponse | JSONResponse:
     try:
         row = tasks_db.create_task(
             title=body.title,
@@ -116,6 +118,15 @@ async def create_task(body: TaskCreateRequest) -> TaskResponse | JSONResponse:
         return _error("invalid_task", str(exc), status.HTTP_400_BAD_REQUEST)
     if row.get("assignee_type") == "human" and row.get("assignee_wp_user_id"):
         task_notify.dispatch_task_notify("assign", row)
+    elif (
+        row.get("assignee_type") == "amy"
+        and rules.AMY_EXECUTION_ENABLED
+        and row.get("status") not in {"done", "running", "failed"}
+    ):
+        # Locked: Amy-at-create runs now in background (todo → running → done/failed).
+        background_tasks.add_task(
+            task_amy_execution.queue_amy_task, row["id"], trigger="create"
+        )
     return _to_response(row)
 
 
@@ -139,7 +150,7 @@ async def get_task(task_id: str) -> TaskResponse | JSONResponse:
 async def expiry_action(
     task_id: str, body: ExpiryActionRequest
 ) -> ExpiryActionResponse | JSONResponse:
-    """P3: owner/backup reassign or acknowledge after expiry (Amy take gated)."""
+    """P3/P4: owner/backup reassign, acknowledge, or Amy take (capability-gated)."""
     try:
         result = task_escalation.handle_expiry_action(
             task_id,
@@ -165,7 +176,7 @@ async def expiry_action(
     dependencies=[Depends(require_amy_secret)],
 )
 async def update_task(
-    task_id: str, body: TaskUpdateRequest
+    task_id: str, body: TaskUpdateRequest, background_tasks: BackgroundTasks
 ) -> TaskResponse | JSONResponse:
     # exclude_unset so omitted fields are not treated as explicit nulls
     fields = body.model_dump(exclude_unset=True)
@@ -178,6 +189,15 @@ async def update_task(
         return _error("not_found", "Task not found.", status.HTTP_404_NOT_FOUND)
     if _assignee_changed(previous, row) and row.get("assignee_type") == "human":
         task_notify.dispatch_task_notify("assign", row)
+    elif (
+        _assignee_changed(previous, row)
+        and row.get("assignee_type") == "amy"
+        and rules.AMY_EXECUTION_ENABLED
+        and row.get("status") not in {"done", "running", "failed"}
+    ):
+        background_tasks.add_task(
+            task_amy_execution.queue_amy_task, row["id"], trigger="create"
+        )
     return _to_response(row)
 
 

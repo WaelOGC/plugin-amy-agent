@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.44 / amy-agent-service v0.2.8 — Task Service P3 owner/backup).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.45 / amy-agent-service v0.2.9 — Task Service P4 Amy execution).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -35,8 +35,9 @@
 > `none` → `mid_report_asked` (50% of created→due) → `expired`; one mid ask
 > (final warning deferred); P1 notify reused; `amy_capable` expiry hook only.
 > **Task Service P3 (v0.2.44 / service 0.2.8):** owner/backup escalate on
-> expiry (creator → site default → backup); reassign UX in bell + modal;
-> Amy-take CTA gated off until P4.
+> expiry (creator → site default → backup); reassign UX in bell + modal.
+> **Task Service P4 (v0.2.45 / service 0.2.9):** Amy execution capability
+> matrix; Amy-at-create + expiry/`amy_capable` + Amy-take CTA; no fake done.
 
 ---
 
@@ -95,23 +96,24 @@
   soft with `—` / connection hint (never fake zeros). **Admin Roles & Social**
   card remains honest coming-soon (tool not started).
 
-### 4. Task Service — complete (Task 1 + Task 2) + P0–P3 escalation
+### 4. Task Service — complete (Task 1 + Task 2) + P0–P4 escalation
 - Backend: persistent SQLite at `data/tasks.db` (no TTL), FastAPI CRUD + stats,
   escalation schema (`escalation_stage`, `acknowledged_at`, extensions,
-  `owner_wp_user_id` / `backup_wp_user_id`), `notifications` +
-  `extension_requests` tables, APScheduler every 5 minutes
+  `owner_wp_user_id` / `backup_wp_user_id`), statuses include `running` /
+  `failed`, `notifications` + `extension_requests` tables, APScheduler every
+  5 minutes, `task_amy_execution` capability matrix
 - Behavior: standard **mid@50% progress ask → expiry** (P2; final warning
-  deferred); P3 owner escalate on expiry; urgent 60m check-ins /
-  any-available-user reassignment / `no_one_available`; extension auto-cap
-  (24h normal) vs always-approve (urgent)
+  deferred); P3 owner escalate on expiry; P4 Amy run on create / expiry
+  `amy_capable` / Amy-take; urgent 60m check-ins / any-available-user
+  reassignment / `no_one_available`; extension auto-cap (24h normal) vs
+  always-approve (urgent)
 - WP: Task Service + My Profile notification bell (shared JS/CSS), acknowledge on
   assignee open, Request Extension in edit modal, AJAX proxies for notifications /
   extensions / ack / expiry-action; dashboard user sync (Telegram + backup +
-  site default owner)
+  site default owner); board columns for Amy Running / Failed
 - **P0 (plugin 0.2.41 / service 0.2.5):** create/edit **Amy does this** vs
   **Someone does this** (human picker) → `assignee_type`; boolean `amy_capable`
   on create/update/list/get; light mode + Amy-capable badges on board/list.
-  Amy assigned = honest queue only (no fake complete / no execution yet).
 - **P1 (plugin 0.2.42 / service 0.2.6):** outbound assign/mid/expiry templates
   (dashboard + email + Telegram). Email = FluentSMTP/`wp_mail` From Settings
   (hello@ — not AgentMail/Gmail). Telegram = same Admin Bot token/webhook as
@@ -123,8 +125,10 @@
   idempotent mid (legacy `midpoint_sent` / `final_warning_sent` skip re-fire).
 - **P3 (plugin 0.2.44 / service 0.2.8):** expiry → resolved owner (creator if
   Telegram-linked + present, else site default owner, else backup); Settings
-  site default owner + My Profile backup; bell/modal reassign UX; Amy-take
-  CTA disabled until P4 (`AMY_EXECUTION_ENABLED=False`). P4 Amy execution open.
+  site default owner + My Profile backup; bell/modal reassign UX.
+- **P4 (plugin 0.2.45 / service 0.2.9):** `AMY_EXECUTION_ENABLED=True`;
+  Amy-at-create background run; expiry/`amy_capable` auto-run; Amy-take CTA
+  live; allowlisted digital tools only; `done` only after verified audit.
 
 ### 5. Analytics — complete (Task 1: plugin + service)
 - Backend: persistent SQLite at `data/analytics.db` (90-day retention, purged by
