@@ -466,7 +466,7 @@
 		} else if (data.ok) {
 			parts.push(i18n.healthOk || 'Python service reachable.');
 		} else {
-			parts.push(i18n.healthUnreachable || 'Python service unreachable (check URL, secret, and Dokploy).');
+			parts.push(i18n.healthUnreachable || 'Python service unreachable (check URL, secret, and your Amy Python service host).');
 		}
 
 		if (settings.enabled) {

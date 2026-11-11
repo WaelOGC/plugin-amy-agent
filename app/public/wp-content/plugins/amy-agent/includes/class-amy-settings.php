@@ -98,6 +98,9 @@ class Amy_Settings {
 	 */
 	public function set_page_hook( $hook ) {
 		$this->page_hook = $hook;
+		if ( $hook ) {
+			add_action( 'load-' . $hook, array( $this, 'add_help_tabs' ) );
+		}
 	}
 
 	/**
@@ -367,7 +370,7 @@ class Amy_Settings {
 					'fromBlocked'       => __( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your own domain mailbox authorized in FluentSMTP.', 'amy-agent' ),
 					'healthChecking'    => __( 'Checking connection…', 'amy-agent' ),
 					'healthOk'          => __( 'Python service reachable.', 'amy-agent' ),
-					'healthUnreachable' => __( 'Python service unreachable (check URL, secret, and Dokploy).', 'amy-agent' ),
+					'healthUnreachable' => __( 'Python service unreachable (check URL, secret, and your Amy Python service host).', 'amy-agent' ),
 					'healthFail'        => __( 'Health check failed. Could not reach WordPress REST.', 'amy-agent' ),
 					'needUrlSecret'     => __( 'Set service URL and shared secret first.', 'amy-agent' ),
 					'enabledOn'         => __( 'Enable Amy is on.', 'amy-agent' ),
@@ -682,42 +685,62 @@ class Amy_Settings {
 	}
 
 	/**
+	 * Shared title for Marketing From / FluentSMTP playbook (in-panel + Help tabs).
+	 *
+	 * @return string
+	 */
+	public static function get_fluentsmtp_playbook_title() {
+		return __( 'Instructions — set your Marketing From', 'amy-agent' );
+	}
+
+	/**
+	 * Shared intro for Marketing From playbook.
+	 *
+	 * @return string
+	 */
+	public static function get_fluentsmtp_playbook_intro() {
+		return __( 'Per-site From via FluentSMTP. hello@ is only an example default for this install — use your own domain mailbox. Never personal Gmail or AgentMail.', 'amy-agent' );
+	}
+
+	/**
+	 * Ordered FluentSMTP buyer playbook steps (plain text; shared by cards + Help tabs).
+	 *
+	 * @param string $example_email Example From shown in step 1.
+	 * @return string[]
+	 */
+	public static function get_fluentsmtp_playbook_steps( $example_email = '' ) {
+		$example_email = sanitize_email( (string) $example_email );
+		if ( '' === $example_email ) {
+			$example_email = self::DEFAULT_MARKETING_FROM_EMAIL;
+		}
+
+		return array(
+			sprintf(
+				/* translators: %s: example domain mailbox (e.g. hello@ogcnewfinity.com) */
+				__( 'Mailbox: create a mailbox on your domain (example on this site: %s).', 'amy-agent' ),
+				$example_email
+			),
+			__( 'FluentSMTP: authorize send as that mailbox under FluentSMTP → Connections (SMTP or provider OAuth).', 'amy-agent' ),
+			__( 'DNS: ensure SPF and DKIM for the domain (and DMARC when ready). Use Force From Email only if you understand it overrides other plugins.', 'amy-agent' ),
+			__( 'Amy: Settings → General → Marketing From email / name = that mailbox → Save settings.', 'amy-agent' ),
+			__( 'Prove it: send FluentSMTP’s own test email From your mailbox, then optionally Amy Email Marketing → Approve → Send to a personal test address only.', 'amy-agent' ),
+		);
+	}
+
+	/**
 	 * Compact buyer playbook: mailbox → FluentSMTP → SPF/DKIM → Amy From → test.
 	 * hello@ is only an example default for this site — never AgentMail.
 	 *
 	 * @param string $example_email Example From shown in step 1 (usually plugin default).
 	 */
 	public static function render_fluentsmtp_buyer_playbook( $example_email = '' ) {
-		$example_email = sanitize_email( (string) $example_email );
-		if ( '' === $example_email ) {
-			$example_email = self::DEFAULT_MARKETING_FROM_EMAIL;
-		}
+		$steps  = self::get_fluentsmtp_playbook_steps( $example_email );
 		$active = self::is_fluentsmtp_active();
 		?>
 		<ol class="amy-agent-settings__steps">
-			<li>
-				<?php
-				echo esc_html(
-					sprintf(
-						/* translators: %s: example domain mailbox (e.g. hello@ogcnewfinity.com) */
-						__( 'Mailbox: create a mailbox on your domain (example on this site: %s).', 'amy-agent' ),
-						$example_email
-					)
-				);
-				?>
-			</li>
-			<li>
-				<?php echo esc_html__( 'FluentSMTP: authorize send as that mailbox under FluentSMTP → Connections (SMTP or provider OAuth).', 'amy-agent' ); ?>
-			</li>
-			<li>
-				<?php echo esc_html__( 'DNS: ensure SPF and DKIM for the domain (and DMARC when ready). Use Force From Email only if you understand it overrides other plugins.', 'amy-agent' ); ?>
-			</li>
-			<li>
-				<?php echo esc_html__( 'Amy: Settings → General → Marketing From email / name = that mailbox → Save settings.', 'amy-agent' ); ?>
-			</li>
-			<li>
-				<?php echo esc_html__( 'Prove it: send FluentSMTP’s own test email From your mailbox, then optionally Amy Email Marketing → Approve → Send to a personal test address only.', 'amy-agent' ); ?>
-			</li>
+			<?php foreach ( $steps as $step ) : ?>
+				<li><?php echo esc_html( $step ); ?></li>
+			<?php endforeach; ?>
 		</ol>
 		<p class="amy-agent-settings__hint">
 			<?php if ( $active ) : ?>
@@ -739,6 +762,232 @@ class Amy_Settings {
 			<?php endif; ?>
 		</p>
 		<?php
+	}
+
+	/**
+	 * BotFather card title (shared).
+	 *
+	 * @return string
+	 */
+	public static function get_botfather_help_title() {
+		return __( 'Create your Telegram bot', 'amy-agent' );
+	}
+
+	/**
+	 * BotFather card intro (shared).
+	 *
+	 * @return string
+	 */
+	public static function get_botfather_help_intro() {
+		return __( 'Telegram does not allow minting bot tokens via API. Each buyer or team creates their own bot in BotFather, then pastes the token here.', 'amy-agent' );
+	}
+
+	/**
+	 * BotFather ordered steps (shared by in-panel card + Help tab).
+	 *
+	 * @return string[]
+	 */
+	public static function get_botfather_help_steps() {
+		return array(
+			__( 'Open BotFather in Telegram (link above / t.me/BotFather).', 'amy-agent' ),
+			__( 'Send /newbot and follow the prompts.', 'amy-agent' ),
+			__( 'Choose a display name, then a username ending in bot.', 'amy-agent' ),
+			__( 'Copy the bot token BotFather sends you.', 'amy-agent' ),
+			__( 'Paste the token into Bot token below, then Save settings.', 'amy-agent' ),
+			__( 'Open a chat with your new bot and send any message before Connect or ID discovery — Telegram only delivers updates after you message the bot first.', 'amy-agent' ),
+		);
+	}
+
+	/**
+	 * Telegram numeric ID help title.
+	 *
+	 * @return string
+	 */
+	public static function get_telegram_id_help_title() {
+		return __( 'How to find your Telegram user ID', 'amy-agent' );
+	}
+
+	/**
+	 * Telegram numeric ID help intro.
+	 *
+	 * @return string
+	 */
+	public static function get_telegram_id_help_intro() {
+		return __( 'Whitelist uses a numeric Telegram user ID (digits only). For private 1:1 chats, chat id equals user id.', 'amy-agent' );
+	}
+
+	/**
+	 * Telegram ID discovery steps (plain text; fallback links rendered separately).
+	 *
+	 * @return string[]
+	 */
+	public static function get_telegram_id_help_steps() {
+		return array(
+			__( 'Message your Amy bot in Telegram (open it from the bot username after Connect, or search the username BotFather gave you). You must message the bot at least once before ID discovery works.', 'amy-agent' ),
+			__( 'If you are not on the whitelist yet, the bot replies with your numeric Telegram ID — copy those digits into Allowed admins.', 'amy-agent' ),
+			__( 'If you are already whitelisted, send /whoami — the bot replies with your Telegram ID.', 'amy-agent' ),
+			__( 'Paste the number into Telegram user ID, choose the linked WordPress admin, Save settings, then press Connect (HTTPS required).', 'amy-agent' ),
+			__( 'Fallback: message @userinfobot or @RawDataBot and copy the numeric Id — only if steps 2–3 are unavailable.', 'amy-agent' ),
+		);
+	}
+
+	/**
+	 * Not-connected Telegram next steps (shared).
+	 *
+	 * @return string[]
+	 */
+	public static function get_telegram_connect_next_steps() {
+		return array(
+			__( 'Paste BotFather token → Save settings.', 'amy-agent' ),
+			__( 'Enable Telegram Admin Bot.', 'amy-agent' ),
+			__( 'Site must be HTTPS.', 'amy-agent' ),
+			__( 'Click Connect.', 'amy-agent' ),
+			__( 'Add at least one numeric admin ID → Save → Send test message.', 'amy-agent' ),
+		);
+	}
+
+	/**
+	 * Whitelist table column tooltips (user ID vs label vs WP user).
+	 *
+	 * @return array<string, string> column_key => tooltip
+	 */
+	public static function get_whitelist_column_tooltips() {
+		return array(
+			'telegram_id' => __( 'Numeric Telegram user ID (digits only). For private 1:1 chats, chat id equals user id.', 'amy-agent' ),
+			'label'       => __( 'Optional short name for your reference. Not used for authentication.', 'amy-agent' ),
+			'wp_user'     => __( 'WordPress admin linked to this Telegram ID for Amy chat mapping.', 'amy-agent' ),
+		);
+	}
+
+	/**
+	 * Build a simple Help-tab HTML block from title, intro, and ordered steps.
+	 *
+	 * @param string   $intro Optional intro paragraph.
+	 * @param string[] $steps Ordered steps (plain text).
+	 * @param string   $footer_html Optional trusted HTML after the list (already escaped).
+	 * @return string
+	 */
+	public static function build_help_tab_steps_html( $intro, array $steps, $footer_html = '' ) {
+		$html = '';
+		$intro = (string) $intro;
+		if ( '' !== $intro ) {
+			$html .= '<p>' . esc_html( $intro ) . '</p>';
+		}
+		if ( ! empty( $steps ) ) {
+			$html .= '<ol>';
+			foreach ( $steps as $step ) {
+				$html .= '<li>' . esc_html( (string) $step ) . '</li>';
+			}
+			$html .= '</ol>';
+		}
+		if ( '' !== (string) $footer_html ) {
+			$html .= (string) $footer_html;
+		}
+		return $html;
+	}
+
+	/**
+	 * Render Telegram ID help steps (in-panel card; includes fallback deeplinks).
+	 */
+	public static function render_telegram_id_help_steps() {
+		$steps = self::get_telegram_id_help_steps();
+		?>
+		<ol class="amy-agent-settings__steps">
+			<?php foreach ( $steps as $index => $step ) : ?>
+				<li>
+					<?php if ( 4 === (int) $index ) : ?>
+						<?php echo esc_html__( 'Fallback: message', 'amy-agent' ); ?>
+						<a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer">@userinfobot</a>
+						<?php echo esc_html__( 'or', 'amy-agent' ); ?>
+						<a href="https://t.me/RawDataBot" target="_blank" rel="noopener noreferrer">@RawDataBot</a>
+						<?php echo esc_html__( 'and copy the numeric Id — only if steps 2–3 are unavailable.', 'amy-agent' ); ?>
+					<?php else : ?>
+						<?php echo esc_html( $step ); ?>
+					<?php endif; ?>
+				</li>
+			<?php endforeach; ?>
+		</ol>
+		<?php
+	}
+
+	/**
+	 * WP Screen Help tabs for Amy → Settings (mirrors in-panel cards).
+	 */
+	public function add_help_tabs() {
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return;
+		}
+
+		$tutorial_footer = '<p>' . esc_html__( 'Official guide:', 'amy-agent' ) . ' <a href="https://core.telegram.org/bots/tutorial" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Telegram Bots tutorial (BotFather + token)', 'amy-agent' ) . '</a></p>';
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-settings-from',
+				'title'   => self::get_fluentsmtp_playbook_title(),
+				'content' => self::build_help_tab_steps_html(
+					self::get_fluentsmtp_playbook_intro(),
+					self::get_fluentsmtp_playbook_steps( self::DEFAULT_MARKETING_FROM_EMAIL )
+				),
+			)
+		);
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-settings-connection',
+				'title'   => __( 'Connection', 'amy-agent' ),
+				'content' => self::build_help_tab_steps_html(
+					__( 'Point WordPress at your Amy Python service host. The shared secret must match the service .env. Keys stay in the WordPress database.', 'amy-agent' ),
+					array(
+						__( 'Python service URL: base URL of your Amy Python service (no trailing slash). On Local, try 127.0.0.1 or host.docker.internal.', 'amy-agent' ),
+						__( 'Shared secret: must match AMY_SHARED_SECRET on the Amy Python service host.', 'amy-agent' ),
+						__( 'Use Check connection to probe WordPress REST → Python /v1/health.', 'amy-agent' ),
+						__( 'Optional AI provider API key is required for Dashboard Chat.', 'amy-agent' ),
+					)
+				),
+			)
+		);
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-settings-botfather',
+				'title'   => self::get_botfather_help_title(),
+				'content' => self::build_help_tab_steps_html(
+					self::get_botfather_help_intro(),
+					self::get_botfather_help_steps(),
+					$tutorial_footer
+				),
+			)
+		);
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-settings-telegram-id',
+				'title'   => self::get_telegram_id_help_title(),
+				'content' => self::build_help_tab_steps_html(
+					self::get_telegram_id_help_intro(),
+					self::get_telegram_id_help_steps()
+				),
+			)
+		);
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-settings-telegram-connect',
+				'title'   => __( 'Telegram connect', 'amy-agent' ),
+				'content' => self::build_help_tab_steps_html(
+					__( 'Not connected — next steps:', 'amy-agent' ),
+					self::get_telegram_connect_next_steps()
+				),
+			)
+		);
+
+		$screen->set_help_sidebar(
+			'<p><strong>' . esc_html__( 'Where in Settings', 'amy-agent' ) . '</strong></p>' .
+			'<p>' . esc_html__( 'General → Marketing From + FluentSMTP playbook.', 'amy-agent' ) . '</p>' .
+			'<p>' . esc_html__( 'Connection → Amy Python service URL and secret.', 'amy-agent' ) . '</p>' .
+			'<p>' . esc_html__( 'Telegram → BotFather, whitelist, Connect.', 'amy-agent' ) . '</p>'
+		);
 	}
 
 	/**
@@ -1246,9 +1495,9 @@ class Amy_Settings {
 					</div>
 
 					<div class="amy-agent-settings__card amy-agent-settings__card--help amy-agent-settings__card--fluentsmtp" id="general-from-playbook">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Instructions — set your Marketing From', 'amy-agent' ); ?></h3>
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html( self::get_fluentsmtp_playbook_title() ); ?></h3>
 						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html__( 'Per-site From via FluentSMTP. hello@ is only an example default for this install — use your own domain mailbox. Never personal Gmail or AgentMail.', 'amy-agent' ); ?>
+							<?php echo esc_html( self::get_fluentsmtp_playbook_intro() ); ?>
 						</p>
 						<?php self::render_fluentsmtp_buyer_playbook( self::DEFAULT_MARKETING_FROM_EMAIL ); ?>
 					</div>
@@ -1299,7 +1548,7 @@ class Amy_Settings {
 				>
 					<h2 class="amy-agent-settings__panel-title"><?php echo esc_html__( 'Connection', 'amy-agent' ); ?></h2>
 					<p class="amy-agent-settings__panel-intro">
-						<?php echo esc_html__( 'Python service URL, shared secret, and the AI provider used for chat and tools. Keys stay in the WordPress database and are never printed back into the page.', 'amy-agent' ); ?>
+						<?php echo esc_html__( 'Amy Python service URL, shared secret, and the AI provider used for chat and tools. Keys stay in the WordPress database and are never printed back into the page.', 'amy-agent' ); ?>
 					</p>
 
 					<div class="amy-agent-settings__card" id="connection">
@@ -1317,7 +1566,7 @@ class Amy_Settings {
 								autocomplete="off"
 							/>
 							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Base URL of amy-agent-service (no trailing slash). On Local, try 127.0.0.1 or host.docker.internal.', 'amy-agent' ); ?>
+								<?php echo esc_html__( 'Base URL of your Amy Python service host (no trailing slash). On Local, try 127.0.0.1 or host.docker.internal.', 'amy-agent' ); ?>
 							</p>
 						</div>
 						<div class="amy-agent-settings__field">
@@ -1346,7 +1595,7 @@ class Amy_Settings {
 								</p>
 							<?php else : ?>
 								<p class="amy-agent-settings__hint">
-									<?php echo esc_html__( 'Must match AMY_SHARED_SECRET in the Python service .env.', 'amy-agent' ); ?>
+									<?php echo esc_html__( 'Must match AMY_SHARED_SECRET on your Amy Python service host (.env).', 'amy-agent' ); ?>
 								</p>
 							<?php endif; ?>
 						</div>
@@ -1441,9 +1690,9 @@ class Amy_Settings {
 					<?php endif; ?>
 
 					<div class="amy-agent-settings__card amy-agent-settings__card--botfather">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Create your Telegram bot', 'amy-agent' ); ?></h3>
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html( self::get_botfather_help_title() ); ?></h3>
 						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html__( 'Telegram does not allow minting bot tokens via API. Each buyer or team creates their own bot in BotFather, then pastes the token here.', 'amy-agent' ); ?>
+							<?php echo esc_html( self::get_botfather_help_intro() ); ?>
 						</p>
 						<p class="amy-agent-settings__botfather-cta">
 							<a
@@ -1458,11 +1707,9 @@ class Amy_Settings {
 							</a>
 						</p>
 						<ol class="amy-agent-settings__steps">
-							<li><?php echo esc_html__( 'Open BotFather in Telegram (link above).', 'amy-agent' ); ?></li>
-							<li><?php echo esc_html__( 'Send /newbot and follow the prompts.', 'amy-agent' ); ?></li>
-							<li><?php echo esc_html__( 'Choose a display name, then a username ending in bot.', 'amy-agent' ); ?></li>
-							<li><?php echo esc_html__( 'Copy the bot token BotFather sends you.', 'amy-agent' ); ?></li>
-							<li><?php echo esc_html__( 'Paste the token into Bot token below, then Save settings.', 'amy-agent' ); ?></li>
+							<?php foreach ( self::get_botfather_help_steps() as $botfather_step ) : ?>
+								<li><?php echo esc_html( $botfather_step ); ?></li>
+							<?php endforeach; ?>
 						</ol>
 						<p class="amy-agent-settings__hint">
 							<?php echo esc_html__( 'Official guide:', 'amy-agent' ); ?>
@@ -1539,11 +1786,9 @@ class Amy_Settings {
 								<?php echo esc_html__( 'Not connected — next steps:', 'amy-agent' ); ?>
 							</p>
 							<ol class="amy-agent-settings__steps">
-								<li><?php echo esc_html__( 'Paste BotFather token → Save settings.', 'amy-agent' ); ?></li>
-								<li><?php echo esc_html__( 'Enable Telegram Admin Bot.', 'amy-agent' ); ?></li>
-								<li><?php echo esc_html__( 'Site must be HTTPS.', 'amy-agent' ); ?></li>
-								<li><?php echo esc_html__( 'Click Connect.', 'amy-agent' ); ?></li>
-								<li><?php echo esc_html__( 'Add at least one numeric admin ID → Save → Send test message.', 'amy-agent' ); ?></li>
+								<?php foreach ( self::get_telegram_connect_next_steps() as $connect_step ) : ?>
+									<li><?php echo esc_html( $connect_step ); ?></li>
+								<?php endforeach; ?>
 							</ol>
 						</div>
 
@@ -1566,15 +1811,37 @@ class Amy_Settings {
 						<p class="amy-agent-settings__telegram-feedback" id="amy-settings-telegram-feedback" hidden role="status"></p>
 					</div>
 
+					<?php $whitelist_tips = self::get_whitelist_column_tooltips(); ?>
 					<div class="amy-agent-settings__card">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Allowed admins (whitelist)', 'amy-agent' ); ?></h3>
 						<div class="amy-agent-settings__table-wrap">
 							<table class="amy-agent-settings__table" id="amy-telegram-admins-table">
 								<thead>
 									<tr>
-										<th scope="col"><?php echo esc_html__( 'Telegram user ID', 'amy-agent' ); ?></th>
-										<th scope="col"><?php echo esc_html__( 'Label', 'amy-agent' ); ?></th>
-										<th scope="col"><?php echo esc_html__( 'Linked WordPress user', 'amy-agent' ); ?></th>
+										<th scope="col">
+											<span
+												class="amy-agent-settings__th-tip"
+												title="<?php echo esc_attr( $whitelist_tips['telegram_id'] ); ?>"
+											>
+												<?php echo esc_html__( 'Telegram user ID', 'amy-agent' ); ?>
+											</span>
+										</th>
+										<th scope="col">
+											<span
+												class="amy-agent-settings__th-tip"
+												title="<?php echo esc_attr( $whitelist_tips['label'] ); ?>"
+											>
+												<?php echo esc_html__( 'Label', 'amy-agent' ); ?>
+											</span>
+										</th>
+										<th scope="col">
+											<span
+												class="amy-agent-settings__th-tip"
+												title="<?php echo esc_attr( $whitelist_tips['wp_user'] ); ?>"
+											>
+												<?php echo esc_html__( 'Linked WordPress user', 'amy-agent' ); ?>
+											</span>
+										</th>
 										<th scope="col"><span class="screen-reader-text"><?php echo esc_html__( 'Remove', 'amy-agent' ); ?></span></th>
 									</tr>
 								</thead>
@@ -1662,23 +1929,11 @@ class Amy_Settings {
 					</div>
 
 					<div class="amy-agent-settings__card amy-agent-settings__card--help">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'How to find your Telegram user ID', 'amy-agent' ); ?></h3>
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html( self::get_telegram_id_help_title() ); ?></h3>
 						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html__( 'Whitelist uses a numeric Telegram user ID (digits only). For private 1:1 chats, chat id equals user id.', 'amy-agent' ); ?>
+							<?php echo esc_html( self::get_telegram_id_help_intro() ); ?>
 						</p>
-						<ol class="amy-agent-settings__steps">
-							<li><?php echo esc_html__( 'Message your Amy bot in Telegram (open it from the bot username after Connect, or search the username BotFather gave you).', 'amy-agent' ); ?></li>
-							<li><?php echo esc_html__( 'If you are not on the whitelist yet, the bot replies with your numeric Telegram ID — copy those digits into Allowed admins.', 'amy-agent' ); ?></li>
-							<li><?php echo esc_html__( 'If you are already whitelisted, send /whoami — the bot replies with your Telegram ID.', 'amy-agent' ); ?></li>
-							<li><?php echo esc_html__( 'Paste the number into Telegram user ID, choose the linked WordPress admin, Save settings, then press Connect (HTTPS required).', 'amy-agent' ); ?></li>
-							<li>
-								<?php echo esc_html__( 'Fallback: message', 'amy-agent' ); ?>
-								<a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer">@userinfobot</a>
-								<?php echo esc_html__( 'or', 'amy-agent' ); ?>
-								<a href="https://t.me/RawDataBot" target="_blank" rel="noopener noreferrer">@RawDataBot</a>
-								<?php echo esc_html__( 'and copy the numeric Id — only if steps 2–3 are unavailable.', 'amy-agent' ); ?>
-							</li>
-						</ol>
+						<?php self::render_telegram_id_help_steps(); ?>
 					</div>
 				</div>
 

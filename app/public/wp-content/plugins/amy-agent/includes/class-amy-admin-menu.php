@@ -130,6 +130,9 @@ class Amy_Admin_Menu {
 			self::TASK_SERVICE_PAGE_SLUG,
 			array( $this, 'render_task_service' )
 		);
+		if ( $this->hook_task_service ) {
+			add_action( 'load-' . $this->hook_task_service, array( $this, 'add_task_service_help_tabs' ) );
+		}
 
 		$this->hook_settings = add_submenu_page(
 			self::PARENT_SLUG,
@@ -184,6 +187,112 @@ class Amy_Admin_Menu {
 			'manage_options',
 			self::EMAIL_MARKETING_PAGE_SLUG,
 			array( $this, 'render_email_marketing_page' )
+		);
+		if ( $this->hook_email_marketing ) {
+			add_action( 'load-' . $this->hook_email_marketing, array( $this, 'add_email_marketing_help_tabs' ) );
+		}
+	}
+
+	/**
+	 * WP Screen Help for Amy → Task Service (mirrors empty-state / connection help).
+	 */
+	public function add_task_service_help_tabs() {
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return;
+		}
+
+		$connection_url = esc_url( $this->settings->settings_deep_link( 'connection', 'connection' ) );
+		$telegram_url   = esc_url( $this->settings->settings_deep_link( 'telegram', 'telegram' ) );
+		$profile_url    = esc_url( admin_url( 'admin.php?page=' . self::MY_PROFILE_PAGE_SLUG ) );
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-task-service-overview',
+				'title'   => __( 'Task Service', 'amy-agent' ),
+				'content' => '<p>' . esc_html__( 'Board and list of tasks backed by your Amy Python service. Create work, assign humans or Amy, and track status.', 'amy-agent' ) . '</p>',
+			)
+		);
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-task-service-connection',
+				'title'   => __( 'Connection', 'amy-agent' ),
+				'content' => Amy_Settings::build_help_tab_steps_html(
+					__( 'If the board is empty or fails to load, check the Amy Python service host first.', 'amy-agent' ),
+					array(
+						__( 'Amy → Settings → Connection: set Python service URL and shared secret, then Check connection.', 'amy-agent' ),
+						__( 'Confirm Enable Amy is on under Settings → General.', 'amy-agent' ),
+					),
+					'<p><a href="' . $connection_url . '">' . esc_html__( 'Open Settings → Connection', 'amy-agent' ) . '</a></p>'
+				),
+			)
+		);
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-task-service-telegram',
+				'title'   => __( 'Telegram alerts', 'amy-agent' ),
+				'content' => Amy_Settings::build_help_tab_steps_html(
+					__( 'Task alerts reuse the Admin Bot from Settings → Telegram (no second bot stack).', 'amy-agent' ),
+					array_merge(
+						Amy_Settings::get_telegram_connect_next_steps(),
+						array(
+							__( 'Assignees link their chat id under Amy → My Profile → Telegram task alerts.', 'amy-agent' ),
+						)
+					),
+					'<p><a href="' . $telegram_url . '">' . esc_html__( 'Open Settings → Telegram', 'amy-agent' ) . '</a> · <a href="' . $profile_url . '">' . esc_html__( 'Open My Profile → Telegram', 'amy-agent' ) . '</a></p>'
+				),
+			)
+		);
+
+		$screen->set_help_sidebar(
+			'<p><strong>' . esc_html__( 'Quick links', 'amy-agent' ) . '</strong></p>' .
+			'<p><a href="' . $connection_url . '">' . esc_html__( 'Settings → Connection', 'amy-agent' ) . '</a></p>' .
+			'<p><a href="' . $telegram_url . '">' . esc_html__( 'Settings → Telegram', 'amy-agent' ) . '</a></p>' .
+			'<p><a href="' . $profile_url . '">' . esc_html__( 'My Profile → Telegram', 'amy-agent' ) . '</a></p>'
+		);
+	}
+
+	/**
+	 * WP Screen Help for Amy → Email Marketing (mirrors From playbook).
+	 */
+	public function add_email_marketing_help_tabs() {
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return;
+		}
+
+		$from_url = esc_url( $this->settings->settings_deep_link( 'general', 'general-from' ) );
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-email-overview',
+				'title'   => __( 'Email Marketing', 'amy-agent' ),
+				'content' => '<p>' . esc_html__( 'Audience from Amy Analytics visitor emails. Approve the draft, then click Send — nothing auto-sends. Treat as lead-only until consent is confirmed. Never personal Gmail or AgentMail.', 'amy-agent' ) . '</p>',
+			)
+		);
+
+		$screen->add_help_tab(
+			array(
+				'id'      => 'amy-email-from',
+				'title'   => Amy_Settings::get_fluentsmtp_playbook_title(),
+				'content' => Amy_Settings::build_help_tab_steps_html(
+					Amy_Settings::get_fluentsmtp_playbook_intro(),
+					Amy_Settings::get_fluentsmtp_playbook_steps( Amy_Settings::DEFAULT_MARKETING_FROM_EMAIL ),
+					'<p><a href="' . $from_url . '">' . esc_html__( 'Change Marketing From in Settings', 'amy-agent' ) . '</a></p>'
+				),
+			)
+		);
+
+		$screen->set_help_sidebar(
+			'<p><strong>' . esc_html__( 'Where', 'amy-agent' ) . '</strong></p>' .
+			'<p><a href="' . $from_url . '">' . esc_html__( 'Settings → General → Marketing From', 'amy-agent' ) . '</a></p>' .
+			'<p>' . (
+				Amy_Settings::is_fluentsmtp_active()
+					? '<a href="' . esc_url( Amy_Settings::get_fluentsmtp_connections_url() ) . '">' . esc_html__( 'FluentSMTP → Connections', 'amy-agent' ) . '</a>'
+					: '<a href="' . esc_url( Amy_Settings::get_fluentsmtp_install_url() ) . '">' . esc_html__( 'Install FluentSMTP', 'amy-agent' ) . '</a>'
+			) . '</p>'
 		);
 	}
 
@@ -2890,9 +2999,12 @@ class Amy_Admin_Menu {
 				</p>
 				<details class="amy-agent-email__from-playbook">
 					<summary class="amy-agent-email__from-playbook-summary">
-						<?php echo esc_html__( 'Instructions — set your Marketing From', 'amy-agent' ); ?>
+						<?php echo esc_html( Amy_Settings::get_fluentsmtp_playbook_title() ); ?>
 					</summary>
 					<div class="amy-agent-email__from-playbook-body">
+						<p class="amy-agent-email__from-playbook-intro">
+							<?php echo esc_html( Amy_Settings::get_fluentsmtp_playbook_intro() ); ?>
+						</p>
 						<?php Amy_Settings::render_fluentsmtp_buyer_playbook( Amy_Settings::DEFAULT_MARKETING_FROM_EMAIL ); ?>
 					</div>
 				</details>
