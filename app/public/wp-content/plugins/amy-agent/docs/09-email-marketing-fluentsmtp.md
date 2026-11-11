@@ -1,19 +1,25 @@
-# Email Marketing — FluentSMTP / hello@ + history
+# Email Marketing — FluentSMTP / per-site From + history
 
-Amy Email Marketing sends with WordPress `wp_mail()`. On ogcnewfinity.com that
-routes through **FluentSMTP** (active). There is **no** AgentMail or personal
-Gmail path. Hostinger Agentic Mail is **not** used for marketing send or
-reply capture.
+Amy Email Marketing sends with WordPress `wp_mail()` → **FluentSMTP**.
+There is **no** AgentMail or personal Gmail path. Hostinger Agentic Mail is
+**not** used for marketing send or reply capture.
 
-## From address
+## Per-site Marketing From (Settings)
 
-| Setting | Default |
+Each WordPress install configures its own sender under
+**Amy → Settings → Email Marketing From**:
+
+| Setting | Behavior |
 | --- | --- |
-| Amy → Settings → **Marketing From email** | `hello@ogcnewfinity.com` |
-| Amy → Settings → **Marketing From name** | `OGC NewFinity` |
+| **Marketing From email** | Site-owned domain mailbox. Empty → plugin default `hello@ogcnewfinity.com` (OGC NewFinity preference). |
+| **Marketing From name** | Display name. Empty → `OGC NewFinity`. |
 
-The Email Marketing page shows the From address clearly. Personal Gmail,
-AgentMail (`@agentmail.to`), and common free webmail hosts are rejected.
+**Buyers / other sites:** set *your* domain mailbox here and authorize that
+exact address in FluentSMTP (plus SPF/DKIM on your domain). Do not use
+personal Gmail, AgentMail (`@agentmail.to`), or free webmail — those hosts
+are rejected in Settings sanitize + live validation.
+
+The Email Marketing page always shows the resolved From from Settings.
 
 ## Admin flow (never silent)
 
@@ -25,9 +31,8 @@ AgentMail (`@agentmail.to`), and common free webmail hosts are rejected.
 5. Each successful/failed/opted-out recipient is written to **Send & reply
    history** in the Amy Python service.
 
-Each recipient gets an individual `wp_mail()` call with
-`From: OGC NewFinity <hello@ogcnewfinity.com>` (or the configured From) and an
-**Unsubscribe** footer linking to the public opt-out endpoint.
+Each recipient gets an individual `wp_mail()` call with the configured From
+and an **Unsubscribe** footer linking to the public opt-out endpoint.
 
 ## History & inbound limitation
 
@@ -37,7 +42,7 @@ Each recipient gets an individual `wp_mail()` call with
 | Manual reply / internal notes | Yes — Email Marketing history panel |
 | Opt-out / suppression | Yes — footer link + admin Opt out; checked before send |
 | Amy propose draft (no send) | Yes — `POST /wp-json/amy-agent/v1/email-marketing/propose` |
-| Automatic hello@ IMAP/Agentic Mail inbound | **No** — FluentSMTP is outbound-only; no AgentMail |
+| Automatic mailbox IMAP / AgentMail inbound | **No** — FluentSMTP is outbound-only |
 
 Optional: authenticated `POST /wp-json/amy-agent/v1/email-inbound` (header
 `X-Amy-Secret`) forwards JSON into history if you wire a mail forwarder
@@ -50,25 +55,26 @@ yourself.
 - `amy_email_marketing_after_send`
 - `amy_email_marketing_propose`
 
-## What Abdulla must configure
+## What each site must configure
 
-### 1. Hostinger mailbox
+### 1. Domain mailbox
 
-1. hPanel → Emails → create/confirm mailbox **`hello@ogcnewfinity.com`**.
-2. Note SMTP host/port/user/password for FluentSMTP.
+1. Create/confirm the Marketing From mailbox on **your** domain (for OGC
+   NewFinity: **`hello@ogcnewfinity.com`**).
+2. Note SMTP credentials for FluentSMTP.
 
 ### 2. FluentSMTP (WordPress)
 
 1. wp-admin → **FluentSMTP** → Connections.
-2. Authorize sending **as** `hello@ogcnewfinity.com`.
-3. Send FluentSMTP’s test email **From hello@** and confirm delivery.
+2. Authorize sending **as** the same address saved in Amy → Settings.
+3. Send FluentSMTP’s test email From that address and confirm delivery.
 
-Transactional mail can keep using `contact@ogcnewfinity.com` if that is the
-FluentSMTP default — Amy only overrides From for Email Marketing sends.
+Transactional mail can keep a different FluentSMTP default — Amy only
+overrides From for Email Marketing (and Task notify) sends.
 
 ### 3. DNS (SPF / DKIM / DMARC)
 
-SPF includes Hostinger / SMTP provider; DKIM published; DMARC recommended.
+SPF includes your SMTP provider; DKIM published; DMARC recommended.
 
 ### 4. Deploy
 
@@ -79,5 +85,5 @@ Deploy Amy Agent **0.2.47+** and amy-agent-service **0.2.10+**.
 - No personal Gmail for marketing.
 - No AgentMail for marketing.
 - No automatic send on Approve (or on Amy propose).
-- From must stay a domain mailbox (default hello@).
+- From = per-site Settings domain mailbox (fallback hello@ when empty).
 - Respect opt-outs before send.

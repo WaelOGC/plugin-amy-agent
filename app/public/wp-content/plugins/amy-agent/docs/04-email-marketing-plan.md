@@ -38,9 +38,10 @@ her tools are simple executors.
 
 ## 3. Locked decisions
 
-### 3.1 Sending infrastructure: FluentSMTP + hello@
-- **Outbound:** WordPress `wp_mail()` → **FluentSMTP** From
-  **`hello@ogcnewfinity.com`** (Settings-configurable domain mailbox).
+### 3.1 Sending infrastructure: FluentSMTP + per-site From
+- **Outbound:** WordPress `wp_mail()` → **FluentSMTP**. Each site sets
+  **Marketing From** in Amy → Settings (own domain mailbox + FluentSMTP auth).
+- **OGC NewFinity default / empty fallback:** `hello@ogcnewfinity.com`.
 - Hard rules: no personal Gmail, no AgentMail (`@agentmail.to`), human
   **Approve** then explicit **Send** click. Cap recipients per batch (default
   50). See `09-email-marketing-fluentsmtp.md`.

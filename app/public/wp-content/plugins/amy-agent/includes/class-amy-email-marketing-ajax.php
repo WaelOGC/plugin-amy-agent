@@ -347,7 +347,7 @@ class Amy_Email_Marketing_Ajax {
 		if ( ! $this->is_allowed_from( $from_email ) ) {
 			wp_send_json_error(
 				array(
-					'message' => __( 'From address must be your domain mailbox set in Amy → Settings → General (example default: hello@ogcnewfinity.com). Personal Gmail and AgentMail are never used.', 'amy-agent' ),
+					'message' => __( 'From address must be a domain mailbox configured in Amy → Settings and authorized in FluentSMTP (site default hello@ogcnewfinity.com when empty). Personal Gmail and AgentMail are never used.', 'amy-agent' ),
 				),
 				400
 			);
@@ -705,31 +705,14 @@ class Amy_Email_Marketing_Ajax {
 	 * @return bool
 	 */
 	private function is_allowed_from( $email ) {
-		$email = strtolower( trim( (string) $email ) );
-		if ( '' === $email || ! is_email( $email ) ) {
-			return false;
-		}
-		$blocked = array(
-			'gmail.com',
-			'googlemail.com',
-			'agentmail.to',
-			'yahoo.com',
-			'outlook.com',
-			'hotmail.com',
-			'live.com',
-			'icloud.com',
-		);
-		$host = substr( strrchr( $email, '@' ), 1 );
-		if ( in_array( $host, $blocked, true ) ) {
-			return false;
-		}
+		$allowed = Amy_Settings::is_allowed_marketing_from_email( $email );
 		/**
 		 * Filter whether a marketing From address is allowed.
 		 *
 		 * @param bool   $allowed Default: domain mailbox not on free-webmail blocklist.
 		 * @param string $email   Candidate From address.
 		 */
-		return (bool) apply_filters( 'amy_email_marketing_allow_from', true, $email );
+		return (bool) apply_filters( 'amy_email_marketing_allow_from', $allowed, $email );
 	}
 
 	/**

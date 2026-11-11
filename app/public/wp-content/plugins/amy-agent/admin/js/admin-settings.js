@@ -361,7 +361,7 @@
 			if (blocked) {
 				err.textContent =
 					i18n.fromBlocked ||
-					'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your domain mailbox in Settings → General (example: hello@ogcnewfinity.com).';
+					'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your own domain mailbox authorized in FluentSMTP.';
 				err.hidden = false;
 			} else {
 				err.textContent = '';

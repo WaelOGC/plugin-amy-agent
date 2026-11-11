@@ -32,12 +32,13 @@ class Amy_Settings {
 	const OPTION_TASK_DEFAULT_OWNER = 'amy_agent_task_default_owner_wp_user_id';
 
 	/**
-	 * Default marketing From when Settings field is empty.
+	 * Plugin / OGC NewFinity site default when Settings From is empty.
+	 * Each install may override with its own domain mailbox in Settings.
 	 */
 	const DEFAULT_MARKETING_FROM_EMAIL = 'hello@ogcnewfinity.com';
 
 	/**
-	 * Default marketing From display name.
+	 * Default marketing From display name (overridable per site in Settings).
 	 */
 	const DEFAULT_MARKETING_FROM_NAME = 'OGC NewFinity';
 
@@ -351,8 +352,9 @@ class Amy_Settings {
 				'telegramNonce'     => wp_create_nonce( Amy_Telegram::NONCE_ACTION ),
 				'isHttps'           => is_ssl(),
 				'blockedFromHosts'  => self::blocked_marketing_from_hosts(),
+				'defaultFromEmail'  => self::DEFAULT_MARKETING_FROM_EMAIL,
 				'i18n'              => array(
-					'fromBlocked'       => __( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your domain mailbox in Settings → General (example: hello@ogcnewfinity.com).', 'amy-agent' ),
+					'fromBlocked'       => __( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your own domain mailbox authorized in FluentSMTP.', 'amy-agent' ),
 					'healthChecking'    => __( 'Checking connection…', 'amy-agent' ),
 					'healthOk'          => __( 'Python service reachable.', 'amy-agent' ),
 					'healthUnreachable' => __( 'Python service unreachable (check URL, secret, and Dokploy).', 'amy-agent' ),
@@ -452,8 +454,23 @@ class Amy_Settings {
 	}
 
 	/**
-	 * Marketing From email — empty falls back to hello@ogcnewfinity.com.
-	 * Rejects personal Gmail / AgentMail / free webmail.
+	 * Whether an address is allowed as marketing From (domain mailbox only).
+	 *
+	 * @param string $email Candidate address.
+	 * @return bool
+	 */
+	public static function is_allowed_marketing_from_email( $email ) {
+		$email = strtolower( trim( (string) $email ) );
+		if ( '' === $email || ! is_email( $email ) ) {
+			return false;
+		}
+		$host = (string) substr( strrchr( $email, '@' ), 1 );
+		return ! in_array( $host, self::blocked_marketing_from_hosts(), true );
+	}
+
+	/**
+	 * Marketing From email — per-site override; empty falls back to plugin default
+	 * (hello@ogcnewfinity.com). Rejects personal Gmail / AgentMail / free webmail.
 	 *
 	 * @param mixed $value Submitted email.
 	 * @return string
@@ -463,15 +480,22 @@ class Amy_Settings {
 		if ( '' === $email || ! is_email( $email ) ) {
 			return self::DEFAULT_MARKETING_FROM_EMAIL;
 		}
-		$host = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
-		if ( in_array( $host, self::blocked_marketing_from_hosts(), true ) ) {
+		if ( ! self::is_allowed_marketing_from_email( $email ) ) {
+			$previous = sanitize_email( trim( (string) get_option( self::OPTION_MARKETING_FROM_EMAIL, '' ) ) );
+			$kept     = self::is_allowed_marketing_from_email( $previous )
+				? strtolower( $previous )
+				: self::DEFAULT_MARKETING_FROM_EMAIL;
 			add_settings_error(
 				'amy_agent_settings',
 				'amy_marketing_from_blocked',
-				__( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your domain mailbox in Settings → General (kept example default hello@ogcnewfinity.com).', 'amy-agent' ),
+				sprintf(
+					/* translators: %s: email kept after rejecting blocked From */
+					__( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Kept %s. Set your own domain mailbox and authorize it in FluentSMTP.', 'amy-agent' ),
+					$kept
+				),
 				'error'
 			);
-			return self::DEFAULT_MARKETING_FROM_EMAIL;
+			return $kept;
 		}
 		return strtolower( $email );
 	}
@@ -591,19 +615,16 @@ class Amy_Settings {
 
 	/**
 	 * Resolved marketing From email (always a usable address).
+	 * Prefers the site’s Settings value; empty/blocked → plugin default hello@.
 	 *
 	 * @return string
 	 */
 	public function get_marketing_from_email() {
 		$email = sanitize_email( trim( (string) get_option( self::OPTION_MARKETING_FROM_EMAIL, '' ) ) );
-		if ( '' === $email || ! is_email( $email ) ) {
-			return self::DEFAULT_MARKETING_FROM_EMAIL;
+		if ( self::is_allowed_marketing_from_email( $email ) ) {
+			return strtolower( $email );
 		}
-		$host = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
-		if ( in_array( $host, self::blocked_marketing_from_hosts(), true ) ) {
-			return self::DEFAULT_MARKETING_FROM_EMAIL;
-		}
-		return strtolower( $email );
+		return self::DEFAULT_MARKETING_FROM_EMAIL;
 	}
 
 	/**
@@ -958,7 +979,7 @@ class Amy_Settings {
 					<div class="amy-agent-settings__card" id="amy-settings-general-from">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Email Marketing From', 'amy-agent' ); ?></h3>
 						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html__( 'Sends go through wp_mail / FluentSMTP. From must be your domain mailbox — never personal Gmail, AgentMail, or free webmail.', 'amy-agent' ); ?>
+							<?php echo esc_html__( 'Each WordPress site configures its own Marketing From. Buyers: use a mailbox on your domain and authorize that address in FluentSMTP (SPF/DKIM). Sends go through wp_mail → FluentSMTP — never personal Gmail, AgentMail (@agentmail.to), or free webmail.', 'amy-agent' ); ?>
 						</p>
 						<div class="amy-agent-settings__field">
 							<label class="amy-agent-settings__field-label" for="amy_agent_marketing_from_email">
@@ -974,7 +995,15 @@ class Amy_Settings {
 							/>
 							<p class="amy-agent-settings__field-error" id="amy-settings-from-error" hidden></p>
 							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Empty falls back to hello@ogcnewfinity.com as an example default. Must match a mailbox FluentSMTP is authorized to send as (SPF/DKIM on your domain).', 'amy-agent' ); ?>
+								<?php
+								echo esc_html(
+									sprintf(
+										/* translators: %s: plugin default From email */
+										__( 'Leave empty to use the plugin default (%s) for this OGC NewFinity install. Other sites should set their own domain mailbox here and authorize it in FluentSMTP (SPF/DKIM).', 'amy-agent' ),
+										self::DEFAULT_MARKETING_FROM_EMAIL
+									)
+								);
+								?>
 							</p>
 						</div>
 						<div class="amy-agent-settings__field">
@@ -990,7 +1019,7 @@ class Amy_Settings {
 								autocomplete="organization"
 							/>
 							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Display name recipients see (example: OGC NewFinity).', 'amy-agent' ); ?>
+								<?php echo esc_html__( 'Display name shown on marketing sends. Defaults to OGC NewFinity when empty.', 'amy-agent' ); ?>
 							</p>
 						</div>
 						<p class="amy-agent-settings__hint">

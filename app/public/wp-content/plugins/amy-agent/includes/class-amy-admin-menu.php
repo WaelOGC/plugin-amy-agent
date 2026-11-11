@@ -2803,7 +2803,7 @@ class Amy_Admin_Menu {
 					echo esc_html(
 						sprintf(
 							/* translators: %s: Marketing From email */
-							__( '%s must be authorized in FluentSMTP on a verified domain. Never personal Gmail or AgentMail.', 'amy-agent' ),
+							__( '%s must be authorized in FluentSMTP on a verified domain. Each site sets Marketing From in Settings (own domain mailbox). Never personal Gmail or AgentMail.', 'amy-agent' ),
 							$from_email
 						)
 					);
