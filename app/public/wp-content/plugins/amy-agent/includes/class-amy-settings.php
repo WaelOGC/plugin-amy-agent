@@ -28,6 +28,9 @@ class Amy_Settings {
 	const OPTION_TELEGRAM_TOKEN   = 'amy_agent_telegram_bot_token';
 	const OPTION_TELEGRAM_ADMINS  = 'amy_agent_telegram_admins';
 
+	/** Site default task owner when creator has no Telegram or is gone (P3). */
+	const OPTION_TASK_DEFAULT_OWNER = 'amy_agent_task_default_owner_wp_user_id';
+
 	/**
 	 * Default marketing From when Settings field is empty.
 	 */
@@ -292,6 +295,16 @@ class Amy_Settings {
 				'type'              => 'array',
 				'sanitize_callback' => array( $this, 'sanitize_telegram_admins' ),
 				'default'           => array(),
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_TASK_DEFAULT_OWNER,
+			array(
+				'type'              => 'integer',
+				'sanitize_callback' => array( $this, 'sanitize_task_default_owner' ),
+				'default'           => 0,
 			)
 		);
 	}
@@ -599,6 +612,33 @@ class Amy_Settings {
 		$name = sanitize_text_field( trim( (string) get_option( self::OPTION_MARKETING_FROM_NAME, '' ) ) );
 		$name = str_replace( array( '<', '>' ), '', $name );
 		return '' !== $name ? $name : self::DEFAULT_MARKETING_FROM_NAME;
+	}
+
+	/**
+	 * Sanitize site default task owner WP user id.
+	 *
+	 * @param mixed $value Raw option.
+	 * @return int
+	 */
+	public function sanitize_task_default_owner( $value ) {
+		$uid = absint( $value );
+		if ( $uid < 1 ) {
+			return 0;
+		}
+		$user = get_userdata( $uid );
+		if ( ! $user || ! user_can( $user, 'manage_options' ) ) {
+			return 0;
+		}
+		return $uid;
+	}
+
+	/**
+	 * Site default owner for Task Service expiry when creator is unreachable.
+	 *
+	 * @return int 0 when unset.
+	 */
+	public function get_task_default_owner_wp_user_id() {
+		return absint( get_option( self::OPTION_TASK_DEFAULT_OWNER, 0 ) );
 	}
 
 	/**
@@ -946,6 +986,42 @@ class Amy_Settings {
 								placeholder="<?php echo esc_attr( self::DEFAULT_MARKETING_FROM_NAME ); ?>"
 								autocomplete="organization"
 							/>
+						</div>
+					</div>
+
+					<?php
+					$default_owner = $this->get_task_default_owner_wp_user_id();
+					$owner_users   = get_users(
+						array(
+							'capability' => 'manage_options',
+							'orderby'    => 'display_name',
+							'order'      => 'ASC',
+						)
+					);
+					?>
+					<div class="amy-agent-settings__card">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Task Service owner', 'amy-agent' ); ?></h3>
+						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
+							<?php echo esc_html__( 'On timeout, Amy notifies the task creator first. If that creator has no Telegram link or is gone, escalate to this site default owner (then their designated backup).', 'amy-agent' ); ?>
+						</p>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_task_default_owner">
+								<?php echo esc_html__( 'Site default owner', 'amy-agent' ); ?>
+							</label>
+							<select
+								id="amy_agent_task_default_owner"
+								name="<?php echo esc_attr( self::OPTION_TASK_DEFAULT_OWNER ); ?>"
+							>
+								<option value="0"><?php echo esc_html__( '— Not set —', 'amy-agent' ); ?></option>
+								<?php foreach ( $owner_users as $owner_user ) : ?>
+									<option value="<?php echo esc_attr( (string) (int) $owner_user->ID ); ?>" <?php selected( $default_owner, (int) $owner_user->ID ); ?>>
+										<?php echo esc_html( $owner_user->display_name ? $owner_user->display_name : $owner_user->user_login ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+							<p class="amy-agent-settings__hint">
+								<?php echo esc_html__( 'Typically Abdulla / the business owner. Each person can also designate a personal backup under Amy → My Profile.', 'amy-agent' ); ?>
+							</p>
 						</div>
 					</div>
 				</div>

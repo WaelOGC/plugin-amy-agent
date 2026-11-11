@@ -838,6 +838,36 @@
 	color: #86efac;
 }
 
+.amy-agent-task-service__expiry {
+	display: flex;
+	flex-direction: column;
+	gap: 0.55rem;
+	padding: 0.85rem;
+	border: 1px solid rgba(227, 93, 106, 0.45);
+	border-radius: 10px;
+	background: rgba(227, 93, 106, 0.08);
+}
+
+.amy-agent-task-service__expiry-title {
+	margin: 0;
+	font-family: var(--amy-font-heading);
+	font-size: 0.95rem;
+	font-weight: 700;
+	color: #fca5a5;
+}
+
+.amy-agent-task-service__expiry-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.45rem;
+}
+
+.amy-agent-task-service__expiry-result {
+	margin: 0;
+	font-size: 0.8125rem;
+	color: #fca5a5;
+}
+
 /* —— Responsive —— */
 
 @media (max-width: 1200px) {

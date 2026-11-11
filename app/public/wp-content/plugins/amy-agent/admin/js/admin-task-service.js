@@ -29,6 +29,10 @@
 		var $extensionHours = $('#amy-agent-task-extension-hours');
 		var $extensionSubmit = $('#amy-agent-task-extension-submit');
 		var $extensionResult = $('#amy-agent-task-extension-result');
+		var $expiry = $('#amy-agent-task-expiry');
+		var $expiryAssignee = $('#amy-agent-task-expiry-assignee');
+		var $expiryResult = $('#amy-agent-task-expiry-result');
+		var $expiryAmyTake = $('#amy-agent-task-expiry-amy-take');
 		var $humanAssigneeField = $('#amy-agent-task-human-assignee-field');
 		var $amyModeHint = $('#amy-agent-task-amy-mode-hint');
 		var $amyCapable = $('#amy-agent-task-amy-capable');
@@ -142,6 +146,9 @@
 				assigneeType: raw.assignee_type,
 				assigneeWpUserId: raw.assignee_wp_user_id,
 				amyCapable: !!raw.amy_capable,
+				ownerWpUserId: raw.owner_wp_user_id || raw.created_by_wp_user_id,
+				backupWpUserId: raw.backup_wp_user_id || null,
+				escalationStage: raw.escalation_stage || 'none',
 				initials: meta.initials,
 				color: meta.color,
 				avatarUrl: raw.assignee_type === 'amy' ? cfg.amyAvatarUrl || '' : '',
@@ -425,6 +432,10 @@
 			$extension.prop('hidden', true);
 			$extensionHours.val('');
 			$extensionResult.prop('hidden', true).text('');
+			$expiry.prop('hidden', true);
+			$expiryAssignee.val('');
+			$expiryResult.prop('hidden', true).text('');
+			$expiryAmyTake.prop('disabled', true);
 			$modalTitle.text(i18n.newTask || 'New Task');
 			$submitBtn.text(i18n.create || 'Create Task');
 			clearFormError();
@@ -453,6 +464,58 @@
 			$extensionResult.prop('hidden', true).text('');
 		}
 
+		function showExpiryFor(task) {
+			var isExpired = task.escalationStage === 'expired' && task.status !== 'done';
+			$expiry.prop('hidden', !isExpired);
+			$expiryResult.prop('hidden', true).text('');
+			if (!isExpired) {
+				return;
+			}
+			if (task.assigneeType === 'human' && task.assigneeWpUserId) {
+				$expiryAssignee.val(String(task.assigneeWpUserId));
+			} else {
+				$expiryAssignee.val('');
+			}
+			// P4 not live — keep disabled with honest title even when amy_capable.
+			$expiryAmyTake.prop('disabled', true);
+		}
+
+		function runExpiryAction(action, extra) {
+			var id = String($('#amy-agent-task-id').val() || '');
+			if (!id) {
+				return;
+			}
+			$expiryResult.prop('hidden', true).text('');
+			return ajax(
+				'amy_task_expiry_action',
+				$.extend(
+					{
+						id: id,
+						expiry_action: action,
+					},
+					extra || {}
+				)
+			)
+				.done(function (response) {
+					if (!response || !response.success) {
+						$expiryResult
+							.text(extractError(response))
+							.prop('hidden', false);
+						return;
+					}
+					closeModal();
+					showNotice(i18n.expiryActionSuccess || 'Expiry action saved.');
+					loadTasks();
+					refreshStats();
+					if (window.AmyAgentNotifications && window.AmyAgentNotifications.reload) {
+						window.AmyAgentNotifications.reload();
+					}
+				})
+				.fail(function (xhr) {
+					$expiryResult.text(extractError(null, xhr)).prop('hidden', false);
+				});
+		}
+
 		function openCreateModal(presetStatus) {
 			resetForm(presetStatus || 'todo');
 			$modal.prop('hidden', false);
@@ -477,6 +540,7 @@
 			$statusField.prop('hidden', false);
 			$deleteBtn.prop('hidden', false);
 			showExtensionFor(task);
+			showExpiryFor(task);
 			$modalTitle.text(i18n.editTask || 'Edit Task');
 			$submitBtn.text(i18n.save || 'Save changes');
 			$modal.prop('hidden', false);
@@ -511,6 +575,9 @@
 						openEditModal(found);
 					}
 				});
+			},
+			reload: function () {
+				return loadTasks().done(refreshStats);
 			},
 		};
 
@@ -722,6 +789,38 @@
 				.always(function () {
 					$extensionSubmit.prop('disabled', false);
 				});
+		});
+
+		$('#amy-agent-task-expiry-reassign-other').on('click', function (event) {
+			event.preventDefault();
+			var uid = parseInt($expiryAssignee.val(), 10) || 0;
+			if (!uid) {
+				$expiryResult
+					.text(i18n.assigneeRequired || 'Please select who should do this.')
+					.prop('hidden', false);
+				return;
+			}
+			runExpiryAction('reassign_other', { assignee_wp_user_id: uid });
+		});
+
+		$('#amy-agent-task-expiry-reassign-same').on('click', function (event) {
+			event.preventDefault();
+			runExpiryAction('reassign_same');
+		});
+
+		$('#amy-agent-task-expiry-ack').on('click', function (event) {
+			event.preventDefault();
+			runExpiryAction('acknowledge_manual');
+		});
+
+		$expiryAmyTake.on('click', function (event) {
+			event.preventDefault();
+			$expiryResult
+				.text(
+					i18n.amyTakeDisabled ||
+						'Amy execution is not live yet. Reassign a human instead.'
+				)
+				.prop('hidden', false);
 		});
 
 		$form.on('submit', function (event) {

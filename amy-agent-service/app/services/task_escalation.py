@@ -3,8 +3,8 @@
 P2 standard state machine (APScheduler every 5 min + SQLite stages):
   none → mid_report_asked (50% of created_at→due) → expired (past due)
 
-Mid ask + expiry reuse P1 ``task_notify`` (dashboard + email/Telegram relay).
-Owner/backup reassign UX = P3. Amy execution = P4 (hook only — never fake done).
+P3: expiry notifies resolved owner (creator → site default → backup) and
+exposes human reassign / honest Amy-take CTA (disabled until P4).
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Any
 
 from app import config_task_rules as rules
 from app.db import notifications_db, tasks_db
-from app.services import task_notify
+from app.services import task_notify, task_owner
 
 logger = logging.getLogger(__name__)
 
@@ -98,23 +98,30 @@ def _normalize_standard_stage(stage: str) -> str:
 def _amy_capable_expiry_hook(task: dict[str, Any]) -> None:
     """P4 handoff stub — log only; never mark done or invent Amy work.
 
-    When ``amy_capable`` is true, P4 should queue real in-system execution.
-    Until then we only escalate notify (creator / future owner-backup).
+    When ``amy_capable`` is true *and* ``AMY_EXECUTION_ENABLED``, P4 should
+    queue real in-system execution. Until then we always notify the owner and
+    leave human reassign as the working path.
     """
     if not task.get("amy_capable"):
         return
-    # TODO(P4 / amy-execution): hand off digital/in-system work to Amy here
-    # (status in_progress → tool allowlist → done/failed with audit). Do not
-    # auto-complete or invent success because the deadline passed.
+    if rules.AMY_EXECUTION_ENABLED:
+        # TODO(P4 / amy-execution): hand off digital/in-system work to Amy here
+        # (status in_progress → tool allowlist → done/failed with audit).
+        logger.info(
+            "Task %s expired with amy_capable=True — Amy execution flag on; "
+            "P4 handoff still pending (no fake completion)",
+            task.get("id"),
+        )
+        return
     logger.info(
         "Task %s expired with amy_capable=True — Amy handoff deferred to P4 "
-        "(notify-only; no fake completion)",
+        "(owner notified; no fake completion)",
         task.get("id"),
     )
 
 
 def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> list[dict[str, Any]]:
-    """P2: mid progress ask @ 50% then expiry for non-urgent open tasks."""
+    """P2/P3: mid progress ask @ 50% then owner expiry escalate."""
     now = time_now(now)
     if task.get("priority") == "urgent":
         return []
@@ -130,12 +137,17 @@ def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> li
     notifications: list[dict[str, Any]] = []
     assignee = _assignee_id(task)
 
-    # Past due → expire (creator / P3 owner decides; do not auto-complete).
+    # Past due → expire + always notify resolved owner (do not auto-complete).
     if now >= due_ts and stage != "expired":
-        # TODO(P3): route expiry to owner/backup instead of creator-only.
         _set_stage(task["id"], "expired")
         _amy_capable_expiry_hook(task)
-        dispatched = task_notify.dispatch_task_notify("expiry", task)
+        escalatee = task_owner.resolve_expiry_escalatee(task)
+        dispatched = task_notify.dispatch_task_notify(
+            "expiry",
+            task,
+            wp_user_id=int(escalatee["wp_user_id"]),
+            action_payload=task_notify.expiry_action_payload(task, escalatee),
+        )
         if dispatched.get("dashboard"):
             notifications.append(dispatched["dashboard"])
         return notifications
@@ -342,6 +354,87 @@ def check_urgent_task(task: dict[str, Any], *, now: float | None = None) -> list
         return notifications
 
     return notifications
+
+
+def handle_expiry_action(
+    task_id: str,
+    *,
+    actor_wp_user_id: int,
+    action: str,
+    assignee_wp_user_id: int | None = None,
+    due_date: str | None = None,
+) -> dict[str, Any]:
+    """Owner/backup expiry actions: reassign, acknowledge, or gated Amy take."""
+    task = tasks_db.get_task(task_id)
+    if task is None:
+        raise ValueError("Task not found")
+    if task.get("status") == "done":
+        raise ValueError("Cannot act on a completed task")
+
+    actor = int(actor_wp_user_id)
+    if action == "acknowledge_manual":
+        # Owner keeps ownership; mark in_progress so work is visibly claimed.
+        updated = tasks_db.update_task(
+            task_id,
+            {
+                "status": "in_progress" if task.get("status") == "todo" else task["status"],
+            },
+        )
+        return {
+            "outcome": "acknowledged_manual",
+            "task": updated or task,
+            "amy_execution_enabled": bool(rules.AMY_EXECUTION_ENABLED),
+        }
+
+    if action == "amy_take":
+        if not task.get("amy_capable"):
+            raise ValueError("Task is not marked amy_capable")
+        if not rules.AMY_EXECUTION_ENABLED:
+            raise ValueError(
+                "Amy execution is not enabled yet (P4). Reassign a human instead."
+            )
+        # P4 will replace this with a real handoff; refuse silent fake success.
+        raise ValueError("Amy execution handoff is not implemented yet (P4)")
+
+    if action not in {"reassign_same", "reassign_other"}:
+        raise ValueError("Unknown expiry action")
+
+    if action == "reassign_same":
+        if task.get("assignee_type") != "human" or task.get("assignee_wp_user_id") is None:
+            raise ValueError("No human assignee to reassign to")
+        new_assignee = int(task["assignee_wp_user_id"])
+    else:
+        if assignee_wp_user_id is None:
+            raise ValueError("assignee_wp_user_id is required for reassign_other")
+        new_assignee = int(assignee_wp_user_id)
+
+    now = time_now()
+    fields: dict[str, Any] = {
+        "assignee_type": "human",
+        "assignee_wp_user_id": new_assignee,
+        "acknowledged_at": None,
+        "escalation_stage": "none",
+        "escalation_stage_updated_at": now,
+        "status": "todo" if task.get("status") == "done" else task.get("status") or "todo",
+    }
+    if due_date is not None and str(due_date).strip():
+        fields["due_date"] = str(due_date).strip()
+    else:
+        due_ts = parse_due_timestamp(task.get("due_date"))
+        if due_ts is None or due_ts <= now:
+            fields["due_date"] = format_due_timestamp(
+                now + rules.EXPIRY_REASSIGN_GRACE_SECONDS
+            )
+
+    updated = tasks_db.update_task(task_id, fields)
+    if updated is None:
+        raise ValueError("Task not found")
+    task_notify.dispatch_task_notify("assign", updated)
+    return {
+        "outcome": action,
+        "task": updated,
+        "amy_execution_enabled": bool(rules.AMY_EXECUTION_ENABLED),
+    }
 
 
 def request_extension(

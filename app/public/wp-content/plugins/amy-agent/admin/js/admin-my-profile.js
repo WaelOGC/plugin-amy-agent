@@ -258,5 +258,43 @@
 					$btn.prop('disabled', false).text((cfg.i18n && cfg.i18n.tgUnlink) || 'Unlink Telegram');
 				});
 		});
+
+		var $backupSelect = $('#amy-my-profile-task-backup');
+		var $backupSave = $('#amy-my-profile-backup-save');
+		var $backupStatus = $('#amy-my-profile-backup-status');
+		$backupSave.on('click', function (event) {
+			event.preventDefault();
+			var $btn = $(this);
+			$btn.prop('disabled', true).text((cfg.i18n && cfg.i18n.backupSaving) || 'Saving backup…');
+			$backupStatus.prop('hidden', true).text('');
+			$.post(cfg.ajaxUrl, {
+				action: 'amy_agent_save_task_backup',
+				nonce: cfg.nonce,
+				backup_wp_user_id: $backupSelect.val() || '0',
+			})
+				.done(function (response) {
+					if (!response || !response.success) {
+						var fail =
+							response && response.data && response.data.message
+								? response.data.message
+								: (cfg.i18n && cfg.i18n.backupError) || 'Could not save backup.';
+						$backupStatus.text(fail).prop('hidden', false);
+						return;
+					}
+					$backupStatus
+						.text((cfg.i18n && cfg.i18n.backupSaved) || 'Backup saved.')
+						.prop('hidden', false);
+				})
+				.fail(function (xhr) {
+					var msg = (cfg.i18n && cfg.i18n.backupError) || 'Could not save backup.';
+					if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
+						msg = xhr.responseJSON.data.message;
+					}
+					$backupStatus.text(msg).prop('hidden', false);
+				})
+				.always(function () {
+					$btn.prop('disabled', false).text((cfg.i18n && cfg.i18n.backupSave) || 'Save backup');
+				});
+		});
 	});
 })(jQuery);

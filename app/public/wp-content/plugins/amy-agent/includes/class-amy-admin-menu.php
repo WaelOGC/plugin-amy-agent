@@ -20,6 +20,8 @@ class Amy_Admin_Menu {
 	const SEO_TASKS_PAGE_SLUG       = 'amy-seo-tasks';
 	const BRAND_PAGE_SLUG           = 'amy-brand-avatar';
 	const USER_AVATAR_META          = 'amy_agent_user_avatar_url';
+	/** Per-owner Task Service backup (P3 escalate fallback). */
+	const USER_TASK_BACKUP_META     = 'amy_task_backup_wp_user_id';
 
 	/**
 	 * @var Amy_Settings
@@ -85,6 +87,7 @@ class Amy_Admin_Menu {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'wp_ajax_amy_agent_save_my_profile', array( $this, 'ajax_save_my_profile' ) );
+		add_action( 'wp_ajax_amy_agent_save_task_backup', array( $this, 'ajax_save_task_backup' ) );
 	}
 
 	/**
@@ -266,6 +269,10 @@ class Amy_Admin_Menu {
 						'tgUnlinking'  => __( 'Unlinking…', 'amy-agent' ),
 						'tgLinked'     => __( 'Telegram linked for task alerts.', 'amy-agent' ),
 						'tgOpenBot'    => __( 'Open bot & tap Start', 'amy-agent' ),
+						'backupSaving' => __( 'Saving backup…', 'amy-agent' ),
+						'backupSave'   => __( 'Save backup', 'amy-agent' ),
+						'backupSaved'  => __( 'Backup saved.', 'amy-agent' ),
+						'backupError'  => __( 'Could not save backup.', 'amy-agent' ),
 					),
 				)
 			);
@@ -334,9 +341,11 @@ class Amy_Admin_Menu {
 						'extensionAuto'    => __( 'Extension granted automatically. Due date updated.', 'amy-agent' ),
 						'extensionPending' => __( 'Extension request sent — awaiting creator approval.', 'amy-agent' ),
 						'extensionInvalid' => __( 'Enter a positive number of hours.', 'amy-agent' ),
-						'modeAmy'          => __( 'Amy', 'amy-agent' ),
-						'modeHuman'        => __( 'Human', 'amy-agent' ),
-						'amyCapableBadge'  => __( 'Amy-capable', 'amy-agent' ),
+						'modeAmy'              => __( 'Amy', 'amy-agent' ),
+						'modeHuman'            => __( 'Human', 'amy-agent' ),
+						'amyCapableBadge'      => __( 'Amy-capable', 'amy-agent' ),
+						'expiryActionSuccess'  => __( 'Expiry action saved.', 'amy-agent' ),
+						'amyTakeDisabled'      => __( 'Amy execution is not live yet. Reassign a human instead.', 'amy-agent' ),
 					),
 				)
 			);
@@ -1251,7 +1260,7 @@ class Amy_Admin_Menu {
 							<span><?php echo esc_html__( 'Amy can do this work (digital / in-system)', 'amy-agent' ); ?></span>
 						</label>
 						<p class="amy-agent-task-service__field-hint">
-							<?php echo esc_html__( 'Used later on timeout: Amy may take capable tasks; otherwise the owner reassigns. Categories come later.', 'amy-agent' ); ?>
+							<?php echo esc_html__( 'On timeout the owner is notified. If capable, “Let Amy take it” appears (disabled until Amy execution ships); otherwise reassign a human.', 'amy-agent' ); ?>
 						</p>
 
 						<label class="amy-agent-task-service__field" for="amy-agent-task-status" id="amy-agent-task-status-field" hidden>
@@ -1294,6 +1303,48 @@ class Amy_Admin_Menu {
 								<?php echo esc_html__( 'Request Extension', 'amy-agent' ); ?>
 							</button>
 							<p class="amy-agent-task-service__extension-result" id="amy-agent-task-extension-result" hidden role="status"></p>
+						</div>
+
+						<div class="amy-agent-task-service__expiry" id="amy-agent-task-expiry" hidden>
+							<p class="amy-agent-task-service__expiry-title"><?php echo esc_html__( 'Past due — owner actions', 'amy-agent' ); ?></p>
+							<p class="amy-agent-task-service__field-hint" id="amy-agent-task-expiry-hint">
+								<?php echo esc_html__( 'Reassign a human. If this task is Amy-capable, “Let Amy take it” stays disabled until Amy execution ships.', 'amy-agent' ); ?>
+							</p>
+							<label class="amy-agent-task-service__field" for="amy-agent-task-expiry-assignee">
+								<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Reassign to', 'amy-agent' ); ?></span>
+								<select id="amy-agent-task-expiry-assignee">
+									<option value=""><?php echo esc_html__( 'Select someone…', 'amy-agent' ); ?></option>
+									<?php foreach ( $assignees as $assignee ) : ?>
+										<?php if ( 'amy' === ( $assignee['type'] ?? '' ) ) : ?>
+											<?php continue; ?>
+										<?php endif; ?>
+										<option value="<?php echo esc_attr( (string) (int) ( $assignee['wpUserId'] ?? 0 ) ); ?>">
+											<?php echo esc_html( $assignee['label'] ); ?>
+										</option>
+									<?php endforeach; ?>
+								</select>
+							</label>
+							<div class="amy-agent-task-service__expiry-actions">
+								<button type="button" class="amy-agent-task-service__btn amy-agent-task-service__btn--accent" id="amy-agent-task-expiry-reassign-other">
+									<?php echo esc_html__( 'Reassign', 'amy-agent' ); ?>
+								</button>
+								<button type="button" class="amy-agent-task-service__btn amy-agent-task-service__btn--ghost" id="amy-agent-task-expiry-reassign-same">
+									<?php echo esc_html__( 'Reassign same person', 'amy-agent' ); ?>
+								</button>
+								<button type="button" class="amy-agent-task-service__btn amy-agent-task-service__btn--ghost" id="amy-agent-task-expiry-ack">
+									<?php echo esc_html__( 'Acknowledge manually', 'amy-agent' ); ?>
+								</button>
+								<button
+									type="button"
+									class="amy-agent-task-service__btn amy-agent-task-service__btn--ghost"
+									id="amy-agent-task-expiry-amy-take"
+									disabled
+									title="<?php echo esc_attr__( 'Amy execution is not live yet (coming in a later phase).', 'amy-agent' ); ?>"
+								>
+									<?php echo esc_html__( 'Let Amy take it', 'amy-agent' ); ?>
+								</button>
+							</div>
+							<p class="amy-agent-task-service__expiry-result" id="amy-agent-task-expiry-result" hidden role="status"></p>
 						</div>
 
 						<p class="amy-agent-task-service__form-error" id="amy-agent-task-form-error" hidden role="alert"></p>
@@ -1408,6 +1459,17 @@ class Amy_Admin_Menu {
 			true
 		);
 
+		$assignees = $this->get_task_assignees_for_js();
+		$humans    = array();
+		foreach ( $assignees as $row ) {
+			if ( 'human' === ( $row['type'] ?? '' ) && ! empty( $row['wpUserId'] ) ) {
+				$humans[] = array(
+					'id'    => (int) $row['wpUserId'],
+					'label' => (string) $row['label'],
+				);
+			}
+		}
+
 		wp_localize_script(
 			'amy-agent-admin-notifications',
 			'amyAgentNotifications',
@@ -1416,20 +1478,28 @@ class Amy_Admin_Menu {
 				'nonce'          => wp_create_nonce( Amy_Tasks_Ajax::NONCE_ACTION ),
 				'currentUserId'  => get_current_user_id(),
 				'taskServiceUrl' => admin_url( 'admin.php?page=' . self::TASK_SERVICE_PAGE_SLUG ),
+				'assignees'      => $humans,
 				'i18n'           => array(
-					'approve'     => __( 'Approve', 'amy-agent' ),
-					'deny'        => __( 'Deny', 'amy-agent' ),
-					'openTask'    => __( 'Open task', 'amy-agent' ),
-					'acknowledge' => __( 'Acknowledge', 'amy-agent' ),
-					'dismiss'     => __( 'Dismiss', 'amy-agent' ),
-					'empty'       => __( 'No unread notifications.', 'amy-agent' ),
+					'approve'          => __( 'Approve', 'amy-agent' ),
+					'deny'             => __( 'Deny', 'amy-agent' ),
+					'openTask'         => __( 'Open task', 'amy-agent' ),
+					'acknowledge'      => __( 'Acknowledge', 'amy-agent' ),
+					'reassignSame'     => __( 'Reassign same', 'amy-agent' ),
+					'reassignOther'    => __( 'Reassign…', 'amy-agent' ),
+					'confirmReassign'  => __( 'Confirm reassign', 'amy-agent' ),
+					'selectAssignee'   => __( 'Select someone…', 'amy-agent' ),
+					'amyTake'          => __( 'Let Amy take it', 'amy-agent' ),
+					'amyTakeDisabled'  => __( 'Amy execution is not live yet (coming in a later phase). Reassign a human instead.', 'amy-agent' ),
+					'dismiss'          => __( 'Dismiss', 'amy-agent' ),
+					'empty'            => __( 'No unread notifications.', 'amy-agent' ),
+					'reassignError'    => __( 'Could not reassign. Please try again.', 'amy-agent' ),
 				),
 			)
 		);
 	}
 
 	/**
-	 * Push manage_options users to the Python service for urgent reassignment.
+	 * Push manage_options users to the Python service for urgent reassignment + P3 owner resolve.
 	 */
 	private function sync_dashboard_users_to_service() {
 		if ( ! function_exists( 'amy_agent' ) ) {
@@ -1445,12 +1515,18 @@ class Amy_Admin_Menu {
 		);
 		$payload = array();
 		foreach ( $users as $user ) {
+			$uid      = (int) $user->ID;
+			$chat_id  = (int) get_user_meta( $uid, Amy_Task_Notify::USER_META_CHAT_ID, true );
+			$backup   = (int) get_user_meta( $uid, self::USER_TASK_BACKUP_META, true );
 			$payload[] = array(
-				'wp_user_id'   => (int) $user->ID,
-				'display_name' => $user->display_name ? $user->display_name : $user->user_login,
+				'wp_user_id'         => $uid,
+				'display_name'       => $user->display_name ? $user->display_name : $user->user_login,
+				'telegram_linked'    => $chat_id > 0,
+				'backup_wp_user_id'  => $backup > 0 ? $backup : null,
 			);
 		}
-		amy_agent()->api_client->sync_dashboard_users( $payload );
+		$site_default = (int) $this->settings->get_task_default_owner_wp_user_id();
+		amy_agent()->api_client->sync_dashboard_users( $payload, $site_default );
 	}
 
 	/**
@@ -1863,6 +1939,44 @@ class Amy_Admin_Menu {
 			$tg_bot_username = (string) get_option( Amy_Telegram::OPTION_BOT_USERNAME, '' );
 			$tg_enabled      = $this->settings->is_telegram_enabled();
 			?>
+			<?php
+			$backup_id    = (int) get_user_meta( (int) $user->ID, self::USER_TASK_BACKUP_META, true );
+			$backup_users = get_users(
+				array(
+					'capability' => 'manage_options',
+					'orderby'    => 'display_name',
+					'order'      => 'ASC',
+					'exclude'    => array( (int) $user->ID ),
+				)
+			);
+			?>
+			<section class="amy-agent-my-profile__panel amy-agent-my-profile__panel--backup" aria-label="<?php echo esc_attr__( 'Task backup', 'amy-agent' ); ?>">
+				<h2 class="amy-agent-my-profile__panel-title">
+					<span class="amy-agent-my-profile__panel-title-icon" aria-hidden="true">
+						<span class="dashicons dashicons-groups"></span>
+					</span>
+					<?php echo esc_html__( 'Task backup', 'amy-agent' ); ?>
+				</h2>
+				<p class="amy-agent-my-profile__telegram-copy">
+					<?php echo esc_html__( 'If you create tasks and become unreachable on timeout (no Telegram / gone), escalation uses the site default owner, then this backup. Designate who should cover for you.', 'amy-agent' ); ?>
+				</p>
+				<label class="amy-agent-my-profile__field" for="amy-my-profile-task-backup">
+					<span class="amy-agent-my-profile__field-label"><?php echo esc_html__( 'My backup person', 'amy-agent' ); ?></span>
+					<select id="amy-my-profile-task-backup" name="backup_wp_user_id">
+						<option value="0"><?php echo esc_html__( '— None —', 'amy-agent' ); ?></option>
+						<?php foreach ( $backup_users as $backup_user ) : ?>
+							<option value="<?php echo esc_attr( (string) (int) $backup_user->ID ); ?>" <?php selected( $backup_id, (int) $backup_user->ID ); ?>>
+								<?php echo esc_html( $backup_user->display_name ? $backup_user->display_name : $backup_user->user_login ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<button type="button" class="amy-agent-my-profile__btn amy-agent-my-profile__btn--outline" id="amy-my-profile-backup-save">
+					<?php echo esc_html__( 'Save backup', 'amy-agent' ); ?>
+				</button>
+				<p class="amy-agent-my-profile__telegram-status" id="amy-my-profile-backup-status" role="status" hidden></p>
+			</section>
+
 			<section class="amy-agent-my-profile__panel amy-agent-my-profile__panel--telegram" aria-label="<?php echo esc_attr__( 'Telegram task alerts', 'amy-agent' ); ?>">
 				<h2 class="amy-agent-my-profile__panel-title">
 					<span class="amy-agent-my-profile__panel-title-icon" aria-hidden="true">
@@ -2187,6 +2301,56 @@ class Amy_Admin_Menu {
 				'gravatarUrl' => esc_url_raw( get_avatar_url( $user_id, array( 'size' => 144 ) ) ),
 				'joined'      => $this->format_joined_date( $user->user_registered ),
 				'roleLabel'   => $this->get_primary_role_label( $user ),
+			)
+		);
+	}
+
+	/**
+	 * AJAX: save the current user's Task Service backup person (P3).
+	 */
+	public function ajax_save_task_backup() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'You do not have permission to edit this profile.', 'amy-agent' ) ),
+				403
+			);
+		}
+
+		check_ajax_referer( 'amy_agent_save_my_profile', 'nonce' );
+
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Not logged in.', 'amy-agent' ) ),
+				401
+			);
+		}
+
+		$backup = isset( $_POST['backup_wp_user_id'] ) ? absint( $_POST['backup_wp_user_id'] ) : 0;
+		if ( $backup > 0 ) {
+			if ( (int) $backup === (int) $user_id ) {
+				wp_send_json_error(
+					array( 'message' => __( 'Choose someone else as your backup.', 'amy-agent' ) ),
+					400
+				);
+			}
+			$backup_user = get_userdata( $backup );
+			if ( ! $backup_user || ! user_can( $backup_user, 'manage_options' ) ) {
+				wp_send_json_error(
+					array( 'message' => __( 'Backup must be a dashboard user.', 'amy-agent' ) ),
+					400
+				);
+			}
+			update_user_meta( $user_id, self::USER_TASK_BACKUP_META, $backup );
+		} else {
+			delete_user_meta( $user_id, self::USER_TASK_BACKUP_META );
+		}
+
+		$this->sync_dashboard_users_to_service();
+
+		wp_send_json_success(
+			array(
+				'backup_wp_user_id' => $backup > 0 ? $backup : null,
 			)
 		);
 	}

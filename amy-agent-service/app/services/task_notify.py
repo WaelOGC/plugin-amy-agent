@@ -2,7 +2,8 @@
 
 Email (FluentSMTP / wp_mail) and Telegram (Admin Bot #11) are sent by WordPress.
 This module owns templates, dashboard bell rows, and calling WP when configured.
-Owner/Amy execution remain P3/P4 — expiry audience here is creator (owner stand-in).
+
+P3: expiry audience is the resolved owner (creator → site default → backup).
 """
 
 from __future__ import annotations
@@ -12,8 +13,10 @@ from typing import Any, Literal
 
 import httpx
 
+from app import config_task_rules as rules
 from app.config import get_settings
 from app.db import notifications_db, progress_notes_db
+from app.services import task_owner
 
 logger = logging.getLogger(__name__)
 
@@ -83,19 +86,34 @@ def render_mid_progress(task: dict[str, Any]) -> dict[str, str]:
 def render_expiry(task: dict[str, Any]) -> dict[str, str]:
     title = (task.get("title") or "Task").strip() or "Task"
     due = format_due(task)
+    amy_capable = bool(task.get("amy_capable"))
     subject = f"Task past due: {title}"
+    if amy_capable and rules.AMY_EXECUTION_ENABLED:
+        proceed = (
+            "Amy can take this digital/in-system work, or you can reassign a human "
+            "in the Amy dashboard notification."
+        )
+    elif amy_capable:
+        proceed = (
+            "This task is marked Amy-capable, but Amy execution is not live yet — "
+            "please reassign a human (or acknowledge and handle it) in the Amy dashboard. "
+            '"Let Amy take it" stays disabled until P4.'
+        )
+    else:
+        proceed = (
+            "This work is not Amy-capable — please reassign someone else "
+            "(same person again, or another teammate) or acknowledge and handle it "
+            "manually in the Amy dashboard."
+        )
     body = (
         f'"{title}" is past its due date ({due}) without completion.\n\n'
-        "Choose how to proceed in the Amy dashboard notification: "
-        "reassign to the same person, reassign to someone else, "
-        "or acknowledge and handle it manually.\n"
-        "(Owner/backup + Amy take-over land in later phases.)"
+        f"{proceed}"
     )
     telegram = (
         f"⚠️ Task past due\n\n"
         f"<b>{_escape_html(title)}</b>\n"
         f"Due: {_escape_html(due)}\n\n"
-        "Open the Amy dashboard to reassign or acknowledge."
+        f"{_escape_html(proceed)}"
     )
     return {"subject": subject, "body": body, "telegram": telegram, "message": body}
 
@@ -120,14 +138,29 @@ def _escape_html(text: str) -> str:
 
 
 def recipient_for_event(event: NotifyEvent, task: dict[str, Any]) -> int | None:
-    """Who should receive this event (P1; owner/backup refined in P3)."""
+    """Who should receive this event."""
     if event in {"assign", "mid_progress"}:
         if task.get("assignee_type") != "human":
             return None
         uid = task.get("assignee_wp_user_id")
         return int(uid) if uid is not None else None
-    # expiry → creator as owner stand-in until P3
-    return int(task["created_by_wp_user_id"])
+    # expiry → resolved owner / site default / backup (P3)
+    return int(task_owner.resolve_expiry_escalatee(task)["wp_user_id"])
+
+
+def expiry_action_payload(task: dict[str, Any], escalatee: dict[str, Any] | None = None) -> dict[str, Any]:
+    resolved = escalatee or task_owner.resolve_expiry_escalatee(task)
+    return {
+        "choices": task_owner.expiry_action_choices(task),
+        "task_id": task["id"],
+        "amy_capable": bool(task.get("amy_capable")),
+        "amy_execution_enabled": bool(rules.AMY_EXECUTION_ENABLED),
+        "escalatee_wp_user_id": int(resolved["wp_user_id"]),
+        "escalatee_role": resolved.get("role"),
+        "escalatee_reason": resolved.get("reason"),
+        "owner_wp_user_id": task_owner.task_owner_id(task),
+        "backup_wp_user_id": task_owner.task_backup_id(task),
+    }
 
 
 def dispatch_task_notify(
@@ -146,7 +179,14 @@ def dispatch_task_notify(
     are logged; dashboard still lands when create_dashboard is true.
     """
     rendered = render_event(event, task)
-    recipient = int(wp_user_id) if wp_user_id is not None else recipient_for_event(event, task)
+    escalatee = None
+    if event == "expiry" and wp_user_id is None:
+        escalatee = task_owner.resolve_expiry_escalatee(task)
+        recipient = int(escalatee["wp_user_id"])
+    else:
+        recipient = (
+            int(wp_user_id) if wp_user_id is not None else recipient_for_event(event, task)
+        )
     result: dict[str, Any] = {
         "event": event,
         "task_id": task.get("id"),
@@ -154,6 +194,7 @@ def dispatch_task_notify(
         "dashboard": None,
         "channels": {"email": "skipped", "telegram": "skipped"},
         "pending_progress": False,
+        "escalatee": escalatee,
     }
     if recipient is None:
         result["channels"] = {"email": "no_recipient", "telegram": "no_recipient"}
@@ -163,14 +204,7 @@ def dispatch_task_notify(
     if requires_action is None:
         requires_action = event == "expiry"
     if action_payload is None and event == "expiry":
-        action_payload = {
-            "choices": [
-                "reassign_same",
-                "reassign_other",
-                "acknowledge_manual",
-            ],
-            "task_id": task["id"],
-        }
+        action_payload = expiry_action_payload(task, escalatee)
 
     if create_dashboard:
         result["dashboard"] = notifications_db.create_notification(
@@ -231,6 +265,9 @@ def _relay_channels_to_wordpress(
             "priority": task.get("priority"),
             "assignee_wp_user_id": task.get("assignee_wp_user_id"),
             "created_by_wp_user_id": task.get("created_by_wp_user_id"),
+            "owner_wp_user_id": task.get("owner_wp_user_id"),
+            "backup_wp_user_id": task.get("backup_wp_user_id"),
+            "amy_capable": bool(task.get("amy_capable")),
         },
         "subject": subject,
         "body": body,

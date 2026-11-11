@@ -38,6 +38,7 @@ class Amy_Tasks_Ajax {
 		add_action( 'wp_ajax_amy_notifications_list', array( $this, 'ajax_notifications_list' ) );
 		add_action( 'wp_ajax_amy_notification_read', array( $this, 'ajax_notification_read' ) );
 		add_action( 'wp_ajax_amy_task_acknowledge', array( $this, 'ajax_acknowledge' ) );
+		add_action( 'wp_ajax_amy_task_expiry_action', array( $this, 'ajax_expiry_action' ) );
 		add_action( 'wp_ajax_amy_task_extension_request', array( $this, 'ajax_extension_request' ) );
 		add_action( 'wp_ajax_amy_extension_approve', array( $this, 'ajax_extension_approve' ) );
 		add_action( 'wp_ajax_amy_extension_deny', array( $this, 'ajax_extension_deny' ) );
@@ -377,6 +378,51 @@ class Amy_Tasks_Ajax {
 		}
 
 		$result = $this->api_client->acknowledge_task( $id, get_current_user_id() );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
+	}
+
+	/**
+	 * Owner/backup expiry actions (reassign / acknowledge / gated Amy take).
+	 */
+	public function ajax_expiry_action() {
+		$this->guard();
+
+		$id     = isset( $_POST['id'] ) ? sanitize_text_field( wp_unslash( $_POST['id'] ) ) : '';
+		$action = isset( $_POST['expiry_action'] ) ? sanitize_key( wp_unslash( $_POST['expiry_action'] ) ) : '';
+		$allowed = array( 'reassign_same', 'reassign_other', 'acknowledge_manual', 'amy_take' );
+		if ( '' === $id ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Task ID is required.', 'amy-agent' ) ),
+				400
+			);
+		}
+		if ( ! in_array( $action, $allowed, true ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Unknown expiry action.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$assignee = isset( $_POST['assignee_wp_user_id'] ) ? absint( $_POST['assignee_wp_user_id'] ) : null;
+		$due_date = isset( $_POST['due_date'] ) ? sanitize_text_field( wp_unslash( $_POST['due_date'] ) ) : null;
+		if ( 'reassign_other' === $action && ( ! $assignee || $assignee < 1 ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'Please select someone to reassign to.', 'amy-agent' ) ),
+				400
+			);
+		}
+
+		$result = $this->api_client->task_expiry_action(
+			$id,
+			get_current_user_id(),
+			$action,
+			$assignee,
+			( null !== $due_date && '' !== $due_date ) ? $due_date : null
+		);
 		if ( ! $result['ok'] ) {
 			$this->send_api_error( $result );
 		}
