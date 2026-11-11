@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.38
+Stable tag: 0.2.39
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -17,12 +17,17 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 == Installation ==
 
 1. Activate the plugin in WordPress.
-2. Go to Settings → Amy Agent and configure the Python service URL, shared secret, AI provider, and API key. Turn on Enable Amy.
+2. Go to Amy → Settings and configure the Python service URL, shared secret, AI provider, and API key. Turn on Enable Amy.
 3. Run the sibling `amy-agent-service` Python process (see that service's README).
 4. Reload any front-end page — the floating Amy widget should appear.
 5. For Email Marketing: set Marketing From (default hello@ogcnewfinity.com) and verify that address in FluentSMTP / Hostinger DNS (SPF/DKIM).
 
 == Changelog ==
+
+= 0.2.39 =
+* Settings: dark Amy admin theme (Space Grotesk / Inter) matching Overview / Email Marketing.
+* Settings: tabbed UI — General (Enable Amy, marketing From) and Connection (service URL, secret, AI provider/key/model).
+* Settings: readiness banner, “what Enable Amy controls” note, connection health check via `/wp-json/amy-agent/v1/health`, and From-email UI validation (blocks Gmail / AgentMail / free webmail).
 
 = 0.2.38 =
 * Overview: wire top strip + tool cards to real Task Service / Analytics / SEO / Email audience / Chat counts (server-side via Amy_Api_Client). Fail soft with — when the service is down; no fake zeros. Admin Roles & Social stays honest coming-soon. Settings/Brand show configured/health/avatar status.

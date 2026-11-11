@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.38 / amy-agent-service unchanged for this Overview pass).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.39 / amy-agent-service unchanged).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -20,6 +20,8 @@
 > conversations, Settings health, Brand avatar). Fail soft (`—` /
 > connection hint) when the Python service is unreachable — never fake zeros.
 > Admin Roles & Social remains an honest coming-soon stub (not started).
+> **Settings (v0.2.39):** dark Amy theme + General / Connection tabs, readiness
+> banner, health check button, marketing From UI validation.
 
 ---
 
@@ -66,6 +68,11 @@
   (green/running as of last check), Nixpacks build, GitHub `plugin-amy-agent` repo,
   build path `/amy-agent-service`, branch `main`, autodeploy on push
 - Admin pages exist for: Overview, Settings, Brand & Avatar (all functional)
+- **Settings (plugin 0.2.39):** dark Amy theme; **General** / **Connection**
+  tabs; readiness banner + Enable Amy controls note (widget + Submit Idea);
+  marketing From email/name with blocked free-webmail UI; **Check connection**
+  against WP `/amy-agent/v1/health` → Python `/v1/health`. Option names
+  unchanged; `amy_agent_enabled` checkbox normalize fix kept.
 - **Overview metrics (plugin 0.2.38):** live counts for built tools (Task Service
   in-progress/open/urgent, Analytics visitors + hot leads, SEO open/fixed checks,
   Email audience with email, Chat active/this-week). Settings shows service
@@ -158,9 +165,12 @@
   extended in plugin **0.2.34** (multi-select/charts) and **0.2.37** (explicit
   Send). Flow: select audience → Approve draft (localStorage) → **Send now**
   confirmation → `wp_mail` via FluentSMTP From **`hello@ogcnewfinity.com`**
-  (configurable in Settings). Never silent; no Gmail / AgentMail. Hostinger
-  Agentic Mail REST + `message.received` webhook still future per
+  (configurable in Settings → General). Never silent; no Gmail / AgentMail.
+  Hostinger Agentic Mail REST + `message.received` webhook still future per
   `docs/04-email-marketing-plan.md`. Setup: `docs/09-email-marketing-fluentsmtp.md`.
+- **Brand & Avatar** — still stock WP-looking admin UI (avatar only); expanded
+  brand/name/tone from `02-dashboard-structure-plan.md` §12 not built yet.
+  Settings no longer hosts avatar.
 
 ## ❌ NOT STARTED — no code, no admin page, design-only in the roadmap doc
 
