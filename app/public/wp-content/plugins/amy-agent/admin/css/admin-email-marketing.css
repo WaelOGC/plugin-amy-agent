@@ -817,11 +817,193 @@
 	color: var(--amy-text-muted);
 }
 
+.amy-agent-email__history {
+	margin-top: 1.75rem;
+	padding-top: 1.25rem;
+	border-top: 1px solid rgba(247, 148, 29, 0.25);
+}
+
+.amy-agent-email__history-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	margin-bottom: 0.5rem;
+}
+
+.amy-agent-email__history-note,
+.amy-agent-email__history-empty {
+	margin: 0 0 1rem;
+	color: var(--amy-text-muted);
+	font-size: 0.85rem;
+	line-height: 1.45;
+}
+
+.amy-agent-email__history-error {
+	margin: 0 0 0.75rem;
+	color: var(--amy-urgent);
+	font-size: 0.875rem;
+}
+
+.amy-agent-email__history-layout {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+	gap: 1rem;
+}
+
+.amy-agent-email__history-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	max-height: 28rem;
+	overflow: auto;
+}
+
+.amy-agent-email__history-row {
+	display: block;
+	width: 100%;
+	text-align: left;
+	padding: 0.75rem 0.85rem;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 10px;
+	background: var(--amy-panel);
+	color: var(--amy-text);
+	cursor: pointer;
+}
+
+.amy-agent-email__history-row:hover,
+.amy-agent-email__history-row:focus {
+	border-color: rgba(247, 148, 29, 0.55);
+	outline: none;
+}
+
+.amy-agent-email__history-row-email {
+	display: block;
+	font-weight: 600;
+	font-size: 0.9rem;
+}
+
+.amy-agent-email__history-row-email em {
+	font-weight: 400;
+	color: var(--amy-urgent);
+	font-style: normal;
+	font-size: 0.8rem;
+}
+
+.amy-agent-email__history-row-meta,
+.amy-agent-email__history-row-preview {
+	display: block;
+	margin-top: 0.2rem;
+	color: var(--amy-text-muted);
+	font-size: 0.78rem;
+}
+
+.amy-agent-email__history-thread {
+	padding: 0.85rem 1rem 1rem;
+	border: 1px solid rgba(247, 148, 29, 0.28);
+	border-radius: 12px;
+	background: var(--amy-panel);
+}
+
+.amy-agent-email__history-back {
+	margin-bottom: 0.65rem;
+	color: #ffd27a !important;
+}
+
+.amy-agent-email__history-thread-title {
+	margin: 0 0 0.2rem;
+	font-size: 1rem;
+}
+
+.amy-agent-email__history-thread-sub {
+	margin: 0 0 0.85rem;
+	color: var(--amy-text-muted);
+	font-size: 0.8rem;
+}
+
+.amy-agent-email__history-messages {
+	list-style: none;
+	margin: 0 0 1rem;
+	padding: 0;
+	max-height: 18rem;
+	overflow: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 0.65rem;
+}
+
+.amy-agent-email__history-msg {
+	padding: 0.65rem 0.75rem;
+	border-radius: 8px;
+	background: rgba(255, 255, 255, 0.03);
+	border-left: 3px solid rgba(247, 148, 29, 0.55);
+}
+
+.amy-agent-email__history-msg--inbound {
+	border-left-color: #6ec6ff;
+}
+
+.amy-agent-email__history-msg--note {
+	border-left-color: #9aa0a6;
+}
+
+.amy-agent-email__history-msg--proposed {
+	border-left-color: #c084fc;
+}
+
+.amy-agent-email__history-msg-head {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.35rem;
+	color: var(--amy-text-muted);
+	font-size: 0.75rem;
+}
+
+.amy-agent-email__history-msg-subject {
+	margin: 0 0 0.35rem;
+	font-size: 0.85rem;
+	font-weight: 600;
+}
+
+.amy-agent-email__history-msg-body {
+	font-size: 0.88rem;
+	line-height: 1.45;
+	white-space: normal;
+	word-break: break-word;
+}
+
+.amy-agent-email__history-msg-error {
+	margin: 0.4rem 0 0;
+	color: var(--amy-urgent);
+	font-size: 0.78rem;
+}
+
+.amy-agent-email__history-compose .amy-agent-email__field {
+	margin-bottom: 0.5rem;
+}
+
+.amy-agent-email__history-inbound-flag {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.65rem;
+	color: var(--amy-text-muted);
+	font-size: 0.8rem;
+}
+
+.amy-agent-email__history-compose-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+}
+
 @media (max-width: 1100px) {
 	.amy-agent-email__stats,
 	.amy-agent-email__insight-row,
 	.amy-agent-email__charts,
-	.amy-agent-email__layout {
+	.amy-agent-email__layout,
+	.amy-agent-email__history-layout {
 		grid-template-columns: 1fr;
 	}
 }

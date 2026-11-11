@@ -201,12 +201,13 @@
 ## 🚧 PARTIAL / NEXT
 
 - **Email Marketing** (`amy-email-marketing`) — audience UI wired (2026-11-10),
-  extended in plugin **0.2.34** (multi-select/charts) and **0.2.37** (explicit
-  Send). Flow: select audience → Approve draft (localStorage) → **Send now**
-  confirmation → `wp_mail` via FluentSMTP From **`hello@ogcnewfinity.com`**
-  (configurable in Settings → General). Never silent; no Gmail / AgentMail.
-  Hostinger Agentic Mail REST + `message.received` webhook still future per
-  `docs/04-email-marketing-plan.md`. Setup: `docs/09-email-marketing-fluentsmtp.md`.
+  Send in **0.2.37**, history/opt-out/Amy propose in **0.2.49** (service
+  **0.2.12**). Flow: select audience → Approve draft → **Send now** →
+  `wp_mail` / FluentSMTP From **`hello@ogcnewfinity.com`**. Durable thread
+  history + manual reply notes + unsubscribe footer. FluentSMTP is
+  outbound-only (no AgentMail / Agentic Mail). Optional inbound webhook if
+  ops forward mail. Setup: `docs/09-email-marketing-fluentsmtp.md`, plan
+  `docs/04-email-marketing-plan.md`.
 - **Brand & Avatar** — still stock WP-looking admin UI (avatar only); expanded
   brand/name/tone from `02-dashboard-structure-plan.md` §12 not built yet.
   Settings no longer hosts avatar.

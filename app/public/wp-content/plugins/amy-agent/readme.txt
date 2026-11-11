@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.48
+Stable tag: 0.2.49
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,10 +20,18 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 2. Go to Amy → Settings and configure the Python service URL, shared secret, AI provider, and API key. Turn on Enable Amy.
 3. Run the sibling `amy-agent-service` Python process (see that service's README).
 4. Reload any front-end page — the floating Amy widget should appear.
-5. For Email Marketing: set Marketing From (empty falls back to hello@ogcnewfinity.com as example) and authorize that mailbox in FluentSMTP / DNS (SPF/DKIM).
+5. For Email Marketing: each site sets Marketing From in Amy → Settings (own domain mailbox + FluentSMTP). Empty falls back to hello@ogcnewfinity.com. Deploy service 0.2.12+ for send/reply history.
 6. For Task Service outbound: set `WORDPRESS_BASE_URL` on the Python service; enable Telegram under Amy → Settings → Telegram; assignees link chat id from Amy → My Profile. Create the Admin Bot via BotFather (Settings → Telegram has the deeplink + steps).
 
 == Changelog ==
+
+= 0.2.49 =
+* Email Marketing: FluentSMTP send history + reply notes in Amy service (no AgentMail / Agentic Mail).
+* Opt-out footer + public unsubscribe + suppression check before send.
+* Amy propose hook (stores draft only; still requires human Approve → Send).
+* Optional authenticated email-inbound webhook; FluentSMTP remains outbound-only.
+* Settings: each site configures its own Marketing From; buyers use their domain mailbox + FluentSMTP. Empty → hello@ogcnewfinity.com. Blocked From keeps the previous valid address.
+* Service 0.2.12: `email_threads` / `email_messages` / `email_suppressions` APIs.
 
 = 0.2.48 =
 * Client help P0: fix Telegram ID instructions (/whoami + unlisted deny path; @userinfobot fallback).

@@ -29,7 +29,11 @@ CAPABILITY_MATRIX: dict[str, dict[str, Any]] = {
     "analytics_summary": {
         "label": "Analytics lead summary",
         "can": "Summarize in-system visitor leads (hot/warm/cold counts + sample).",
-        "cannot": "Contact leads externally, send marketing mail, or change lead status.",
+        "cannot": (
+            "Silently send marketing mail. Amy may POST /v1/email-marketing/propose "
+            "(or WP /email-marketing/propose) to store a draft; human Approve → "
+            "FluentSMTP Send is still required. No AgentMail."
+        ),
         "keywords": (
             "analytics",
             "lead",

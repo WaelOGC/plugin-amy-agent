@@ -16,6 +16,7 @@ from app.routes import (
     chat,
     config_sync,
     conversations,
+    email_marketing,
     health,
     notifications,
     seo_batches,
@@ -132,7 +133,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="Amy Agent Service",
-    version="0.2.11",
+    version="0.2.12",
     description="Intelligence layer for the Amy Agent WordPress plugin (Phase 1 scaffold).",
     lifespan=lifespan,
 )
@@ -141,6 +142,7 @@ app.include_router(health.router)
 app.include_router(config_sync.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
+app.include_router(email_marketing.router)
 app.include_router(submit_idea.router)
 app.include_router(tasks.router)
 app.include_router(notifications.router)

@@ -940,6 +940,7 @@
 					approvedSnapshot = null;
 					clearDraftStorage();
 					updateSendButton();
+					loadHistory();
 				})
 				.fail(function (xhr) {
 					var msg =
@@ -958,8 +959,303 @@
 				});
 		});
 
+		/* ---- Send / reply history (FluentSMTP log + manual inbound) ---- */
+		var $historyList = $('#amy-agent-email-history-list');
+		var $historyEmpty = $('#amy-agent-email-history-empty');
+		var $historyError = $('#amy-agent-email-history-error');
+		var $historyThread = $('#amy-agent-email-history-thread');
+		var $historyMessages = $('#amy-agent-email-history-messages');
+		var $historyMeta = $('#amy-agent-email-history-thread-meta');
+		var $historyNoteBody = $('#amy-agent-email-history-note-body');
+		var $historyAsInbound = $('#amy-agent-email-history-as-inbound');
+		var $historyNote = $('#amy-agent-email-history-note');
+		var activeThreadId = null;
+		var activeThreadEmail = '';
+
+		function showHistoryError(msg) {
+			if (!msg) {
+				$historyError.attr('hidden', 'hidden').text('');
+				return;
+			}
+			$historyError.removeAttr('hidden').text(msg);
+		}
+
+		function directionLabel(dir, status) {
+			if (status === 'failed') {
+				return i18n.statusFailed || 'Failed';
+			}
+			if (status === 'suppressed') {
+				return i18n.statusSuppressed || 'Opted out';
+			}
+			if (dir === 'outbound') {
+				return i18n.dirOutbound || 'Sent';
+			}
+			if (dir === 'inbound') {
+				return i18n.dirInbound || 'Reply';
+			}
+			if (dir === 'proposed') {
+				return i18n.dirProposed || 'Amy proposed';
+			}
+			return i18n.dirNote || 'Note';
+		}
+
+		function formatHistoryTime(ts) {
+			var seconds = parseFloat(ts);
+			if (!seconds) {
+				return '—';
+			}
+			try {
+				return new Date(seconds * 1000).toLocaleString();
+			} catch (e) {
+				return formatLastSeen(ts);
+			}
+		}
+
+		function loadHistory() {
+			showHistoryError('');
+			$.ajax({
+				url: cfg.ajaxUrl,
+				method: 'POST',
+				dataType: 'json',
+				data: {
+					action: 'amy_email_marketing_history',
+					nonce: cfg.sendNonce,
+					limit: 40,
+					offset: 0,
+				},
+			})
+				.done(function (res) {
+					if (!res || !res.success) {
+						showHistoryError(
+							(res && res.data && res.data.message) ||
+								i18n.historyError ||
+								'Could not load history.'
+						);
+						return;
+					}
+					var data = res.data || {};
+					if (data.inbound_limitation) {
+						$historyNote.text(data.inbound_limitation);
+					}
+					renderHistoryList(data.threads || []);
+				})
+				.fail(function () {
+					showHistoryError(i18n.historyError || 'Could not load history.');
+				});
+		}
+
+		function renderHistoryList(threads) {
+			$historyList.empty();
+			if (!threads.length) {
+				$historyEmpty.removeAttr('hidden');
+				$historyThread.attr('hidden', 'hidden');
+				return;
+			}
+			$historyEmpty.attr('hidden', 'hidden');
+			threads.forEach(function (t) {
+				var last = t.last_message || {};
+				var preview = escapeHtml((last.body || t.subject || '').slice(0, 120));
+				var row =
+					'<button type="button" class="amy-agent-email__history-row" data-thread-id="' +
+					escapeHtml(t.id) +
+					'">' +
+					'<span class="amy-agent-email__history-row-email">' +
+					escapeHtml(t.participant_email) +
+					(t.suppressed || t.status === 'opted_out'
+						? ' <em>(' + escapeHtml(i18n.statusSuppressed || 'Opted out') + ')</em>'
+						: '') +
+					'</span>' +
+					'<span class="amy-agent-email__history-row-meta">' +
+					escapeHtml(directionLabel(last.direction, last.status)) +
+					' · ' +
+					escapeHtml(formatHistoryTime(t.updated_at)) +
+					'</span>' +
+					'<span class="amy-agent-email__history-row-preview">' +
+					preview +
+					'</span>' +
+					'</button>';
+				$historyList.append(row);
+			});
+		}
+
+		function openThread(threadId) {
+			activeThreadId = threadId;
+			showHistoryError('');
+			$.ajax({
+				url: cfg.ajaxUrl,
+				method: 'POST',
+				dataType: 'json',
+				data: {
+					action: 'amy_email_marketing_thread',
+					nonce: cfg.sendNonce,
+					thread_id: threadId,
+				},
+			})
+				.done(function (res) {
+					if (!res || !res.success) {
+						showHistoryError(
+							(res && res.data && res.data.message) ||
+								i18n.historyError ||
+								'Could not load thread.'
+						);
+						return;
+					}
+					renderThread(res.data || {});
+				})
+				.fail(function () {
+					showHistoryError(i18n.historyError || 'Could not load thread.');
+				});
+		}
+
+		function renderThread(data) {
+			var thread = data.thread || {};
+			var messages = data.messages || [];
+			activeThreadEmail = thread.participant_email || '';
+			$historyMeta.html(
+				'<p class="amy-agent-email__history-thread-title"><strong>' +
+					escapeHtml(thread.participant_email || '') +
+					'</strong></p>' +
+					'<p class="amy-agent-email__history-thread-sub">' +
+					escapeHtml(thread.subject || '') +
+					(thread.suppressed
+						? ' · ' + escapeHtml(i18n.statusSuppressed || 'Opted out')
+						: '') +
+					'</p>'
+			);
+			$historyMessages.empty();
+			messages.forEach(function (m) {
+				$historyMessages.append(
+					'<li class="amy-agent-email__history-msg amy-agent-email__history-msg--' +
+						escapeHtml(m.direction || 'note') +
+						'">' +
+						'<div class="amy-agent-email__history-msg-head">' +
+						'<span>' +
+						escapeHtml(directionLabel(m.direction, m.status)) +
+						'</span>' +
+						'<time>' +
+						escapeHtml(formatHistoryTime(m.created_at)) +
+						'</time>' +
+						'</div>' +
+						(m.subject
+							? '<p class="amy-agent-email__history-msg-subject">' +
+							  escapeHtml(m.subject) +
+							  '</p>'
+							: '') +
+						'<div class="amy-agent-email__history-msg-body">' +
+						escapeHtml(m.body || '').replace(/\n/g, '<br>') +
+						'</div>' +
+						(m.error
+							? '<p class="amy-agent-email__history-msg-error">' +
+							  escapeHtml(m.error) +
+							  '</p>'
+							: '') +
+						'</li>'
+				);
+			});
+			$historyNoteBody.val('');
+			$historyAsInbound.prop('checked', false);
+			$historyThread.removeAttr('hidden');
+			if (data.inbound_limitation) {
+				$historyNote.text(data.inbound_limitation);
+			}
+		}
+
+		$historyList.on('click', '[data-thread-id]', function () {
+			openThread(String($(this).data('thread-id')));
+		});
+
+		$('#amy-agent-email-history-refresh').on('click', function () {
+			activeThreadId = null;
+			$historyThread.attr('hidden', 'hidden');
+			loadHistory();
+		});
+
+		$('#amy-agent-email-history-back').on('click', function () {
+			activeThreadId = null;
+			$historyThread.attr('hidden', 'hidden');
+			loadHistory();
+		});
+
+		$('#amy-agent-email-history-save-note').on('click', function () {
+			if (!activeThreadId) {
+				return;
+			}
+			var body = String($historyNoteBody.val() || '').trim();
+			if (!body) {
+				showHistoryError(i18n.needBody || 'Add a message body before approving.');
+				return;
+			}
+			$.ajax({
+				url: cfg.ajaxUrl,
+				method: 'POST',
+				dataType: 'json',
+				data: {
+					action: 'amy_email_marketing_note',
+					nonce: cfg.sendNonce,
+					thread_id: activeThreadId,
+					body: body,
+					as_inbound: $historyAsInbound.is(':checked') ? '1' : '0',
+				},
+			})
+				.done(function (res) {
+					if (!res || !res.success) {
+						showHistoryError(
+							(res && res.data && res.data.message) || i18n.noteError || 'Could not save note.'
+						);
+						return;
+					}
+					showStatus(i18n.noteSaved || 'Note saved to conversation history.');
+					openThread(activeThreadId);
+				})
+				.fail(function () {
+					showHistoryError(i18n.noteError || 'Could not save note.');
+				});
+		});
+
+		$('#amy-agent-email-history-optout').on('click', function () {
+			if (!activeThreadEmail) {
+				return;
+			}
+			if (
+				!window.confirm(
+					i18n.optOutConfirm ||
+						'Mark this address as opted out? Future marketing sends will be blocked.'
+				)
+			) {
+				return;
+			}
+			$.ajax({
+				url: cfg.ajaxUrl,
+				method: 'POST',
+				dataType: 'json',
+				data: {
+					action: 'amy_email_marketing_optout',
+					nonce: cfg.sendNonce,
+					email: activeThreadEmail,
+					reason: 'admin history panel',
+				},
+			})
+				.done(function (res) {
+					if (!res || !res.success) {
+						showHistoryError(
+							(res && res.data && res.data.message) || i18n.optOutError || 'Could not record opt-out.'
+						);
+						return;
+					}
+					showStatus(i18n.optOutDone || 'Recipient opted out.');
+					if (activeThreadId) {
+						openThread(activeThreadId);
+					}
+					loadHistory();
+				})
+				.fail(function () {
+					showHistoryError(i18n.optOutError || 'Could not record opt-out.');
+				});
+		});
+
 		restoreDraft();
 		loadAudience();
 		updateSendButton();
+		loadHistory();
 	});
 })(jQuery);

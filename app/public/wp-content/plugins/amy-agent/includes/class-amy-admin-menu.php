@@ -548,6 +548,29 @@ class Amy_Admin_Menu {
 						'exportDone'        => __( 'Selected emails exported as CSV.', 'amy-agent' ),
 						'selectionCleared'  => __( 'Selection cleared.', 'amy-agent' ),
 						'draftDirty'        => __( 'Draft changed after approval — approve again before sending.', 'amy-agent' ),
+						'historyTitle'      => __( 'Send & reply history', 'amy-agent' ),
+						'historyEmpty'      => __( 'No sends yet. After you Send via FluentSMTP, threads appear here.', 'amy-agent' ),
+						'historyError'      => __( 'Could not load history. Check the Amy Agent service connection.', 'amy-agent' ),
+						'historyInboundNote'=> __( 'FluentSMTP is outbound-only. Automatic hello@ inbound is not wired (no AgentMail). Log replies with Add reply note.', 'amy-agent' ),
+						'openThread'        => __( 'Open', 'amy-agent' ),
+						'addNote'           => __( 'Add note', 'amy-agent' ),
+						'addReplyNote'      => __( 'Add reply note', 'amy-agent' ),
+						'notePlaceholder'   => __( 'Paste or summarize their reply, or leave an internal note…', 'amy-agent' ),
+						'noteSaved'         => __( 'Note saved to conversation history.', 'amy-agent' ),
+						'noteError'         => __( 'Could not save note.', 'amy-agent' ),
+						'optOut'            => __( 'Opt out', 'amy-agent' ),
+						'optOutConfirm'     => __( 'Mark this address as opted out? Future marketing sends will be blocked.', 'amy-agent' ),
+						'optOutDone'        => __( 'Recipient opted out.', 'amy-agent' ),
+						'optOutError'       => __( 'Could not record opt-out.', 'amy-agent' ),
+						'dirOutbound'       => __( 'Sent', 'amy-agent' ),
+						'dirInbound'        => __( 'Reply', 'amy-agent' ),
+						'dirNote'           => __( 'Note', 'amy-agent' ),
+						'dirProposed'       => __( 'Amy proposed', 'amy-agent' ),
+						'statusFailed'      => __( 'Failed', 'amy-agent' ),
+						'statusSuppressed'  => __( 'Opted out', 'amy-agent' ),
+						'refreshHistory'    => __( 'Refresh', 'amy-agent' ),
+						'backToList'        => __( 'Back to list', 'amy-agent' ),
+						'saveNote'          => __( 'Save', 'amy-agent' ),
 					),
 				)
 			);
@@ -2780,7 +2803,7 @@ class Amy_Admin_Menu {
 					echo esc_html(
 						sprintf(
 							/* translators: %s: Marketing From email */
-							__( '%s must be authorized in FluentSMTP on a verified domain. Never personal Gmail or AgentMail.', 'amy-agent' ),
+							__( '%s must be authorized in FluentSMTP on a verified domain. Each site sets Marketing From in Settings (own domain mailbox). Never personal Gmail or AgentMail.', 'amy-agent' ),
 							$from_email
 						)
 					);
@@ -3018,6 +3041,52 @@ class Amy_Admin_Menu {
 					</p>
 				</section>
 			</div>
+
+			<section class="amy-agent-email__history" aria-labelledby="amy-agent-email-history-title">
+				<div class="amy-agent-email__history-head">
+					<h2 class="amy-agent-email__section-title" id="amy-agent-email-history-title">
+						<?php echo esc_html__( 'Send & reply history', 'amy-agent' ); ?>
+					</h2>
+					<button type="button" class="button" id="amy-agent-email-history-refresh">
+						<?php echo esc_html__( 'Refresh', 'amy-agent' ); ?>
+					</button>
+				</div>
+				<p class="amy-agent-email__history-note" id="amy-agent-email-history-note">
+					<?php echo esc_html__( 'Durable log in the Amy service (same store as Chat). FluentSMTP is outbound-only — no AgentMail. Log inbound replies manually, or forward to the optional email-inbound webhook.', 'amy-agent' ); ?>
+				</p>
+				<p class="amy-agent-email__history-error" id="amy-agent-email-history-error" hidden role="alert"></p>
+				<div class="amy-agent-email__history-layout">
+					<div class="amy-agent-email__history-list" id="amy-agent-email-history-list" aria-live="polite"></div>
+					<div class="amy-agent-email__history-thread" id="amy-agent-email-history-thread" hidden>
+						<button type="button" class="button-link amy-agent-email__history-back" id="amy-agent-email-history-back">
+							<?php echo esc_html__( 'Back to list', 'amy-agent' ); ?>
+						</button>
+						<div id="amy-agent-email-history-thread-meta"></div>
+						<ol class="amy-agent-email__history-messages" id="amy-agent-email-history-messages"></ol>
+						<div class="amy-agent-email__history-compose">
+							<label class="amy-agent-email__field">
+								<span><?php echo esc_html__( 'Add reply note', 'amy-agent' ); ?></span>
+								<textarea id="amy-agent-email-history-note-body" rows="4" placeholder="<?php echo esc_attr__( 'Paste or summarize their reply, or leave an internal note…', 'amy-agent' ); ?>"></textarea>
+							</label>
+							<label class="amy-agent-email__history-inbound-flag">
+								<input type="checkbox" id="amy-agent-email-history-as-inbound" value="1" />
+								<?php echo esc_html__( 'Treat as inbound reply (not internal note)', 'amy-agent' ); ?>
+							</label>
+							<div class="amy-agent-email__history-compose-actions">
+								<button type="button" class="button button-primary" id="amy-agent-email-history-save-note">
+									<?php echo esc_html__( 'Save', 'amy-agent' ); ?>
+								</button>
+								<button type="button" class="button" id="amy-agent-email-history-optout">
+									<?php echo esc_html__( 'Opt out', 'amy-agent' ); ?>
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+				<p class="amy-agent-email__history-empty" id="amy-agent-email-history-empty" hidden>
+					<?php echo esc_html__( 'No sends yet. After you Send via FluentSMTP, threads appear here.', 'amy-agent' ); ?>
+				</p>
+			</section>
 		</div>
 		<?php
 	}

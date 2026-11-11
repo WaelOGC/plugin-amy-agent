@@ -1,10 +1,10 @@
 # Amy Agent — Email Marketing Plan (Final)
 
 > Location: `amy-agent/docs/04-email-marketing-plan.md`
-> Status: **Decisions locked, including outreach-target scope (companies +
-> individuals), confirmation rule, storage location, and legal review
-> timing. No code yet — spec to build a Cursor prompt from, once Wael gives
-> explicit go-ahead to write that prompt.**
+> Status: **Decisions locked.** Outbound = FluentSMTP / `wp_mail` From
+> **`hello@ogcnewfinity.com`**. History + opt-out + Amy propose hooks ship in
+> plugin **0.2.49** / service **0.2.12**. **No AgentMail**, no personal Gmail,
+> no Hostinger Agentic Mail client for marketing.
 > Priority: comes after Dashboard Chat (#3) and Analytics, since Email
 > Marketing consumes data Analytics produces and is triggered through the
 > Dashboard Chat / Amy the Leader orchestrator.
@@ -24,56 +24,48 @@ her tools are simple executors.
 
 ## 2. What it is not (scope boundaries)
 
-- **Not a replacement for FluentSMTP.** FluentSMTP keeps handling WordPress's
-  own transactional mail (contact forms, notifications) via
-  `contact@ogcnewfinity.com`, exactly as configured today. Unrelated to this.
 - **Not a bulk newsletter/campaign platform.** If a real mass-broadcast
   newsletter is needed later (thousands of recipients in one send), that is a
   separate, future decision — likely Hostinger Reach — and out of scope here.
+- **Not AgentMail / Hostinger Agentic Mail.** Marketing never uses
+  `@agentmail.to` or the Agentic Mail REST send path. Transactional WP mail
+  and marketing both ride FluentSMTP; marketing overrides From to hello@.
 - **Not the place where leads get identified or researched.** IP-to-company
   identification lives in Analytics; researching companies and drafting the
   first message is a capability of Amy the Leader herself. This tool's only
-  job is the final step: sending.
+  job is the final step: sending (after human Approve → Send for cold
+  outreach).
 
 ## 3. Locked decisions
 
-### 3.1 Sending infrastructure: Hostinger Agentic Mail
-- Uses **Hostinger Agentic Mail**, a feature built into Hostinger Business
-  Email (available on all plan tiers, including the free tier Wael is
-  currently on) — not Mailgun, not any third-party email API.
-- Integration method: **REST API** (`api.mail.hostinger.com`), not the MCP
-  Server — chosen for consistency with the existing Python service, which
-  already talks to everything else via REST.
-- A **webhook** is configured for the `message.received` event, so the moment
-  a contacted lead replies, the Python service is notified in real time (no
-  polling) and can surface that reply back through Amy / the Dashboard Chat.
-- **Mailbox used (plan target):** `contact@ogcnewfinity.com` (existing in
-  hPanel). **Interim (plugin ≥0.2.37):** admin Email Marketing Send uses
-  WordPress `wp_mail` → **FluentSMTP** From **`hello@ogcnewfinity.com`**
-  (Settings-configurable) until Agentic Mail REST + webhook are wired. See
-  `09-email-marketing-fluentsmtp.md`. Same hard rules: no Gmail / AgentMail;
-  human Approve then explicit Send click.
+### 3.1 Sending infrastructure: FluentSMTP + per-site From
+- **Outbound:** WordPress `wp_mail()` → **FluentSMTP**. Each site sets
+  **Marketing From** in Amy → Settings (own domain mailbox + FluentSMTP auth).
+- **OGC NewFinity default / empty fallback:** `hello@ogcnewfinity.com`.
+- Hard rules: no personal Gmail, no AgentMail (`@agentmail.to`), human
+  **Approve** then explicit **Send** click. Cap recipients per batch (default
+  50). See `09-email-marketing-fluentsmtp.md`.
+- **Inbound limitation:** FluentSMTP is outbound-only. Automatic hello@
+  mailbox receive is **not** wired. Durable send history + **manual reply
+  notes** live in the Python service. Optional authenticated webhook
+  `POST /wp-json/amy-agent/v1/email-inbound` (and service
+  `/v1/email-marketing/inbound`) can store forwarded mail if ops set that up
+  later — still not AgentMail.
 
 ### 3.2 Plan / limits
-- **Development phase (now): free plan.** Current limits (~100 sends/day,
-  100 recipients per message) are sufficient for building and testing.
-- **At full launch** (theme + plugin both live), Wael will upgrade to at
-  least **Business Starter** (1,000 sends/day/mailbox) to support real usage.
-  This is a manual upgrade Wael performs later — not part of this build.
-- The 100-recipients-per-message cap is a non-issue for this tool's actual
-  use case (1-to-1 personalized sends), reinforcing that this was never meant
-  to be a bulk-campaign tool.
+- Personalized 1-to-1 / small-batch follow-ups only.
+- Soft plugin cap (filter `amy_email_marketing_max_recipients`, default 50).
+- Deliverability depends on hello@ mailbox + FluentSMTP auth + SPF/DKIM
+  (Abdulla ops — not code).
 
 ### 3.3 What triggers a send
-- Amy the Leader decides to send, based on:
-  - A lead surfaced by Analytics (Hot/Warm/Cold scoring) that has a known
-    email address.
-  - An explicit task from Wael via Dashboard Chat / Telegram Admin Bot, e.g.
-    "search Rotterdam for marketing agencies, check their sites, and draft an
-    outreach email" — Amy researches, drafts, and (with confirmation) sends
-    via this same infrastructure.
-- The tool itself has no automation logic of its own — it exposes "send an
-  email" as a capability; all judgment about who/when/what stays with Amy.
+- Human admin: Email Marketing UI (audience → draft → Approve → Send).
+- **Amy propose hook** (service/WP): `POST …/email-marketing/propose` stores a
+  `proposed` message in history and **never sends**. Cold outreach still
+  requires Wael/admin Approve → Send in the UI.
+- WP actions for integrators: `amy_email_marketing_before_send`,
+  `amy_email_marketing_send_result`, `amy_email_marketing_after_send`,
+  `amy_email_marketing_propose`.
 
 ## 4. Locked decisions (continued)
 
@@ -85,46 +77,44 @@ either of two kinds of targets:
 - **Specific individuals** — e.g. an influencer or creator Wael has noticed
   on TikTok/Instagram/Facebook who doesn't have a website or clear online
   business presence yet. Wael gives Amy the name/profile manually via
-  Dashboard Chat or Telegram Admin Bot (e.g. "check if this person has a
-  website, and if their social presence suggests they need one, see if we
-  can offer to help"). Amy researches via Google/social search, evaluates,
-  and — same as with companies — drafts and (per 4.2) requests confirmation
-  before sending.
-
-This does not change the sending infrastructure, plan, or trigger logic in
-section 3 — it only broadens who counts as a valid outreach target.
+  Dashboard Chat or Telegram Admin Bot. Amy researches, drafts, and — same
+  as with companies — proposes / requests confirmation before sending.
 
 ### 4.2 Confirmation rule before sending
 A single rule governs whether Amy needs Wael's approval before a message
 goes out, and it depends only on **who initiated contact first** — not on
 message content:
-- If **Amy is initiating contact** with a company or individual who has not
-  reached out to us before (cold outreach), Amy must present the drafted
-  message to Wael and get explicit confirmation before sending.
+- If **Amy is initiating contact** (cold outreach), Amy must present the
+  drafted message and get explicit confirmation before sending (UI Approve →
+  Send, or an approved propose).
 - If **the customer/lead initiated contact** (they messaged us first, or
   replied to a prior message), Amy can respond freely without asking for
-  approval each time — regardless of what the reply contains (including
-  pricing or offers).
+  approval each time — once inbound is available. Until then, humans log
+  inbound via reply notes; automatic Amy reply-without-approve remains
+  gated on real inbound.
 
 ### 4.3 Message history storage
-Sent/received email history is stored in the **same Python-service-side
-data store** used for Dashboard Chat conversations (see
-`03-dashboard-chat-plan.md`) — not a separate email-specific store. This
-keeps all of Amy's memory centralized in one place, consistent with the
-project's "single brain" principle, and prepares for the second developer
-joining soon.
+Sent / proposed / manual inbound / notes are stored in the **same Python
+service SQLite file** as Dashboard Chat (`conversations.db` tables
+`email_threads`, `email_messages`, `email_suppressions`). Admin UX:
+Email Marketing → **Send & reply history**.
 
 ### 4.4 Legal / GDPR note (non-binding)
-Cold outreach (to companies or individuals who have not contacted us first)
-has real legal considerations under Dutch/EU direct-marketing rules:
-- A documented legitimate-interest basis for the contact.
-- A clear opt-out in every cold-outreach message.
-- Dutch law treats outreach to a general business address differently from
-  outreach to a specifically named individual — this matters more now that
-  individual outreach (4.1) is in scope, not just companies.
+Cold outreach has real legal considerations under Dutch/EU rules:
+- Documented legitimate-interest basis.
+- **Clear opt-out in every cold-outreach message** (footer Unsubscribe link
+  → `GET /wp-json/amy-agent/v1/email-opt-out` + suppression list checked
+  before send).
+- Legal review before cold outreach goes live with real recipients —
+  scheduling decision, not a technical open item.
 
-Wael already has a legal/GDPR adviser he can consult. Per his direction,
-this review will happen **before cold outreach goes live with real
-recipients**, not before development — development and testing on the free
-plan can continue now. This is a scheduling decision, not a technical
-open item, and should not block building the feature.
+## 5. Shipped surface (0.2.49 / service 0.2.12)
+
+| Piece | Where |
+| --- | --- |
+| Approve → Send via FluentSMTP From hello@ | Plugin Email Marketing AJAX |
+| Per-recipient history after send | Service `/v1/email-marketing/outbound` |
+| History admin list + thread + reply notes | Email Marketing page |
+| Opt-out footer + public link + admin Opt out | Plugin + suppressions API |
+| Amy propose (no send) | WP + service `/email-marketing/propose` |
+| Optional inbound webhook | WP `/email-inbound` → service `/inbound` |

@@ -701,6 +701,119 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * GET /v1/email-marketing/threads.
+	 *
+	 * @param int         $limit  Page size.
+	 * @param int         $offset Offset.
+	 * @param string|null $q      Search.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_email_threads( $limit = 50, $offset = 0, $q = null ) {
+		$query = array(
+			'limit'  => (int) $limit,
+			'offset' => (int) $offset,
+		);
+		if ( null !== $q && '' !== $q ) {
+			$query['q'] = (string) $q;
+		}
+		return $this->request( 'GET', '/v1/email-marketing/threads?' . http_build_query( $query ) );
+	}
+
+	/**
+	 * GET /v1/email-marketing/threads/{id}.
+	 *
+	 * @param string $thread_id Thread id.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function get_email_thread( $thread_id ) {
+		return $this->request(
+			'GET',
+			'/v1/email-marketing/threads/' . rawurlencode( (string) $thread_id )
+		);
+	}
+
+	/**
+	 * POST /v1/email-marketing/outbound — durable send log after FluentSMTP.
+	 *
+	 * @param array<string, mixed> $payload RecordOutboundRequest body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function record_email_outbound( array $payload ) {
+		return $this->request( 'POST', '/v1/email-marketing/outbound', $payload );
+	}
+
+	/**
+	 * POST /v1/email-marketing/threads/{id}/notes.
+	 *
+	 * @param string               $thread_id Thread id.
+	 * @param array<string, mixed> $payload   Note body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function add_email_thread_note( $thread_id, array $payload ) {
+		return $this->request(
+			'POST',
+			'/v1/email-marketing/threads/' . rawurlencode( (string) $thread_id ) . '/notes',
+			$payload
+		);
+	}
+
+	/**
+	 * POST /v1/email-marketing/propose — Amy draft hook (never sends).
+	 *
+	 * @param array<string, mixed> $payload Propose body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function propose_email_send( array $payload ) {
+		return $this->request( 'POST', '/v1/email-marketing/propose', $payload );
+	}
+
+	/**
+	 * GET /v1/email-marketing/suppressions/check.
+	 *
+	 * @param string $email Address.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function check_email_suppressed( $email ) {
+		return $this->request(
+			'GET',
+			'/v1/email-marketing/suppressions/check?' . http_build_query( array( 'email' => (string) $email ) )
+		);
+	}
+
+	/**
+	 * POST /v1/email-marketing/suppressions.
+	 *
+	 * @param array<string, mixed> $payload Suppression body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function add_email_suppression( array $payload ) {
+		return $this->request( 'POST', '/v1/email-marketing/suppressions', $payload );
+	}
+
+	/**
+	 * GET /v1/email-marketing/suppressions.
+	 *
+	 * @param int $limit Max rows.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_email_suppressions( $limit = 500 ) {
+		return $this->request(
+			'GET',
+			'/v1/email-marketing/suppressions?' . http_build_query( array( 'limit' => (int) $limit ) )
+		);
+	}
+
+	/**
+	 * POST /v1/email-marketing/inbound — optional generic inbound forwarder.
+	 *
+	 * @param array<string, mixed> $payload Inbound body.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function record_email_inbound( array $payload ) {
+		return $this->request( 'POST', '/v1/email-marketing/inbound', $payload );
+	}
+
+	/**
 	 * GET /v1/notifications.
 	 *
 	 * @param int  $wp_user_id  Recipient WP user ID.
