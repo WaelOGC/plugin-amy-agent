@@ -580,7 +580,13 @@ class Amy_Telegram {
 		}
 
 		if ( str_starts_with( $text, '/' ) ) {
-			$this->handle_command( $chat_id, $text, $whitelist_row, $wp_user );
+			$this->handle_command(
+				$chat_id,
+				$text,
+				$whitelist_row,
+				$wp_user,
+				(bool) $identity['admin_chat']
+			);
 			return new WP_REST_Response( array( 'ok' => true ), 200 );
 		}
 
@@ -791,16 +797,25 @@ class Amy_Telegram {
 	}
 
 	/**
-	 * @param int                                      $chat_id Chat id.
-	 * @param string                                   $text    Full message text.
-	 * @param array{telegram_id:int,label:string,wp_user_id:int} $row     Whitelist row.
-	 * @param WP_User                                  $wp_user Linked user.
+	 * @param int                                      $chat_id    Chat id.
+	 * @param string                                   $text       Full message text.
+	 * @param array{telegram_id:int,label:string,wp_user_id:int} $row Whitelist/assignee row.
+	 * @param WP_User                                  $wp_user    Linked user.
+	 * @param bool                                     $admin_chat True when Telegram whitelist allows Amy chat.
 	 */
-	private function handle_command( $chat_id, $text, $row, $wp_user ) {
-		$cmd = strtolower( trim( strtok( $text, " \n\r\t" ) ) );
+	private function handle_command( $chat_id, $text, $row, $wp_user, $admin_chat = false ) {
+		$parts = preg_split( '/\s+/', trim( $text ), 2 );
+		$raw_cmd = isset( $parts[0] ) ? strtolower( (string) $parts[0] ) : '';
+		// Telegram may send /analytics@BotName — strip the bot suffix.
+		$cmd = preg_replace( '/@.*/', '', $raw_cmd );
+		$arg = isset( $parts[1] ) ? trim( (string) $parts[1] ) : '';
 
 		if ( '/start' === $cmd || '/help' === $cmd ) {
-			$help = __( "I'm Amy — your admin assistant. Chat here like Dashboard Chat. Commands: /new, /whoami, /help.", 'amy-agent' );
+			if ( $admin_chat ) {
+				$help = __( "I'm Amy — your admin assistant. Chat here like Dashboard Chat. Commands: /analytics, /new, /whoami, /help.", 'amy-agent' );
+			} else {
+				$help = __( "I'm Amy. Commands: /whoami, /help. For Amy chat + /analytics, ask an admin to add you to the Telegram whitelist in Settings.", 'amy-agent' );
+			}
 			$this->send_message( $chat_id, $help, false );
 			return;
 		}
@@ -817,12 +832,92 @@ class Amy_Telegram {
 		}
 
 		if ( '/new' === $cmd ) {
+			if ( ! $admin_chat ) {
+				$this->send_message(
+					$chat_id,
+					__( 'Thanks — your message was received. For Amy chat, ask an admin to add you to the Telegram whitelist in Settings.', 'amy-agent' ),
+					false
+				);
+				return;
+			}
 			$this->clear_chat_conversation( $chat_id );
 			$this->send_message( $chat_id, __( 'Started a new conversation.', 'amy-agent' ), false );
 			return;
 		}
 
+		if ( '/analytics' === $cmd ) {
+			if ( ! $admin_chat ) {
+				$this->send_message(
+					$chat_id,
+					__( 'Thanks — your message was received. For Amy chat, ask an admin to add you to the Telegram whitelist in Settings.', 'amy-agent' ),
+					false
+				);
+				return;
+			}
+			if ( '' !== $arg ) {
+				// Custom follow-up after the slash → same admin chat brain (fresh snapshot).
+				$this->handle_plain_text(
+					$chat_id,
+					sprintf(
+						/* translators: %s: admin Analytics follow-up question */
+						__( 'Regarding Amy Analytics: %s', 'amy-agent' ),
+						$arg
+					),
+					$row,
+					$wp_user
+				);
+				return;
+			}
+			$this->handle_analytics_slash( $chat_id );
+			return;
+		}
+
 		$this->send_message( $chat_id, __( 'Unknown command. Try /help.', 'amy-agent' ), false );
+	}
+
+	/**
+	 * Fresh Analytics pull for Telegram /analytics (deterministic slash reply).
+	 *
+	 * @param int $chat_id Telegram chat id.
+	 */
+	private function handle_analytics_slash( $chat_id ) {
+		if ( ! $this->settings->is_ready() ) {
+			$this->send_message(
+				$chat_id,
+				__( 'Analytics unavailable right now. Check Amy → Settings → Connection / Overview.', 'amy-agent' ),
+				false
+			);
+			return;
+		}
+
+		$result = $this->api_client->get_analytics_summary( true );
+		if ( ! $result['ok'] || ! is_array( $result['body'] ) ) {
+			$this->send_message(
+				$chat_id,
+				__( 'Analytics unavailable right now. Check Amy → Settings → Connection / Overview.', 'amy-agent' ),
+				false
+			);
+			return;
+		}
+
+		$body = $result['body'];
+		$reply = '';
+		if ( ! empty( $body['slash_reply'] ) && is_string( $body['slash_reply'] ) ) {
+			$reply = $body['slash_reply'];
+		} elseif ( ! empty( $body['summary'] ) && is_string( $body['summary'] ) ) {
+			$reply = $body['summary'];
+		}
+
+		if ( '' === $reply ) {
+			$this->send_message(
+				$chat_id,
+				__( 'Analytics unavailable right now. Check Amy → Settings → Connection / Overview.', 'amy-agent' ),
+				false
+			);
+			return;
+		}
+
+		$this->send_message( $chat_id, $reply, false );
 	}
 
 	/**

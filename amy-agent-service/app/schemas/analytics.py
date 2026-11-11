@@ -49,3 +49,53 @@ class LeadEventItem(BaseModel):
 class LeadEventListResponse(BaseModel):
     session_id: str
     events: list[LeadEventItem]
+
+
+class AnalyticsSummaryCounts(BaseModel):
+    hot: int = 0
+    warm: int = 0
+    cold: int = 0
+    other: int = 0
+
+
+class AnalyticsEmailCaptures(BaseModel):
+    total: int = 0
+    last_7d: int = 0
+
+
+class AnalyticsLastSeenWindows(BaseModel):
+    last_24h: int = 0
+    last_7d: int = 0
+    most_recent_at: float | None = None
+    most_recent: str | None = None
+
+
+class AnalyticsSummarySampleItem(BaseModel):
+    session_id: str | None = None
+    session_id_short: str | None = None
+    lead_status: str | None = None
+    has_email: bool = False
+    lead_email: str | None = None
+    last_seen_at: float = 0
+    last_seen: str | None = None
+    ip_country: str | None = None
+    ip_city: str | None = None
+
+
+class AnalyticsSummaryResponse(BaseModel):
+    """Shared Analytics summary contract for chat, Overview, and slash shortcuts."""
+
+    ok: bool
+    total: int = 0
+    counts: AnalyticsSummaryCounts = AnalyticsSummaryCounts()
+    with_email: int = 0
+    email_captures: AnalyticsEmailCaptures = AnalyticsEmailCaptures()
+    last_seen: AnalyticsLastSeenWindows = AnalyticsLastSeenWindows()
+    empty: bool = True
+    summary: str = ""
+    slash_reply: str = ""
+    sample: list[AnalyticsSummarySampleItem] = []
+    sample_count: int = 0
+    hot_sample: list[AnalyticsSummarySampleItem] = []
+    hot_sample_count: int = 0
+    error: str | None = None

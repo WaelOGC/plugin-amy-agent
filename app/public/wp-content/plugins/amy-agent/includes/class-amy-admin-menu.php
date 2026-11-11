@@ -527,7 +527,7 @@ class Amy_Admin_Menu {
 						'delete'         => __( 'Delete', 'amy-agent' ),
 						'attach'         => __( 'Attach a file', 'amy-agent' ),
 						'uploadError'    => __( 'Could not upload that file.', 'amy-agent' ),
-						'composerPlaceholder' => __( 'Message Amy…', 'amy-agent' ),
+						'composerPlaceholder' => __( 'Message Amy…  (try /Analytics)', 'amy-agent' ),
 						'justNow'        => __( 'just now', 'amy-agent' ),
 						'minutesAgo'     => __( 'm ago', 'amy-agent' ),
 						'hoursAgo'       => __( 'h ago', 'amy-agent' ),
