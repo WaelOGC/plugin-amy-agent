@@ -352,7 +352,7 @@ class Amy_Settings {
 				'isHttps'           => is_ssl(),
 				'blockedFromHosts'  => self::blocked_marketing_from_hosts(),
 				'i18n'              => array(
-					'fromBlocked'       => __( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use a domain mailbox such as hello@ogcnewfinity.com.', 'amy-agent' ),
+					'fromBlocked'       => __( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your domain mailbox in Settings → General (example: hello@ogcnewfinity.com).', 'amy-agent' ),
 					'healthChecking'    => __( 'Checking connection…', 'amy-agent' ),
 					'healthOk'          => __( 'Python service reachable.', 'amy-agent' ),
 					'healthUnreachable' => __( 'Python service unreachable (check URL, secret, and Dokploy).', 'amy-agent' ),
@@ -364,7 +364,7 @@ class Amy_Settings {
 					'keySaved'          => __( 'key saved', 'amy-agent' ),
 					'noApiKey'          => __( 'AI API key not set.', 'amy-agent' ),
 					'pluginVersion'     => __( 'Plugin', 'amy-agent' ),
-					'tgSaveFirst'       => __( 'Save settings first so the bot token is stored.', 'amy-agent' ),
+					'tgSaveFirst'       => __( 'Bot token is missing. Amy → Settings → Telegram → paste token from BotFather → Save settings.', 'amy-agent' ),
 					'tgConnecting'      => __( 'Connecting…', 'amy-agent' ),
 					'tgDisconnecting'   => __( 'Disconnecting…', 'amy-agent' ),
 					'tgTesting'         => __( 'Sending test messages…', 'amy-agent' ),
@@ -372,7 +372,10 @@ class Amy_Settings {
 					'tgConnected'       => __( 'Connected', 'amy-agent' ),
 					'tgNotConnected'    => __( 'Not connected', 'amy-agent' ),
 					'tgError'           => __( 'Error', 'amy-agent' ),
-					'tgHttpsRequired'   => __( 'Telegram webhooks require HTTPS. Connect is disabled until the site uses HTTPS.', 'amy-agent' ),
+					'tgHttpsRequired'   => __( 'Telegram webhooks require HTTPS. Ask your host for HTTPS, then reload Amy → Settings → Telegram.', 'amy-agent' ),
+					'tgConnectFailed'   => __( 'Connect failed. Check token, Enable Telegram Admin Bot, HTTPS, then Connect again under Settings → Telegram.', 'amy-agent' ),
+					'tgTestFailed'      => __( 'Test failed. Enable the bot, save a BotFather token, add at least one numeric admin ID, then Send test message under Settings → Telegram.', 'amy-agent' ),
+					'tgStatusFailed'    => __( 'Status request failed. Save settings, then reload Amy → Settings → Telegram.', 'amy-agent' ),
 					'tgMaxAdmins'       => __( 'Maximum 10 admins.', 'amy-agent' ),
 				),
 			)
@@ -465,7 +468,7 @@ class Amy_Settings {
 			add_settings_error(
 				'amy_agent_settings',
 				'amy_marketing_from_blocked',
-				__( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Kept hello@ogcnewfinity.com.', 'amy-agent' ),
+				__( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use your domain mailbox in Settings → General (kept example default hello@ogcnewfinity.com).', 'amy-agent' ),
 				'error'
 			);
 			return self::DEFAULT_MARKETING_FROM_EMAIL;
@@ -952,10 +955,10 @@ class Amy_Settings {
 						</div>
 					</div>
 
-					<div class="amy-agent-settings__card">
+					<div class="amy-agent-settings__card" id="amy-settings-general-from">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Email Marketing From', 'amy-agent' ); ?></h3>
 						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html__( 'Sends go through wp_mail / FluentSMTP. From must be a verified domain mailbox — never personal Gmail, AgentMail, or free webmail.', 'amy-agent' ); ?>
+							<?php echo esc_html__( 'Sends go through wp_mail / FluentSMTP. From must be your domain mailbox — never personal Gmail, AgentMail, or free webmail.', 'amy-agent' ); ?>
 						</p>
 						<div class="amy-agent-settings__field">
 							<label class="amy-agent-settings__field-label" for="amy_agent_marketing_from_email">
@@ -971,7 +974,7 @@ class Amy_Settings {
 							/>
 							<p class="amy-agent-settings__field-error" id="amy-settings-from-error" hidden></p>
 							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Default: hello@ogcnewfinity.com. Must match a mailbox FluentSMTP is authorized to send as (SPF/DKIM on the domain).', 'amy-agent' ); ?>
+								<?php echo esc_html__( 'Empty falls back to hello@ogcnewfinity.com as an example default. Must match a mailbox FluentSMTP is authorized to send as (SPF/DKIM on your domain).', 'amy-agent' ); ?>
 							</p>
 						</div>
 						<div class="amy-agent-settings__field">
@@ -986,7 +989,17 @@ class Amy_Settings {
 								placeholder="<?php echo esc_attr( self::DEFAULT_MARKETING_FROM_NAME ); ?>"
 								autocomplete="organization"
 							/>
+							<p class="amy-agent-settings__hint">
+								<?php echo esc_html__( 'Display name recipients see (example: OGC NewFinity).', 'amy-agent' ); ?>
+							</p>
 						</div>
+						<p class="amy-agent-settings__hint">
+							<?php echo esc_html__( 'Where:', 'amy-agent' ); ?>
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=fluent-mail' ) ); ?>">
+								<?php echo esc_html__( 'FluentSMTP → Connections', 'amy-agent' ); ?>
+							</a>
+							<?php echo esc_html__( '— authorize send as this mailbox, then prove it with FluentSMTP’s test email.', 'amy-agent' ); ?>
+						</p>
 					</div>
 
 					<?php
@@ -1172,7 +1185,7 @@ class Amy_Settings {
 
 					<?php if ( ! is_ssl() ) : ?>
 						<div class="amy-agent-settings__notice amy-agent-settings__notice--warn" role="status">
-							<?php echo esc_html__( 'This site is not using HTTPS. Telegram only accepts HTTPS webhooks — Connect is disabled until the site is served over HTTPS.', 'amy-agent' ); ?>
+							<?php echo esc_html__( 'This site is not using HTTPS. Telegram only accepts HTTPS webhooks — ask your host for HTTPS, then reload Amy → Settings → Telegram.', 'amy-agent' ); ?>
 						</div>
 					<?php endif; ?>
 
@@ -1200,6 +1213,19 @@ class Amy_Settings {
 							<li><?php echo esc_html__( 'Copy the bot token BotFather sends you.', 'amy-agent' ); ?></li>
 							<li><?php echo esc_html__( 'Paste the token into Bot token below, then Save settings.', 'amy-agent' ); ?></li>
 						</ol>
+						<p class="amy-agent-settings__hint">
+							<?php echo esc_html__( 'Official guide:', 'amy-agent' ); ?>
+							<a
+								class="amy-agent-settings__external-link"
+								href="https://core.telegram.org/bots/tutorial"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<?php echo esc_html__( 'Telegram Bots tutorial (BotFather + token)', 'amy-agent' ); ?>
+								<span class="dashicons dashicons-external" aria-hidden="true"></span>
+								<span class="screen-reader-text"><?php echo esc_html__( '(opens in a new tab)', 'amy-agent' ); ?></span>
+							</a>
+						</p>
 					</div>
 
 					<div class="amy-agent-settings__card">
@@ -1252,6 +1278,23 @@ class Amy_Settings {
 						</div>
 
 						<p class="amy-agent-settings__telegram-status" id="amy-settings-telegram-status" role="status" aria-live="polite"></p>
+
+						<div
+							class="amy-agent-settings__tg-next-steps"
+							id="amy-settings-telegram-next-steps"
+							hidden
+						>
+							<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
+								<?php echo esc_html__( 'Not connected — next steps:', 'amy-agent' ); ?>
+							</p>
+							<ol class="amy-agent-settings__steps">
+								<li><?php echo esc_html__( 'Paste BotFather token → Save settings.', 'amy-agent' ); ?></li>
+								<li><?php echo esc_html__( 'Enable Telegram Admin Bot.', 'amy-agent' ); ?></li>
+								<li><?php echo esc_html__( 'Site must be HTTPS.', 'amy-agent' ); ?></li>
+								<li><?php echo esc_html__( 'Click Connect.', 'amy-agent' ); ?></li>
+								<li><?php echo esc_html__( 'Add at least one numeric admin ID → Save → Send test message.', 'amy-agent' ); ?></li>
+							</ol>
+						</div>
 
 						<div class="amy-agent-settings__telegram-actions">
 							<button
@@ -1368,10 +1411,23 @@ class Amy_Settings {
 					</div>
 
 					<div class="amy-agent-settings__card amy-agent-settings__card--help">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'How to find your Telegram ID', 'amy-agent' ); ?></h3>
-						<p class="amy-agent-settings__hint">
-							<?php echo esc_html__( 'Open your bot in Telegram and send /start — it replies with your ID. Paste it above, save, then press Connect.', 'amy-agent' ); ?>
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'How to find your Telegram user ID', 'amy-agent' ); ?></h3>
+						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
+							<?php echo esc_html__( 'Whitelist uses a numeric Telegram user ID (digits only). For private 1:1 chats, chat id equals user id.', 'amy-agent' ); ?>
 						</p>
+						<ol class="amy-agent-settings__steps">
+							<li><?php echo esc_html__( 'Message your Amy bot in Telegram (open it from the bot username after Connect, or search the username BotFather gave you).', 'amy-agent' ); ?></li>
+							<li><?php echo esc_html__( 'If you are not on the whitelist yet, the bot replies with your numeric Telegram ID — copy those digits into Allowed admins.', 'amy-agent' ); ?></li>
+							<li><?php echo esc_html__( 'If you are already whitelisted, send /whoami — the bot replies with your Telegram ID.', 'amy-agent' ); ?></li>
+							<li><?php echo esc_html__( 'Paste the number into Telegram user ID, choose the linked WordPress admin, Save settings, then press Connect (HTTPS required).', 'amy-agent' ); ?></li>
+							<li>
+								<?php echo esc_html__( 'Fallback: message', 'amy-agent' ); ?>
+								<a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer">@userinfobot</a>
+								<?php echo esc_html__( 'or', 'amy-agent' ); ?>
+								<a href="https://t.me/RawDataBot" target="_blank" rel="noopener noreferrer">@RawDataBot</a>
+								<?php echo esc_html__( 'and copy the numeric Id — only if steps 2–3 are unavailable.', 'amy-agent' ); ?>
+							</li>
+						</ol>
 					</div>
 				</div>
 

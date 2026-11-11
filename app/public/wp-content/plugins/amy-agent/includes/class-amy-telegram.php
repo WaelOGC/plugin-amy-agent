@@ -221,7 +221,9 @@ class Amy_Telegram {
 
 		if ( ! is_ssl() ) {
 			wp_send_json_error(
-				array( 'message' => __( 'Telegram webhooks require HTTPS. Connect is disabled on non-HTTPS sites.', 'amy-agent' ) ),
+				array(
+					'message' => __( 'Telegram webhooks require HTTPS. Ask your host for HTTPS, then reload Amy → Settings → Telegram.', 'amy-agent' ),
+				),
 				400
 			);
 		}
@@ -229,7 +231,9 @@ class Amy_Telegram {
 		$token = $this->get_bot_token();
 		if ( '' === $token ) {
 			wp_send_json_error(
-				array( 'message' => __( 'Save a bot token in settings first.', 'amy-agent' ) ),
+				array(
+					'message' => __( 'Bot token is missing. Amy → Settings → Telegram → paste token from BotFather → Save settings.', 'amy-agent' ),
+				),
 				400
 			);
 		}
@@ -374,7 +378,7 @@ class Amy_Telegram {
 		if ( ! $this->is_telegram_enabled() || '' === $this->get_bot_token() ) {
 			wp_send_json_error(
 				array(
-					'message' => __( 'Telegram bot is not enabled. Ask an admin to configure Amy → Settings → Telegram.', 'amy-agent' ),
+					'message' => __( 'Telegram bot is not enabled. Amy → Settings → Telegram → Enable Telegram Admin Bot, paste a BotFather token, Save settings, then Connect.', 'amy-agent' ),
 				),
 				400
 			);
@@ -390,7 +394,9 @@ class Amy_Telegram {
 		}
 		if ( '' === $username ) {
 			wp_send_json_error(
-				array( 'message' => __( 'Connect the bot webhook in Settings → Telegram first.', 'amy-agent' ) ),
+				array(
+					'message' => __( 'Connect the bot webhook in Settings → Telegram first. Click Connect (HTTPS required).', 'amy-agent' ),
+				),
 				400
 			);
 		}
@@ -437,7 +443,9 @@ class Amy_Telegram {
 
 		if ( ! $this->is_telegram_enabled() || '' === $this->get_bot_token() ) {
 			wp_send_json_error(
-				array( 'message' => __( 'Enable the bot and save a token first.', 'amy-agent' ) ),
+				array(
+					'message' => __( 'Telegram bot is not ready. Amy → Settings → Telegram → Enable Telegram Admin Bot, paste token from BotFather → Save settings, then Connect.', 'amy-agent' ),
+				),
 				400
 			);
 		}
