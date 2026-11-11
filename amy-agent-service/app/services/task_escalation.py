@@ -377,11 +377,13 @@ def handle_expiry_action(
 
     actor = int(actor_wp_user_id)
     if action == "acknowledge_manual":
-        # Owner keeps ownership; mark in_progress so work is visibly claimed.
+        # Owner keeps ownership; claim visible work (including after Amy failed).
+        prev = task.get("status") or "todo"
+        next_status = "in_progress" if prev in {"todo", "failed", "running"} else prev
         updated = tasks_db.update_task(
             task_id,
             {
-                "status": "in_progress" if task.get("status") == "todo" else task["status"],
+                "status": next_status,
             },
         )
         return {

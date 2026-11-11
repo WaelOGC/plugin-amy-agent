@@ -322,3 +322,21 @@ def test_acknowledge_manual_via_api(client: TestClient) -> None:
     assert body["outcome"] == "acknowledged_manual"
     assert body["task"]["status"] == "in_progress"
     assert body["amy_execution_enabled"] is True
+
+
+def test_acknowledge_manual_claims_failed_amy_task(client: TestClient) -> None:
+    created = _human_task(client, amy_capable=False)
+    tasks_db.update_task(
+        created["id"],
+        {"status": "failed", "assignee_type": "amy", "assignee_wp_user_id": None},
+    )
+    response = client.post(
+        f"/v1/tasks/{created['id']}/expiry-action",
+        headers=AUTH,
+        json={
+            "actor_wp_user_id": 1,
+            "action": "acknowledge_manual",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["task"]["status"] == "in_progress"

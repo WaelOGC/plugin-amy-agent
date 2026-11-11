@@ -81,28 +81,44 @@
 					escapeHtml(i18n.deny || 'Deny') +
 					'</button>' +
 					'</div>';
-			} else if (n.requires_action && n.type === 'task_expired' && payload.task_id) {
+			} else if (
+				n.requires_action &&
+				payload.task_id &&
+				(n.type === 'task_expired' || n.type === 'amy_execution_failed')
+			) {
 				var choices = Array.isArray(payload.choices) ? payload.choices : [];
 				var amyCapable = !!payload.amy_capable;
 				var amyEnabled = !!payload.amy_execution_enabled;
 				var showAmy = choices.indexOf('amy_take') !== -1 || amyCapable;
+				var showSame = choices.length === 0 || choices.indexOf('reassign_same') !== -1;
+				var showOther = choices.length === 0 || choices.indexOf('reassign_other') !== -1;
+				var showAck = choices.length === 0 || choices.indexOf('acknowledge_manual') !== -1;
 				actions =
-					'<div class="amy-agent-notifications__actions amy-agent-notifications__actions--expiry">' +
-					'<button type="button" class="amy-agent-notifications__action" data-amy-expiry-same="' +
-					escapeHtml(payload.task_id) +
-					'">' +
-					escapeHtml(i18n.reassignSame || 'Reassign same') +
-					'</button>' +
-					'<button type="button" class="amy-agent-notifications__action" data-amy-expiry-other-toggle="' +
-					escapeHtml(payload.task_id) +
-					'">' +
-					escapeHtml(i18n.reassignOther || 'Reassign…') +
-					'</button>' +
-					'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-expiry-ack="' +
-					escapeHtml(payload.task_id) +
-					'">' +
-					escapeHtml(i18n.acknowledge || 'Acknowledge') +
-					'</button>';
+					'<div class="amy-agent-notifications__actions amy-agent-notifications__actions--expiry">';
+				if (showSame) {
+					actions +=
+						'<button type="button" class="amy-agent-notifications__action" data-amy-expiry-same="' +
+						escapeHtml(payload.task_id) +
+						'">' +
+						escapeHtml(i18n.reassignSame || 'Reassign same') +
+						'</button>';
+				}
+				if (showOther) {
+					actions +=
+						'<button type="button" class="amy-agent-notifications__action" data-amy-expiry-other-toggle="' +
+						escapeHtml(payload.task_id) +
+						'">' +
+						escapeHtml(i18n.reassignOther || 'Reassign…') +
+						'</button>';
+				}
+				if (showAck) {
+					actions +=
+						'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-expiry-ack="' +
+						escapeHtml(payload.task_id) +
+						'">' +
+						escapeHtml(i18n.acknowledge || 'Acknowledge') +
+						'</button>';
+				}
 				if (showAmy) {
 					actions +=
 						'<button type="button" class="amy-agent-notifications__action is-ghost" data-amy-expiry-amy="' +
