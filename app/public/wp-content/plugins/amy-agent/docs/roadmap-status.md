@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.42 / amy-agent-service v0.2.6 — Task Service P1 outbound).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.43 / amy-agent-service v0.2.7 — Task Service P2 scheduler).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -30,7 +30,11 @@
 > **Task Service P1 (v0.2.42 / service 0.2.6):** assign/mid/expiry templates;
 > email via FluentSMTP/`wp_mail` From Settings hello@; Telegram via Admin Bot;
 > My Profile chat-id link; progress notes on mid Telegram reply; dashboard bell
-> kept. Scheduler rename / owner-backup / Amy run = P2–P4.
+> kept.
+> **Task Service P2 (v0.2.43 / service 0.2.7):** APScheduler state machine
+> `none` → `mid_report_asked` (50% of created→due) → `expired`; one mid ask
+> (final warning deferred); P1 notify reused; `amy_capable` expiry hook only.
+> Owner/backup UX + Amy run = P3–P4.
 
 ---
 
@@ -93,10 +97,10 @@
 - Backend: persistent SQLite at `data/tasks.db` (no TTL), FastAPI CRUD + stats,
   escalation schema (`escalation_stage`, `acknowledged_at`, extensions),
   `notifications` + `extension_requests` tables, APScheduler every 5 minutes
-- Behavior: standard midpoint/final reminders + creator expiry actions; urgent
-  60m check-ins / any-available-user reassignment / `no_one_available` notify;
-  extension auto-cap (24h normal) vs always-approve (urgent); dashboard-only
-  notifications (no Telegram yet — see `08-task-service-plan.md` implementation notes)
+- Behavior: standard **mid@50% progress ask → expiry** (P2; final warning
+  deferred); creator expiry actions; urgent 60m check-ins / any-available-user
+  reassignment / `no_one_available`; extension auto-cap (24h normal) vs
+  always-approve (urgent)
 - WP: Task Service + My Profile notification bell (shared JS/CSS), acknowledge on
   assignee open, Request Extension in edit modal, AJAX proxies for notifications /
   extensions / ack; dashboard user sync for reassignment pool
@@ -109,8 +113,12 @@
   (hello@ — not AgentMail/Gmail). Telegram = same Admin Bot token/webhook as
   Settings → Telegram; assignees connect chat id from My Profile. Mid free-text
   Telegram reply → `task_progress_notes`. Service needs `WORDPRESS_BASE_URL`
-  for channel relay. Escalation P2–P4 (scheduler rename, owner/backup, Amy run)
-  still open.
+  for channel relay.
+- **P2 (plugin 0.2.43 / service 0.2.7):** scheduler stages
+  `none` → `mid_report_asked` → `expired` from `created_at`→`due_date`;
+  idempotent mid (legacy `midpoint_sent` / `final_warning_sent` skip re-fire);
+  expiry notify + `amy_capable` P4 hook (no fake complete). P3 owner/backup +
+  P4 Amy execution still open.
 
 ### 5. Analytics — complete (Task 1: plugin + service)
 - Backend: persistent SQLite at `data/analytics.db` (90-day retention, purged by

@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.42
+Stable tag: 0.2.43
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,12 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 6. For Task Service outbound: set `WORDPRESS_BASE_URL` on the Python service; enable Telegram under Amy → Settings → Telegram; assignees link chat id from Amy → My Profile.
 
 == Changelog ==
+
+= 0.2.43 =
+* Task Service P2: scheduler state machine assign → one mid progress ask at 50% of deadline window → expiry (no +4h final warning).
+* Stage `mid_report_asked` (legacy `midpoint_sent` / `final_warning_sent` still recognized, no double-fire).
+* Expiry keeps P1 notify + creator handoff; `amy_capable` logs a P4 hook only — never fake Amy completion.
+* Service 0.2.7: APScheduler + SQLite stages aligned to locked mid/expiry decisions.
 
 = 0.2.42 =
 * Task Service P1: assign / mid-progress / expiry templates with outbound email (wp_mail → FluentSMTP From Settings hello@) and Telegram (reuses Admin Bot #11).
