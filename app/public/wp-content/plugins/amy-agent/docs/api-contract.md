@@ -199,6 +199,8 @@ There is no newsletter event type (the newsletter form has no working backend ye
 
 Shared Analytics summary for admin chat, Telegram `/analytics`, and (later) Overview. Returns lead-session `total`, `counts` (hot/warm/cold/other), `with_email`, `email_captures` (Submit Idea / contact capture totals + `last_7d`), `last_seen` windows (`last_24h` / `last_7d` / `most_recent`), optional `hot_sample` / `sample`, plus `summary` and deterministic `slash_reply` text. Optional query `include_emails=true` adds `lead_email` on sample rows (admin channels only). This is **not** GA pageviews.
 
+Admin `POST /v1/chat` (`mode: admin`) also injects **SEO Tasks** and **Task Service** report-only snapshots (same sources as Overview / Task P4 `seo_review_summary` + `GET /v1/tasks/stats`): open/pending_approval + verdict/status counts; open/urgent/in_progress/running board stats. Chat may cite these figures but does not approve SEO writes or reassign tasks.
+
 ### `GET /v1/analytics/leads`
 
 Optional query `status=cold|warm|hot`. Ranked hot → warm → cold, then `last_seen_at` descending. Each item includes truncated session id, location, last seen, lead email if captured, and a server-built `signal` string.
