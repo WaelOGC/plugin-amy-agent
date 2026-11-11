@@ -2,7 +2,7 @@
 
 > Priority #6 in `roadmap-status.md`.
 
-## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0/P1 escalation (2026-11-11)
+## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0/P1/P2 escalation (2026-11-11)
 
 **Task 1:** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats,
 WordPress API client + admin-ajax proxies, real assignees, board/list CRUD,
@@ -23,7 +23,14 @@ ask / expiry templates; email via FluentSMTP/`wp_mail` From Settings hello@;
 Telegram via Admin Bot (#11) reused (Settings → Telegram token + webhook);
 My Profile chat-id connect; progress notes on mid Telegram reply; dashboard
 bell kept. Set service env `WORDPRESS_BASE_URL` to the WP site origin for
-channel relay. P2–P4 (scheduler rename, owner/backup, Amy execution) remain.
+channel relay.
+
+**P2 (plugin 0.2.43 / service 0.2.7):** scheduler state machine aligned to
+locked decisions — **one** mid progress ask at **50%** of `created_at`→due,
+then **expiry** (final warning deferred). Stage `mid_report_asked` (legacy
+`midpoint_sent` / `final_warning_sent` still recognized for idempotency).
+Expiry reuses P1 notify; `amy_capable` leaves a P4 handoff hook only (never
+fake Amy completion). P3 owner/backup UX + P4 Amy execution remain.
 
 ## Implementation notes (scoping vs original plan)
 
@@ -43,8 +50,8 @@ what still differs from §3–§6 above):
    comments mark the wire-up point for a future execution engine.
 
 Default timings live in `amy-agent-service/app/config_task_rules.py`
-(midpoint 50%, final warning 4h, urgent check-in / ack window 60m, extension
-cap 24h).
+(midpoint 50% progress ask; final warning 4h knob present but **disabled** in
+P2; urgent check-in / ack window 60m; extension cap 24h).
 
 ## 1. What this is
 

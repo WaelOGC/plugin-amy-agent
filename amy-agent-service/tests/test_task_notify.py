@@ -137,7 +137,7 @@ def test_mid_progress_sets_pending_and_telegram_reply_saves_note(
     assert task is not None
     from app.services.task_escalation import format_due_timestamp
 
-    # Long window so midpoint fires before the 4h final-warning cutoff.
+    # Synthetic window: mid at 50% of created_at → due (P2 mid_report_asked).
     now = 2_000_000.0
     task["created_at"] = now - 100_000
     task["due_date"] = format_due_timestamp(now + 100_000)
@@ -146,6 +146,9 @@ def test_mid_progress_sets_pending_and_telegram_reply_saves_note(
     notes = check_standard_task(task, now=now)
     assert len(notes) == 1
     assert notes[0]["type"] == "mid_progress_ask"
+    stored = tasks_db.get_task(created["id"])
+    assert stored is not None
+    assert stored["escalation_stage"] == "mid_report_asked"
     pending = progress_notes_db.get_pending_progress_reply(4)
     assert pending is not None
     assert pending["task_id"] == created["id"]

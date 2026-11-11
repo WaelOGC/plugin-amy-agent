@@ -1,4 +1,11 @@
-"""Task escalation / reminder / extension engine (one-task-at-a-time helpers)."""
+"""Task escalation / reminder / extension engine (one-task-at-a-time helpers).
+
+P2 standard state machine (APScheduler every 5 min + SQLite stages):
+  none → mid_report_asked (50% of created_at→due) → expired (past due)
+
+Mid ask + expiry reuse P1 ``task_notify`` (dashboard + email/Telegram relay).
+Owner/backup reassign UX = P3. Amy execution = P4 (hook only — never fake done).
+"""
 
 from __future__ import annotations
 
@@ -49,6 +56,21 @@ def format_due_timestamp(ts: float) -> str:
     )
 
 
+def mid_due_timestamps(
+    created_at: float, due_ts: float
+) -> tuple[float, float]:
+    """Return (mid_at, due_ts) for a created_at → due window.
+
+    Mid fires at STANDARD_MIDPOINT_FRACTION of the window. Callers schedule
+    implicitly: APScheduler polls open tasks; no per-task job registry.
+    """
+    window = due_ts - created_at
+    if window <= 0:
+        return due_ts, due_ts
+    mid_at = created_at + (window * rules.STANDARD_MIDPOINT_FRACTION)
+    return mid_at, due_ts
+
+
 def _set_stage(task_id: str, stage: str) -> None:
     tasks_db.update_task(
         task_id,
@@ -66,8 +88,33 @@ def _assignee_id(task: dict[str, Any]) -> int | None:
     return int(uid) if uid is not None else None
 
 
+def _normalize_standard_stage(stage: str) -> str:
+    """Map legacy Task-2 / P1 stage names onto the P2 machine."""
+    if stage in tasks_db.MID_REPORT_SENT_STAGES:
+        return "mid_report_asked"
+    return stage
+
+
+def _amy_capable_expiry_hook(task: dict[str, Any]) -> None:
+    """P4 handoff stub — log only; never mark done or invent Amy work.
+
+    When ``amy_capable`` is true, P4 should queue real in-system execution.
+    Until then we only escalate notify (creator / future owner-backup).
+    """
+    if not task.get("amy_capable"):
+        return
+    # TODO(P4 / amy-execution): hand off digital/in-system work to Amy here
+    # (status in_progress → tool allowlist → done/failed with audit). Do not
+    # auto-complete or invent success because the deadline passed.
+    logger.info(
+        "Task %s expired with amy_capable=True — Amy handoff deferred to P4 "
+        "(notify-only; no fake completion)",
+        task.get("id"),
+    )
+
+
 def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> list[dict[str, Any]]:
-    """Reminders + expiry for non-urgent open tasks."""
+    """P2: mid progress ask @ 50% then expiry for non-urgent open tasks."""
     now = time_now(now)
     if task.get("priority") == "urgent":
         return []
@@ -78,19 +125,16 @@ def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> li
     if due_ts is None:
         return []
 
-    stage = task.get("escalation_stage") or "none"
+    stage = _normalize_standard_stage(task.get("escalation_stage") or "none")
     created = float(task.get("created_at") or now)
     notifications: list[dict[str, Any]] = []
     assignee = _assignee_id(task)
-    title = task.get("title") or "Task"
 
-    # Past due → expire (creator decides next step; do not auto-complete).
+    # Past due → expire (creator / P3 owner decides; do not auto-complete).
     if now >= due_ts and stage != "expired":
-        # TODO(amy-execution): once Amy can autonomously complete digital/in-system
-        # work, offer that as a fourth choice here. For now notify-only — never
-        # fake auto-completion.
         # TODO(P3): route expiry to owner/backup instead of creator-only.
         _set_stage(task["id"], "expired")
+        _amy_capable_expiry_hook(task)
         dispatched = task_notify.dispatch_task_notify("expiry", task)
         if dispatched.get("dashboard"):
             notifications.append(dispatched["dashboard"])
@@ -99,36 +143,44 @@ def check_standard_task(task: dict[str, Any], *, now: float | None = None) -> li
     if now >= due_ts:
         return []
 
-    window = due_ts - created
-    if window <= 0:
+    mid_at, _ = mid_due_timestamps(created, due_ts)
+    if mid_at >= due_ts:
+        # Zero/negative window already handled; nothing to mid-ask.
         return []
 
-    midpoint = created + (window * rules.STANDARD_MIDPOINT_FRACTION)
-    final_at = due_ts - rules.STANDARD_FINAL_WARNING_SECONDS
-
-    # Final warning (may skip midpoint on very short deadlines).
-    if now >= final_at and stage in {"none", "midpoint_sent"}:
+    # One mid progress ask (idempotent via mid_report_asked + legacy aliases).
+    if now >= mid_at and stage == "none":
         if assignee:
+            dispatched = task_notify.dispatch_task_notify("mid_progress", task)
+            if dispatched.get("dashboard"):
+                notifications.append(dispatched["dashboard"])
+        # Mark sent even without assignee so we never double-fire after a later assign.
+        _set_stage(task["id"], "mid_report_asked")
+        return notifications
+
+    # Optional final warning deferred (STANDARD_FINAL_WARNING_ENABLED=False).
+    if (
+        rules.STANDARD_FINAL_WARNING_ENABLED
+        and stage == "mid_report_asked"
+        and assignee
+    ):
+        final_at = due_ts - rules.STANDARD_FINAL_WARNING_SECONDS
+        if now >= final_at:
+            title = task.get("title") or "Task"
             notifications.append(
                 notifications_db.create_notification(
                     task_id=task["id"],
                     wp_user_id=assignee,
                     type="reminder_final",
-                    message=f'Final warning: "{title}" is due soon. Please finish or request an extension.',
+                    message=(
+                        f'Final warning: "{title}" is due soon. '
+                        "Please finish or request an extension."
+                    ),
                     requires_action=False,
                 )
             )
-        _set_stage(task["id"], "final_warning_sent")
-        return notifications
-
-    # Midpoint → progress-report ask (P1 adapters; P2 may rename stage).
-    if now >= midpoint and stage == "none":
-        if assignee:
-            dispatched = task_notify.dispatch_task_notify("mid_progress", task)
-            if dispatched.get("dashboard"):
-                notifications.append(dispatched["dashboard"])
-        _set_stage(task["id"], "midpoint_sent")
-        return notifications
+            _set_stage(task["id"], "final_warning_sent")
+            return notifications
 
     return notifications
 

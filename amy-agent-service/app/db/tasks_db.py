@@ -13,6 +13,8 @@ Priority = Literal["normal", "urgent"]
 TaskStatus = Literal["todo", "in_progress", "waiting_extension", "done"]
 EscalationStage = Literal[
     "none",
+    "mid_report_asked",
+    # Legacy P1/Task-2 stages — still readable; new writes use mid_report_asked.
     "midpoint_sent",
     "final_warning_sent",
     "expired",
@@ -26,12 +28,19 @@ VALID_STATUSES = frozenset({"todo", "in_progress", "waiting_extension", "done"})
 VALID_ESCALATION_STAGES = frozenset(
     {
         "none",
+        "mid_report_asked",
+        # Legacy aliases (accepted so existing tasks.db rows keep validating).
         "midpoint_sent",
         "final_warning_sent",
         "expired",
         "reassigned",
         "creator_notified_no_one_available",
     }
+)
+
+# Stages that mean the mid progress ask already fired (idempotent skip).
+MID_REPORT_SENT_STAGES = frozenset(
+    {"mid_report_asked", "midpoint_sent", "final_warning_sent"}
 )
 
 _SERVICE_ROOT = Path(__file__).resolve().parents[2]
