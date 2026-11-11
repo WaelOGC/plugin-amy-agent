@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 os.environ["AMY_SHARED_SECRET"] = "test-secret-phase1"
 
 from app.config import get_settings  # noqa: E402
-from app.db import tasks_db  # noqa: E402
+from app.db import notifications_db, progress_notes_db, tasks_db  # noqa: E402
 from app.main import app  # noqa: E402
 
 get_settings.cache_clear()
@@ -22,6 +22,9 @@ AUTH = {"X-Amy-Secret": "test-secret-phase1"}
 def client(tmp_path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     db_path = tmp_path / "tasks.db"
     monkeypatch.setattr(tasks_db, "_DB_PATH", db_path)
+    monkeypatch.setattr(notifications_db, "_DB_PATH", db_path)
+    monkeypatch.setattr(progress_notes_db, "_DB_PATH", db_path)
+    monkeypatch.setenv("WORDPRESS_BASE_URL", "")
     get_settings.cache_clear()
     return TestClient(app)
 

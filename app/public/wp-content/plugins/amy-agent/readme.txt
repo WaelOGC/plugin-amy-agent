@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.41
+Stable tag: 0.2.42
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,8 +21,16 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 3. Run the sibling `amy-agent-service` Python process (see that service's README).
 4. Reload any front-end page — the floating Amy widget should appear.
 5. For Email Marketing: set Marketing From (default hello@ogcnewfinity.com) and verify that address in FluentSMTP / Hostinger DNS (SPF/DKIM).
+6. For Task Service outbound: set `WORDPRESS_BASE_URL` on the Python service; enable Telegram under Amy → Settings → Telegram; assignees link chat id from Amy → My Profile.
 
 == Changelog ==
+
+= 0.2.42 =
+* Task Service P1: assign / mid-progress / expiry templates with outbound email (wp_mail → FluentSMTP From Settings hello@) and Telegram (reuses Admin Bot #11).
+* Dashboard bell kept; new `task_assigned` + `mid_progress_ask` notification types.
+* My Profile: Telegram connect/unlink for task alerts (deep link `/start connect_<code>`).
+* Progress notes: free-text Telegram replies after a mid ask are stored on the task.
+* Service 0.2.6: `WORDPRESS_BASE_URL` relay to `/wp-json/amy-agent/v1/task-notify`; progress-notes API.
 
 = 0.2.41 =
 * Task Service P0: create/edit modal uses clear **Amy does this** vs **Someone does this** (human picker) wired to `assignee_type`.

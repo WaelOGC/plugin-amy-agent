@@ -1091,7 +1091,7 @@ class Amy_Settings {
 				>
 					<h2 class="amy-agent-settings__panel-title"><?php echo esc_html__( 'Telegram', 'amy-agent' ); ?></h2>
 					<p class="amy-agent-settings__panel-intro">
-						<?php echo esc_html__( 'Private admin bot — same Amy and conversations as Dashboard Chat. Token and webhook secret stay in WordPress only.', 'amy-agent' ); ?>
+						<?php echo esc_html__( 'Private Admin Bot (one bot for Dashboard Chat and Task Service alerts). Paste a BotFather token, whitelist admins for Amy chat, then Connect the HTTPS webhook. Assignees link their chat id from Amy → My Profile → Telegram task alerts. Token and webhook secret stay in WordPress only — Task Service outbound reuses this bot (no second stack).', 'amy-agent' ); ?>
 					</p>
 
 					<?php if ( ! is_ssl() ) : ?>
