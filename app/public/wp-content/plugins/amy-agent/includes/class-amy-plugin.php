@@ -128,7 +128,7 @@ class Amy_Plugin {
 		$this->api_client         = new Amy_Api_Client( $this->settings );
 		$this->tasks_ajax         = new Amy_Tasks_Ajax( $this->api_client );
 		$this->analytics_ajax       = new Amy_Analytics_Ajax( $this->api_client );
-		$this->email_marketing_ajax = new Amy_Email_Marketing_Ajax( $this->settings );
+		$this->email_marketing_ajax = new Amy_Email_Marketing_Ajax( $this->settings, $this->api_client );
 		$this->seo_meta             = new Amy_Seo_Meta();
 		$this->seo_tasks_ajax       = new Amy_Seo_Tasks_Ajax( $this->api_client );
 		$this->seo_taxonomy_meta    = new Amy_Seo_Taxonomy_Meta();

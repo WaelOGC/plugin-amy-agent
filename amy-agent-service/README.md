@@ -52,7 +52,7 @@ PHP may need a different host than the browser:
 
 Submit Your Idea sessions are stored in SQLite at `data/submit_idea_sessions.db` (created automatically). This survives **process restarts** on the same filesystem. A **Dokploy redeploy** that starts a fresh container will still wipe sessions unless `data/` (or the app directory) is mounted as a persistent volume in the Dokploy service config (Application → Volumes).
 
-Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (created automatically, no TTL). Analytics events live in `data/analytics.db` (90-day retention). SEO Tasks checks live in `data/seo_tasks.db` (no TTL). All of these files have the **exact same volume-mounting requirement**: a Dokploy redeploy will wipe them unless `data/` is mounted as a persistent volume in the Dokploy service configuration. Do not mount individual DB files — mount the whole `data/` directory. The existing `data/` volume already covers `seo_tasks.db`; no extra volume config is needed.
+Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (created automatically, no TTL). Analytics events live in `data/analytics.db` (90-day retention). SEO Tasks checks live in `data/seo_tasks.db` (no TTL). Email Marketing send/reply history tables live in `data/conversations.db` alongside Dashboard Chat (no AgentMail). All of these files have the **exact same volume-mounting requirement**: a Dokploy redeploy will wipe them unless `data/` is mounted as a persistent volume in the Dokploy service configuration. Do not mount individual DB files — mount the whole `data/` directory. The existing `data/` volume already covers `seo_tasks.db`; no extra volume config is needed.
 
 ## Endpoints (see plugin `docs/api-contract.md`)
 
@@ -74,6 +74,13 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set) |
 | GET | `/v1/analytics/leads` | Lead list for the admin page (optional `status`) |
 | GET | `/v1/analytics/leads/{session_id}/events` | Event timeline for one session |
+| GET | `/v1/email-marketing/threads` | FluentSMTP send/reply history threads (in `conversations.db`) |
+| GET | `/v1/email-marketing/threads/{id}` | Thread + messages (inbound limitation noted; no AgentMail) |
+| POST | `/v1/email-marketing/outbound` | Record FluentSMTP / wp_mail batch results |
+| POST | `/v1/email-marketing/threads/{id}/notes` | Manual note or inbound reply note |
+| POST | `/v1/email-marketing/propose` | Amy draft hook — stores proposed send; never mails |
+| GET/POST | `/v1/email-marketing/suppressions` | Opt-out list |
+| POST | `/v1/email-marketing/inbound` | Optional generic inbound forwarder |
 | POST | `/v1/seo-tasks/check` | Rule-based SEO snapshot check; stores a pending-approval row. `content_type` defaults to `post`; category/tag/media use type-specific rules. |
 | GET | `/v1/seo-tasks/checks` | List stored checks (optional `status`, `verdict`, `content_type`) |
 | GET | `/v1/seo-tasks/checks/{id}` | Fetch one check |
