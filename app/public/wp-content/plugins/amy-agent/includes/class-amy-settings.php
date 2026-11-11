@@ -1176,6 +1176,32 @@ class Amy_Settings {
 						</div>
 					<?php endif; ?>
 
+					<div class="amy-agent-settings__card amy-agent-settings__card--botfather">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Create your Telegram bot', 'amy-agent' ); ?></h3>
+						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
+							<?php echo esc_html__( 'Telegram does not allow minting bot tokens via API. Each buyer or team creates their own bot in BotFather, then pastes the token here.', 'amy-agent' ); ?>
+						</p>
+						<p class="amy-agent-settings__botfather-cta">
+							<a
+								class="amy-agent-settings__btn amy-agent-settings__btn--accent amy-agent-settings__external-link"
+								href="https://t.me/BotFather"
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								<?php echo esc_html__( 'Open BotFather', 'amy-agent' ); ?>
+								<span class="dashicons dashicons-external" aria-hidden="true"></span>
+								<span class="screen-reader-text"><?php echo esc_html__( '(opens in a new tab)', 'amy-agent' ); ?></span>
+							</a>
+						</p>
+						<ol class="amy-agent-settings__steps">
+							<li><?php echo esc_html__( 'Open BotFather in Telegram (link above).', 'amy-agent' ); ?></li>
+							<li><?php echo esc_html__( 'Send /newbot and follow the prompts.', 'amy-agent' ); ?></li>
+							<li><?php echo esc_html__( 'Choose a display name, then a username ending in bot.', 'amy-agent' ); ?></li>
+							<li><?php echo esc_html__( 'Copy the bot token BotFather sends you.', 'amy-agent' ); ?></li>
+							<li><?php echo esc_html__( 'Paste the token into Bot token below, then Save settings.', 'amy-agent' ); ?></li>
+						</ol>
+					</div>
+
 					<div class="amy-agent-settings__card">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Bot connection', 'amy-agent' ); ?></h3>
 						<div class="amy-agent-settings__field">
@@ -1220,7 +1246,7 @@ class Amy_Settings {
 								</p>
 							<?php else : ?>
 								<p class="amy-agent-settings__hint">
-									<?php echo esc_html__( 'Create the bot with @BotFather. Never share this token.', 'amy-agent' ); ?>
+									<?php echo esc_html__( 'Paste the token from BotFather (steps above). Never share this token.', 'amy-agent' ); ?>
 								</p>
 							<?php endif; ?>
 						</div>

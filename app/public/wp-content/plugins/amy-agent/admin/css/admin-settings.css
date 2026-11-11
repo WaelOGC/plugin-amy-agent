@@ -609,6 +609,45 @@
 	margin: 0;
 }
 
+.amy-agent-settings__card--botfather {
+	border-color: rgba(247, 148, 29, 0.55);
+	background: linear-gradient(180deg, rgba(247, 148, 29, 0.1) 0%, var(--amy-panel) 48%);
+}
+
+.amy-agent-settings__botfather-cta {
+	margin: 0 0 0.95rem;
+}
+
+.amy-agent-settings__external-link .dashicons {
+	width: 1em;
+	height: 1em;
+	font-size: 1em;
+	line-height: 1;
+	vertical-align: -0.1em;
+}
+
+.amy-agent-settings__external-link:focus-visible {
+	outline: 2px solid var(--amy-border);
+	outline-offset: 2px;
+}
+
+.amy-agent-settings__steps {
+	margin: 0;
+	padding: 0 0 0 1.2rem;
+	color: var(--amy-text-muted);
+	font-size: 0.875rem;
+	line-height: 1.55;
+	max-width: 36rem;
+}
+
+.amy-agent-settings__steps li {
+	margin: 0 0 0.35rem;
+}
+
+.amy-agent-settings__steps li:last-child {
+	margin-bottom: 0;
+}
+
 @media (max-width: 782px) {
 	.amy-agent-settings {
 		margin: 1rem 0.75rem 1rem 0;
