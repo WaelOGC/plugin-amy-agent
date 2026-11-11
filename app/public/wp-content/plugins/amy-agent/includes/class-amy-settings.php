@@ -56,6 +56,24 @@ class Amy_Settings {
 	}
 
 	/**
+	 * Free-webmail / AgentMail hosts rejected for marketing From.
+	 *
+	 * @return string[]
+	 */
+	public static function blocked_marketing_from_hosts() {
+		return array(
+			'gmail.com',
+			'googlemail.com',
+			'agentmail.to',
+			'yahoo.com',
+			'outlook.com',
+			'hotmail.com',
+			'live.com',
+			'icloud.com',
+		);
+	}
+
+	/**
 	 * Store the real Settings screen hook (from add_submenu_page return value).
 	 *
 	 * @param string|false $hook Hook suffix from WordPress.
@@ -215,91 +233,6 @@ class Amy_Settings {
 				'default'           => self::DEFAULT_MARKETING_FROM_NAME,
 			)
 		);
-
-		add_settings_section(
-			'amy_agent_section_general',
-			__( 'General', 'amy-agent' ),
-			array( $this, 'render_section_general' ),
-			self::PAGE_SLUG
-		);
-
-		add_settings_field(
-			self::OPTION_ENABLED,
-			__( 'Enable Amy', 'amy-agent' ),
-			array( $this, 'render_field_enabled' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_general'
-		);
-
-		add_settings_field(
-			self::OPTION_SERVICE_URL,
-			__( 'Python service URL', 'amy-agent' ),
-			array( $this, 'render_field_service_url' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_general'
-		);
-
-		add_settings_field(
-			self::OPTION_SHARED_SECRET,
-			__( 'Shared secret', 'amy-agent' ),
-			array( $this, 'render_field_shared_secret' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_general'
-		);
-
-		add_settings_section(
-			'amy_agent_section_ai',
-			__( 'AI provider', 'amy-agent' ),
-			array( $this, 'render_section_ai' ),
-			self::PAGE_SLUG
-		);
-
-		add_settings_field(
-			self::OPTION_AI_PROVIDER,
-			__( 'Provider', 'amy-agent' ),
-			array( $this, 'render_field_provider' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_ai'
-		);
-
-		add_settings_field(
-			self::OPTION_AI_API_KEY,
-			__( 'API key', 'amy-agent' ),
-			array( $this, 'render_field_api_key' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_ai'
-		);
-
-		add_settings_field(
-			self::OPTION_AI_MODEL,
-			__( 'Model (optional)', 'amy-agent' ),
-			array( $this, 'render_field_model' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_ai'
-		);
-
-		add_settings_section(
-			'amy_agent_section_email_marketing',
-			__( 'Email Marketing', 'amy-agent' ),
-			array( $this, 'render_section_email_marketing' ),
-			self::PAGE_SLUG
-		);
-
-		add_settings_field(
-			self::OPTION_MARKETING_FROM_EMAIL,
-			__( 'Marketing From email', 'amy-agent' ),
-			array( $this, 'render_field_marketing_from_email' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_email_marketing'
-		);
-
-		add_settings_field(
-			self::OPTION_MARKETING_FROM_NAME,
-			__( 'Marketing From name', 'amy-agent' ),
-			array( $this, 'render_field_marketing_from_name' ),
-			self::PAGE_SLUG,
-			'amy_agent_section_email_marketing'
-		);
 	}
 
 	/**
@@ -313,9 +246,16 @@ class Amy_Settings {
 		}
 
 		wp_enqueue_style(
+			'amy-agent-admin-settings-fonts',
+			'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap',
+			array(),
+			null
+		);
+
+		wp_enqueue_style(
 			'amy-agent-admin-settings',
 			AMY_AGENT_URL . 'admin/css/admin-settings.css',
-			array(),
+			array( 'amy-agent-admin-settings-fonts', 'dashicons' ),
 			AMY_AGENT_VERSION
 		);
 
@@ -325,6 +265,30 @@ class Amy_Settings {
 			array(),
 			AMY_AGENT_VERSION,
 			true
+		);
+
+		wp_localize_script(
+			'amy-agent-admin-settings',
+			'amyAgentSettings',
+			array(
+				'healthUrl'         => esc_url_raw( rest_url( 'amy-agent/v1/health' ) ),
+				'restNonce'         => wp_create_nonce( 'wp_rest' ),
+				'blockedFromHosts'  => self::blocked_marketing_from_hosts(),
+				'i18n'              => array(
+					'fromBlocked'       => __( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use a domain mailbox such as hello@ogcnewfinity.com.', 'amy-agent' ),
+					'healthChecking'    => __( 'Checking connection…', 'amy-agent' ),
+					'healthOk'          => __( 'Python service reachable.', 'amy-agent' ),
+					'healthUnreachable' => __( 'Python service unreachable (check URL, secret, and Dokploy).', 'amy-agent' ),
+					'healthFail'        => __( 'Health check failed. Could not reach WordPress REST.', 'amy-agent' ),
+					'needUrlSecret'     => __( 'Set service URL and shared secret first.', 'amy-agent' ),
+					'enabledOn'         => __( 'Enable Amy is on.', 'amy-agent' ),
+					'enabledOff'        => __( 'Enable Amy is off — widget and Submit Idea stay hidden.', 'amy-agent' ),
+					'providerLabel'     => __( 'Provider:', 'amy-agent' ),
+					'keySaved'          => __( 'key saved', 'amy-agent' ),
+					'noApiKey'          => __( 'AI API key not set.', 'amy-agent' ),
+					'pluginVersion'     => __( 'Plugin', 'amy-agent' ),
+				),
+			)
 		);
 	}
 
@@ -409,18 +373,8 @@ class Amy_Settings {
 		if ( '' === $email || ! is_email( $email ) ) {
 			return self::DEFAULT_MARKETING_FROM_EMAIL;
 		}
-		$host    = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
-		$blocked = array(
-			'gmail.com',
-			'googlemail.com',
-			'agentmail.to',
-			'yahoo.com',
-			'outlook.com',
-			'hotmail.com',
-			'live.com',
-			'icloud.com',
-		);
-		if ( in_array( $host, $blocked, true ) ) {
+		$host = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
+		if ( in_array( $host, self::blocked_marketing_from_hosts(), true ) ) {
 			add_settings_error(
 				'amy_agent_settings',
 				'amy_marketing_from_blocked',
@@ -452,18 +406,8 @@ class Amy_Settings {
 		if ( '' === $email || ! is_email( $email ) ) {
 			return self::DEFAULT_MARKETING_FROM_EMAIL;
 		}
-		$host    = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
-		$blocked = array(
-			'gmail.com',
-			'googlemail.com',
-			'agentmail.to',
-			'yahoo.com',
-			'outlook.com',
-			'hotmail.com',
-			'live.com',
-			'icloud.com',
-		);
-		if ( in_array( $host, $blocked, true ) ) {
+		$host = strtolower( (string) substr( strrchr( $email, '@' ), 1 ) );
+		if ( in_array( $host, self::blocked_marketing_from_hosts(), true ) ) {
 			return self::DEFAULT_MARKETING_FROM_EMAIL;
 		}
 		return strtolower( $email );
@@ -594,147 +538,6 @@ class Amy_Settings {
 	}
 
 	/**
-	 * Section intro: general.
-	 */
-	public function render_section_general() {
-		echo '<p>' . esc_html__( 'Connect WordPress to the Amy Python service. Amy stays inactive until Enable is on and the service URL + shared secret are set.', 'amy-agent' ) . '</p>';
-	}
-
-	/**
-	 * Section intro: AI.
-	 */
-	public function render_section_ai() {
-		echo '<p>' . esc_html__( 'Choose which AI provider powers Amy. The key is stored in the WordPress database and sent to the Python service at request time — never hardcoded.', 'amy-agent' ) . '</p>';
-	}
-
-	/**
-	 * Section intro: Email Marketing From.
-	 */
-	public function render_section_email_marketing() {
-		echo '<p>' . esc_html__( 'Marketing follow-ups send via WordPress wp_mail (FluentSMTP on ogcnewfinity.com). From must be a verified domain mailbox — never personal Gmail or AgentMail. hello@ must be verified in FluentSMTP / Hostinger before live sends.', 'amy-agent' ) . '</p>';
-	}
-
-	/**
-	 * Marketing From email field.
-	 */
-	public function render_field_marketing_from_email() {
-		printf(
-			'<input type="email" class="regular-text" name="%1$s" value="%2$s" placeholder="%3$s" />',
-			esc_attr( self::OPTION_MARKETING_FROM_EMAIL ),
-			esc_attr( $this->get_marketing_from_email() ),
-			esc_attr( self::DEFAULT_MARKETING_FROM_EMAIL )
-		);
-		echo '<p class="description">' . esc_html__( 'Default: hello@ogcnewfinity.com. Must match a mailbox FluentSMTP is authorized to send as (SPF/DKIM on the domain).', 'amy-agent' ) . '</p>';
-	}
-
-	/**
-	 * Marketing From name field.
-	 */
-	public function render_field_marketing_from_name() {
-		printf(
-			'<input type="text" class="regular-text" name="%1$s" value="%2$s" placeholder="%3$s" />',
-			esc_attr( self::OPTION_MARKETING_FROM_NAME ),
-			esc_attr( $this->get_marketing_from_name() ),
-			esc_attr( self::DEFAULT_MARKETING_FROM_NAME )
-		);
-	}
-
-	/**
-	 * Enable checkbox.
-	 */
-	public function render_field_enabled() {
-		$checked = $this->is_enabled();
-		printf(
-			'<label><input type="checkbox" name="%1$s" value="1" %2$s /> %3$s</label>',
-			esc_attr( self::OPTION_ENABLED ),
-			checked( $checked, true, false ),
-			esc_html__( 'Show the Amy chat button on the site (requires service URL + secret).', 'amy-agent' )
-		);
-		echo '<p class="description">' . esc_html__( 'Uncheck and save to hide Amy again.', 'amy-agent' ) . '</p>';
-	}
-
-	/**
-	 * Service URL field.
-	 */
-	public function render_field_service_url() {
-		printf(
-			'<input type="url" class="regular-text" name="%1$s" value="%2$s" placeholder="http://127.0.0.1:8765" />',
-			esc_attr( self::OPTION_SERVICE_URL ),
-			esc_attr( $this->get_service_url() )
-		);
-		echo '<p class="description">' . esc_html__( 'Base URL of amy-agent-service (no trailing slash). On Local, try 127.0.0.1 or host.docker.internal.', 'amy-agent' ) . '</p>';
-	}
-
-	/**
-	 * Shared secret field.
-	 */
-	public function render_field_shared_secret() {
-		$secret     = $this->get_shared_secret();
-		$has_secret = '' !== $secret;
-		printf(
-			'<input type="password" class="regular-text" name="%1$s" value="" autocomplete="new-password" placeholder="%2$s" />',
-			esc_attr( self::OPTION_SHARED_SECRET ),
-			$has_secret ? esc_attr__( 'Enter a new secret to replace the saved one', 'amy-agent' ) : esc_attr__( 'Enter a shared secret', 'amy-agent' )
-		);
-		if ( $has_secret ) {
-			echo '<p class="amy-agent-saved-status"><strong>' . esc_html__( 'Saved:', 'amy-agent' ) . '</strong> ';
-			echo esc_html(
-				sprintf(
-					/* translators: %s: masked secret ending */
-					__( 'Shared secret is stored in the database (%s). Leave the field blank when saving to keep it.', 'amy-agent' ),
-					$this->mask_secret( $secret )
-				)
-			);
-			echo '</p>';
-		} else {
-			echo '<p class="description">' . esc_html__( 'Must match AMY_SHARED_SECRET in the Python service .env.', 'amy-agent' ) . '</p>';
-		}
-	}
-
-	/**
-	 * Provider select.
-	 */
-	public function render_field_provider() {
-		$current = $this->get_ai_provider();
-		printf( '<select name="%s" id="amy_agent_ai_provider">', esc_attr( self::OPTION_AI_PROVIDER ) );
-		foreach ( self::providers() as $slug => $label ) {
-			printf(
-				'<option value="%1$s" %2$s>%3$s</option>',
-				esc_attr( $slug ),
-				selected( $current, $slug, false ),
-				esc_html( $label )
-			);
-		}
-		echo '</select>';
-	}
-
-	/**
-	 * API key — password field never re-prints the raw key into HTML.
-	 */
-	public function render_field_api_key() {
-		$key     = $this->get_ai_api_key();
-		$has_key = '' !== $key;
-		printf(
-			'<input type="password" class="regular-text" name="%1$s" value="" autocomplete="new-password" placeholder="%2$s" />',
-			esc_attr( self::OPTION_AI_API_KEY ),
-			$has_key ? esc_attr__( 'Enter a new key to replace the saved one', 'amy-agent' ) : esc_attr__( 'Paste your API key', 'amy-agent' )
-		);
-		if ( $has_key ) {
-			echo '<p class="amy-agent-saved-status"><strong>' . esc_html__( 'Saved:', 'amy-agent' ) . '</strong> ';
-			echo esc_html(
-				sprintf(
-					/* translators: %s: masked API key ending */
-					__( 'API key is stored in the database (%s). Leave the field blank when saving to keep it.', 'amy-agent' ),
-					$this->mask_secret( $key )
-				)
-			);
-			echo '</p>';
-		} else {
-			echo '<p class="description">' . esc_html__( 'Stored via the Options API. The field stays empty after save on purpose so the key is never shown in the page HTML.', 'amy-agent' ) . '</p>';
-		}
-	}
-
-	/**
 	 * Mask a secret for admin display (keep last 4 chars).
 	 *
 	 * @param string $value Raw secret.
@@ -750,34 +553,348 @@ class Amy_Settings {
 	}
 
 	/**
-	 * Optional model override.
+	 * Readiness summary for the Settings header banner.
+	 *
+	 * @return array{state:string,badge:string,title:string,text:string,missing:string[]}
 	 */
-	public function render_field_model() {
-		$model = (string) get_option( self::OPTION_AI_MODEL, '' );
-		printf(
-			'<input type="text" class="regular-text" name="%1$s" value="%2$s" placeholder="%3$s" />',
-			esc_attr( self::OPTION_AI_MODEL ),
-			esc_attr( $model ),
-			esc_attr__( 'Provider default if empty', 'amy-agent' )
+	private function get_readiness_summary() {
+		$enabled    = $this->is_enabled();
+		$configured = $this->is_service_configured();
+		$ready      = $this->is_ready();
+		$missing    = array();
+
+		if ( ! $enabled ) {
+			$missing[] = __( 'Enable Amy is off', 'amy-agent' );
+		}
+		if ( '' === $this->get_service_url() ) {
+			$missing[] = __( 'Python service URL is empty', 'amy-agent' );
+		}
+		if ( '' === $this->get_shared_secret() ) {
+			$missing[] = __( 'Shared secret is empty', 'amy-agent' );
+		}
+
+		if ( $ready ) {
+			return array(
+				'state'   => 'ready',
+				'badge'   => __( 'Ready', 'amy-agent' ),
+				'title'   => __( 'Amy is ready on the site', 'amy-agent' ),
+				'text'    => __( 'Enable Amy is on and the service URL + shared secret are set. The floating widget and Amy Submit Idea can load.', 'amy-agent' ),
+				'missing' => array(),
+			);
+		}
+
+		if ( $configured && ! $enabled ) {
+			return array(
+				'state'   => 'warn',
+				'badge'   => __( 'Configured · Off', 'amy-agent' ),
+				'title'   => __( 'Service is configured, Amy is disabled', 'amy-agent' ),
+				'text'    => __( 'Turn on Enable Amy (General tab) and save to show the floating widget and Submit Idea.', 'amy-agent' ),
+				'missing' => $missing,
+			);
+		}
+
+		return array(
+			'state'   => 'off',
+			'badge'   => __( 'Not ready', 'amy-agent' ),
+			'title'   => __( 'Amy is not ready yet', 'amy-agent' ),
+			'text'    => __( 'Enable Amy plus a service URL and shared secret are required. Widget and Submit Idea stay hidden until then.', 'amy-agent' ),
+			'missing' => $missing,
 		);
 	}
 
 	/**
-	 * Settings page markup.
+	 * Settings page markup (tabbed dark Amy admin theme).
 	 */
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
+
+		$readiness  = $this->get_readiness_summary();
+		$has_secret = '' !== $this->get_shared_secret();
+		$has_key    = '' !== $this->get_ai_api_key();
+		$model      = (string) get_option( self::OPTION_AI_MODEL, '' );
+		$active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'general'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( 'connection' !== $active_tab ) {
+			$active_tab = 'general';
+		}
 		?>
-		<div class="wrap amy-agent-settings">
-			<h1><?php echo esc_html__( 'Settings', 'amy-agent' ); ?></h1>
-			<form method="post" action="options.php">
-				<?php
-				settings_fields( 'amy_agent_settings' );
-				do_settings_sections( self::PAGE_SLUG );
-				submit_button( __( 'Save settings', 'amy-agent' ) );
-				?>
+		<div class="wrap amy-agent-settings" id="amy-agent-settings">
+			<header class="amy-agent-settings__header">
+				<h1 class="amy-agent-settings__title"><?php echo esc_html__( 'Settings', 'amy-agent' ); ?></h1>
+				<p class="amy-agent-settings__intro">
+					<?php echo esc_html__( 'Site-wide Amy switches and connection plumbing. Tool-specific options stay on their own pages (Email Marketing, SEO Tasks, etc.). Avatar lives on Brand & Avatar.', 'amy-agent' ); ?>
+				</p>
+				<span class="amy-agent-settings__underline" aria-hidden="true"></span>
+			</header>
+
+			<?php settings_errors( 'amy_agent_settings' ); ?>
+
+			<div
+				class="amy-agent-settings__readiness amy-agent-settings__readiness--<?php echo esc_attr( $readiness['state'] ); ?>"
+				role="status"
+			>
+				<span class="amy-agent-settings__readiness-badge"><?php echo esc_html( $readiness['badge'] ); ?></span>
+				<div class="amy-agent-settings__readiness-copy">
+					<p class="amy-agent-settings__readiness-title"><?php echo esc_html( $readiness['title'] ); ?></p>
+					<p class="amy-agent-settings__readiness-text"><?php echo esc_html( $readiness['text'] ); ?></p>
+					<?php if ( ! empty( $readiness['missing'] ) ) : ?>
+						<ul class="amy-agent-settings__readiness-list">
+							<?php foreach ( $readiness['missing'] as $item ) : ?>
+								<li><?php echo esc_html( $item ); ?></li>
+							<?php endforeach; ?>
+						</ul>
+					<?php endif; ?>
+				</div>
+			</div>
+
+			<p class="amy-agent-settings__controls-note">
+				<strong><?php echo esc_html__( 'What Enable Amy controls:', 'amy-agent' ); ?></strong>
+				<?php echo esc_html__( ' the floating site chat widget and Amy Submit Idea. Analytics tracking can still run when the service URL + secret are set. Brand avatar is edited under Brand & Avatar — not here.', 'amy-agent' ); ?>
+			</p>
+
+			<div class="amy-agent-settings__tabs" role="tablist" aria-label="<?php echo esc_attr__( 'Settings tabs', 'amy-agent' ); ?>">
+				<button
+					type="button"
+					class="amy-agent-settings__tab<?php echo 'general' === $active_tab ? ' is-active' : ''; ?>"
+					role="tab"
+					id="amy-settings-tab-general"
+					data-amy-settings-tab="general"
+					aria-controls="amy-settings-panel-general"
+					aria-selected="<?php echo 'general' === $active_tab ? 'true' : 'false'; ?>"
+				>
+					<?php echo esc_html__( 'General', 'amy-agent' ); ?>
+				</button>
+				<button
+					type="button"
+					class="amy-agent-settings__tab<?php echo 'connection' === $active_tab ? ' is-active' : ''; ?>"
+					role="tab"
+					id="amy-settings-tab-connection"
+					data-amy-settings-tab="connection"
+					aria-controls="amy-settings-panel-connection"
+					aria-selected="<?php echo 'connection' === $active_tab ? 'true' : 'false'; ?>"
+				>
+					<?php echo esc_html__( 'Connection', 'amy-agent' ); ?>
+				</button>
+			</div>
+
+			<form method="post" action="options.php" class="amy-agent-settings__form">
+				<?php settings_fields( 'amy_agent_settings' ); ?>
+
+				<div
+					class="amy-agent-settings__panel"
+					id="amy-settings-panel-general"
+					role="tabpanel"
+					aria-labelledby="amy-settings-tab-general"
+					<?php echo 'general' === $active_tab ? '' : 'hidden'; ?>
+				>
+					<h2 class="amy-agent-settings__panel-title"><?php echo esc_html__( 'General', 'amy-agent' ); ?></h2>
+					<p class="amy-agent-settings__panel-intro">
+						<?php echo esc_html__( 'Rarely touched site switches and the marketing From identity used by Email Marketing sends.', 'amy-agent' ); ?>
+					</p>
+
+					<div class="amy-agent-settings__card">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Site presence', 'amy-agent' ); ?></h3>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__toggle" for="amy_agent_enabled">
+								<input
+									type="checkbox"
+									id="amy_agent_enabled"
+									name="<?php echo esc_attr( self::OPTION_ENABLED ); ?>"
+									value="1"
+									<?php checked( $this->is_enabled(), true ); ?>
+								/>
+								<span class="amy-agent-settings__toggle-copy">
+									<strong><?php echo esc_html__( 'Enable Amy', 'amy-agent' ); ?></strong>
+									<span><?php echo esc_html__( 'Show the floating chat widget and Amy Submit Idea when the service URL + shared secret are also set.', 'amy-agent' ); ?></span>
+								</span>
+							</label>
+							<p class="amy-agent-settings__hint">
+								<?php echo esc_html__( 'Uncheck and save to hide Amy on the site again. Connection settings stay saved.', 'amy-agent' ); ?>
+							</p>
+						</div>
+					</div>
+
+					<div class="amy-agent-settings__card">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Email Marketing From', 'amy-agent' ); ?></h3>
+						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
+							<?php echo esc_html__( 'Sends go through wp_mail / FluentSMTP. From must be a verified domain mailbox — never personal Gmail, AgentMail, or free webmail.', 'amy-agent' ); ?>
+						</p>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_marketing_from_email">
+								<?php echo esc_html__( 'Marketing From email', 'amy-agent' ); ?>
+							</label>
+							<input
+								type="email"
+								id="amy_agent_marketing_from_email"
+								name="<?php echo esc_attr( self::OPTION_MARKETING_FROM_EMAIL ); ?>"
+								value="<?php echo esc_attr( $this->get_marketing_from_email() ); ?>"
+								placeholder="<?php echo esc_attr( self::DEFAULT_MARKETING_FROM_EMAIL ); ?>"
+								autocomplete="off"
+							/>
+							<p class="amy-agent-settings__field-error" id="amy-settings-from-error" hidden></p>
+							<p class="amy-agent-settings__hint">
+								<?php echo esc_html__( 'Default: hello@ogcnewfinity.com. Must match a mailbox FluentSMTP is authorized to send as (SPF/DKIM on the domain).', 'amy-agent' ); ?>
+							</p>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_marketing_from_name">
+								<?php echo esc_html__( 'Marketing From name', 'amy-agent' ); ?>
+							</label>
+							<input
+								type="text"
+								id="amy_agent_marketing_from_name"
+								name="<?php echo esc_attr( self::OPTION_MARKETING_FROM_NAME ); ?>"
+								value="<?php echo esc_attr( $this->get_marketing_from_name() ); ?>"
+								placeholder="<?php echo esc_attr( self::DEFAULT_MARKETING_FROM_NAME ); ?>"
+								autocomplete="organization"
+							/>
+						</div>
+					</div>
+				</div>
+
+				<div
+					class="amy-agent-settings__panel"
+					id="amy-settings-panel-connection"
+					role="tabpanel"
+					aria-labelledby="amy-settings-tab-connection"
+					<?php echo 'connection' === $active_tab ? '' : 'hidden'; ?>
+				>
+					<h2 class="amy-agent-settings__panel-title"><?php echo esc_html__( 'Connection', 'amy-agent' ); ?></h2>
+					<p class="amy-agent-settings__panel-intro">
+						<?php echo esc_html__( 'Python service URL, shared secret, and the AI provider used for chat and tools. Keys stay in the WordPress database and are never printed back into the page.', 'amy-agent' ); ?>
+					</p>
+
+					<div class="amy-agent-settings__card">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Python service', 'amy-agent' ); ?></h3>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_service_url">
+								<?php echo esc_html__( 'Python service URL', 'amy-agent' ); ?>
+							</label>
+							<input
+								type="url"
+								id="amy_agent_service_url"
+								name="<?php echo esc_attr( self::OPTION_SERVICE_URL ); ?>"
+								value="<?php echo esc_attr( $this->get_service_url() ); ?>"
+								placeholder="http://127.0.0.1:8765"
+								autocomplete="off"
+							/>
+							<p class="amy-agent-settings__hint">
+								<?php echo esc_html__( 'Base URL of amy-agent-service (no trailing slash). On Local, try 127.0.0.1 or host.docker.internal.', 'amy-agent' ); ?>
+							</p>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_shared_secret">
+								<?php echo esc_html__( 'Shared secret', 'amy-agent' ); ?>
+							</label>
+							<input
+								type="password"
+								id="amy_agent_shared_secret"
+								name="<?php echo esc_attr( self::OPTION_SHARED_SECRET ); ?>"
+								value=""
+								autocomplete="new-password"
+								placeholder="<?php echo $has_secret ? esc_attr__( 'Enter a new secret to replace the saved one', 'amy-agent' ) : esc_attr__( 'Enter a shared secret', 'amy-agent' ); ?>"
+							/>
+							<?php if ( $has_secret ) : ?>
+								<p class="amy-agent-settings__saved">
+									<?php
+									echo esc_html(
+										sprintf(
+											/* translators: %s: masked secret ending */
+											__( 'Shared secret is stored in the database (%s). Leave blank when saving to keep it.', 'amy-agent' ),
+											$this->mask_secret( $this->get_shared_secret() )
+										)
+									);
+									?>
+								</p>
+							<?php else : ?>
+								<p class="amy-agent-settings__hint">
+									<?php echo esc_html__( 'Must match AMY_SHARED_SECRET in the Python service .env.', 'amy-agent' ); ?>
+								</p>
+							<?php endif; ?>
+						</div>
+
+						<div class="amy-agent-settings__health">
+							<button type="button" class="amy-agent-settings__btn amy-agent-settings__btn--ghost" id="amy-settings-health-check">
+								<?php echo esc_html__( 'Check connection', 'amy-agent' ); ?>
+							</button>
+							<p class="amy-agent-settings__health-status" id="amy-settings-health-status" hidden role="status"></p>
+						</div>
+						<p class="amy-agent-settings__hint">
+							<?php echo esc_html__( 'Calls WordPress /wp-json/amy-agent/v1/health, which probes the Python service /v1/health with the saved secret.', 'amy-agent' ); ?>
+						</p>
+					</div>
+
+					<div class="amy-agent-settings__card">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'AI provider', 'amy-agent' ); ?></h3>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_ai_provider">
+								<?php echo esc_html__( 'Provider', 'amy-agent' ); ?>
+							</label>
+							<select id="amy_agent_ai_provider" name="<?php echo esc_attr( self::OPTION_AI_PROVIDER ); ?>">
+								<?php foreach ( self::providers() as $slug => $label ) : ?>
+									<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $this->get_ai_provider(), $slug ); ?>>
+										<?php echo esc_html( $label ); ?>
+									</option>
+								<?php endforeach; ?>
+							</select>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_ai_api_key">
+								<?php echo esc_html__( 'API key', 'amy-agent' ); ?>
+							</label>
+							<input
+								type="password"
+								id="amy_agent_ai_api_key"
+								name="<?php echo esc_attr( self::OPTION_AI_API_KEY ); ?>"
+								value=""
+								autocomplete="new-password"
+								placeholder="<?php echo $has_key ? esc_attr__( 'Enter a new key to replace the saved one', 'amy-agent' ) : esc_attr__( 'Paste your API key', 'amy-agent' ); ?>"
+							/>
+							<?php if ( $has_key ) : ?>
+								<p class="amy-agent-settings__saved">
+									<?php
+									echo esc_html(
+										sprintf(
+											/* translators: %s: masked API key ending */
+											__( 'API key is stored in the database (%s). Leave blank when saving to keep it.', 'amy-agent' ),
+											$this->mask_secret( $this->get_ai_api_key() )
+										)
+									);
+									?>
+								</p>
+							<?php else : ?>
+								<p class="amy-agent-settings__hint">
+									<?php echo esc_html__( 'Stored via the Options API. The field stays empty after save on purpose so the key is never shown in the page HTML.', 'amy-agent' ); ?>
+								</p>
+							<?php endif; ?>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_ai_model">
+								<?php echo esc_html__( 'Model (optional)', 'amy-agent' ); ?>
+							</label>
+							<input
+								type="text"
+								id="amy_agent_ai_model"
+								name="<?php echo esc_attr( self::OPTION_AI_MODEL ); ?>"
+								value="<?php echo esc_attr( $model ); ?>"
+								placeholder="<?php echo esc_attr__( 'Provider default if empty', 'amy-agent' ); ?>"
+								autocomplete="off"
+							/>
+						</div>
+					</div>
+				</div>
+
+				<div class="amy-agent-settings__actions">
+					<?php
+					submit_button(
+						__( 'Save settings', 'amy-agent' ),
+						'primary amy-agent-settings__btn--save',
+						'submit',
+						false
+					);
+					?>
+				</div>
 			</form>
 		</div>
 		<?php
