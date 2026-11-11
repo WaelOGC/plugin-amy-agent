@@ -481,8 +481,12 @@ def test_admin_mode_uses_admin_prompt_without_always_on_snapshots() -> None:
     assert "connections are not built yet" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
     assert "seo tasks, task service board stats, and live web search are not wired" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
     assert "analytics_summary" in AMY_ADMIN_SYSTEM_PROMPT
+    assert "analytics_traffic" in AMY_ADMIN_SYSTEM_PROMPT
+    assert "email_audience_summary" in AMY_ADMIN_SYSTEM_PROMPT
     assert "seo_summary" in AMY_ADMIN_SYSTEM_PROMPT
     assert "task_stats" in AMY_ADMIN_SYSTEM_PROMPT
+    assert "email marketing audience depth are not wired" not in AMY_ADMIN_SYSTEM_PROMPT.lower()
+    assert "Approve → Send" in AMY_ADMIN_SYSTEM_PROMPT
 
 
 def test_admin_mode_appends_identity_when_name_or_email_present() -> None:

@@ -22,11 +22,19 @@ from app.services.analytics_summary import (
     format_analytics_chat_context,
     format_last_seen_ago,
 )
+from app.services.email_audience_summary import (
+    email_audience_summary_for_chat,
+    format_email_audience_chat_context,
+)
 from app.services.seo_task_summary import (
     format_seo_chat_context,
     format_task_service_chat_context,
     seo_review_summary_for_chat,
     task_service_summary_for_chat,
+)
+from app.services.traffic_summary import (
+    format_traffic_chat_context,
+    traffic_summary_for_chat,
 )
 
 logger = logging.getLogger(__name__)
@@ -106,6 +114,34 @@ ADMIN_TOOL_SPECS: list[ToolSpec] = [
             "additionalProperties": False,
         },
     ),
+    ToolSpec(
+        name="analytics_traffic",
+        description=(
+            "Live Amy Analytics page_view traffic depth: pageviews and unique "
+            "sessions for all-time / 24h / 7d / 30d, plus top page paths. Use for "
+            "site traffic, pageviews, page views over time, or top/most-visited "
+            "pages. Not Google Analytics. Lead hot/warm/cold stays on analytics_summary."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
+    ToolSpec(
+        name="email_audience_summary",
+        description=(
+            "Read-only Email Marketing audience: count of Analytics leads with "
+            "email, hot/warm/cold breakdown, recent email captures, small admin "
+            "sample. Report-only — cannot send; Approve → Send stays in Email "
+            "Marketing (FluentSMTP). No AgentMail."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    ),
 ]
 
 ADMIN_TOOL_NAMES = frozenset(spec.name for spec in ADMIN_TOOL_SPECS)
@@ -125,6 +161,23 @@ _LEADS_QUERY_INTENT = re.compile(
     r"list\s+(hot\s+)?leads|show\s+(me\s+)?(hot\s+)?leads|"
     r"hot\s+sample|which\s+leads|lead\s+list|leads\s+with\s+email|"
     r"filter\s+leads|who\s+are\s+the\s+hot"
+    r")\b",
+    re.IGNORECASE,
+)
+_TRAFFIC_INTENT = re.compile(
+    r"\b("
+    r"pageviews?|page\s+views?|site\s+traffic|traffic\s+depth|traffic|"
+    r"top\s+pages?|most[_\s-]?visited|visited\s+pages?|"
+    r"page_view|views\s+over\s+time|how\s+many\s+page"
+    r")\b",
+    re.IGNORECASE,
+)
+_EMAIL_AUDIENCE_INTENT = re.compile(
+    r"\b("
+    r"email\s+audience|marketing\s+audience|email\s+list|"
+    r"audience\s+size|who\s+can\s+we\s+email|emails?\s+on\s+file|"
+    r"marketing\s+list|email\s+marketing\s+audience|"
+    r"how\s+many\s+(have|with)\s+email"
     r")\b",
     re.IGNORECASE,
 )
@@ -164,6 +217,16 @@ def detect_admin_tool_intent(user_text: str) -> list[str]:
             names.append("analytics_leads_query")
         if "analytics_summary" not in names:
             names.insert(0, "analytics_summary")
+    if _TRAFFIC_INTENT.search(text):
+        if "analytics_traffic" not in names:
+            names.append("analytics_traffic")
+        # Plain "traffic" also matches analytics intent; keep both when pageviews asked.
+        if "analytics_summary" not in names and re.search(
+            r"\b(traffic|visitors?)\b", text, re.IGNORECASE
+        ):
+            names.insert(0, "analytics_summary")
+    if _EMAIL_AUDIENCE_INTENT.search(text):
+        names.append("email_audience_summary")
     if _SEO_INTENT.search(text):
         names.append("seo_summary")
     if _TASK_INTENT.search(text):
@@ -312,11 +375,40 @@ def _run_task_stats(_args: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _run_analytics_traffic(_args: dict[str, Any]) -> dict[str, Any]:
+    snap = traffic_summary_for_chat()
+    return {
+        "ok": bool(snap.get("ok")),
+        "tool": "analytics_traffic",
+        "snapshot": snap,
+        "chat_context": format_traffic_chat_context(snap),
+        "summary": snap.get("summary"),
+        "error": snap.get("error"),
+    }
+
+
+def _run_email_audience_summary(_args: dict[str, Any]) -> dict[str, Any]:
+    snap = email_audience_summary_for_chat()
+    return {
+        "ok": bool(snap.get("ok")),
+        "tool": "email_audience_summary",
+        "snapshot": snap,
+        "chat_context": format_email_audience_chat_context(snap),
+        "summary": snap.get("summary"),
+        "error": snap.get("error"),
+        "send_policy": snap.get("send_policy"),
+        "total": snap.get("total"),
+        "counts": snap.get("counts"),
+    }
+
+
 _HANDLERS = {
     "analytics_summary": _run_analytics_summary,
     "analytics_leads_query": _run_analytics_leads_query,
     "seo_summary": _run_seo_summary,
     "task_stats": _run_task_stats,
+    "analytics_traffic": _run_analytics_traffic,
+    "email_audience_summary": _run_email_audience_summary,
 }
 
 
@@ -347,9 +439,12 @@ def tool_result_message(call: ToolCallRequest, result: dict[str, Any]) -> ChatMe
         "summary": result.get("summary"),
         "error": result.get("error"),
         "count": result.get("count"),
+        "total": result.get("total"),
         "total_matching": result.get("total_matching"),
         "filters": result.get("filters"),
         "leads": result.get("leads"),
+        "send_policy": result.get("send_policy"),
+        "counts": result.get("counts"),
     }
     # Drop None keys for a tighter tool result.
     compact = {k: v for k, v in payload.items() if v is not None}

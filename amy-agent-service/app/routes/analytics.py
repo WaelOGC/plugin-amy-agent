@@ -10,12 +10,18 @@ from app.db import analytics_db
 from app.schemas.analytics import (
     AnalyticsSummaryResponse,
     AnalyticsSummarySampleItem,
+    AnalyticsTrafficResponse,
+    EmailAudienceResponse,
+    EmailAudienceSampleItem,
     EventIngestRequest,
     EventIngestResponse,
     LeadEventItem,
     LeadEventListResponse,
     LeadListItem,
     LeadListResponse,
+    TrafficTopPathItem,
+    TrafficWindowCounts,
+    TrafficWindows,
 )
 from app.schemas.messages import ErrorBody
 from app.services import geolocation, lead_scoring
@@ -23,6 +29,8 @@ from app.services.analytics_summary import (
     build_analytics_summary,
     format_analytics_slash_reply,
 )
+from app.services.email_audience_summary import build_email_audience_summary
+from app.services.traffic_summary import build_traffic_summary
 
 router = APIRouter(tags=["analytics"])
 
@@ -162,6 +170,87 @@ async def analytics_summary(
         sample_count=int(snap.get("sample_count") or 0),
         hot_sample=_items(list(snap.get("hot_sample") or [])),
         hot_sample_count=int(snap.get("hot_sample_count") or 0),
+        error=snap.get("error"),
+    )
+
+
+@router.get(
+    "/v1/analytics/traffic",
+    response_model=AnalyticsTrafficResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def analytics_traffic() -> AnalyticsTrafficResponse:
+    """Page-view aggregates from visitor_events (Amy beacon — not GA)."""
+    snap = build_traffic_summary()
+    windows_raw = snap.get("windows") or {}
+
+    def _window(key: str) -> TrafficWindowCounts:
+        w = windows_raw.get(key) or {}
+        return TrafficWindowCounts(
+            pageviews=int(w.get("pageviews") or 0),
+            unique_sessions=int(w.get("unique_sessions") or 0),
+        )
+
+    def _paths(raw: list) -> list[TrafficTopPathItem]:
+        out: list[TrafficTopPathItem] = []
+        for item in raw:
+            out.append(
+                TrafficTopPathItem(
+                    path=str(item.get("path") or "(unknown)"),
+                    pageviews=int(item.get("pageviews") or 0),
+                    unique_sessions=int(item.get("unique_sessions") or 0),
+                )
+            )
+        return out
+
+    return AnalyticsTrafficResponse(
+        ok=bool(snap.get("ok")),
+        windows=TrafficWindows(
+            all_time=_window("all_time"),
+            last_24h=_window("last_24h"),
+            last_7d=_window("last_7d"),
+            last_30d=_window("last_30d"),
+        ),
+        top_paths_7d=_paths(list(snap.get("top_paths_7d") or [])),
+        top_paths_all=_paths(list(snap.get("top_paths_all") or [])),
+        empty=bool(snap.get("empty")),
+        summary=str(snap.get("summary") or ""),
+        error=snap.get("error"),
+    )
+
+
+@router.get(
+    "/v1/analytics/email-audience",
+    response_model=EmailAudienceResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def analytics_email_audience() -> EmailAudienceResponse:
+    """Read-only Email Marketing audience from Analytics leads-with-email."""
+    snap = build_email_audience_summary()
+    sample: list[EmailAudienceSampleItem] = []
+    for item in list(snap.get("sample") or []):
+        sample.append(
+            EmailAudienceSampleItem(
+                session_id=item.get("session_id"),
+                session_id_short=item.get("session_id_short"),
+                lead_status=item.get("lead_status"),
+                lead_email=item.get("lead_email"),
+                ip_country=item.get("ip_country"),
+                ip_city=item.get("ip_city"),
+                last_seen_at=float(item.get("last_seen_at") or 0),
+            )
+        )
+    return EmailAudienceResponse(
+        ok=bool(snap.get("ok")),
+        total=int(snap.get("total") or 0),
+        counts=snap.get("counts") or {},
+        email_captures=snap.get("email_captures") or {},
+        sample=sample,
+        sample_count=int(snap.get("sample_count") or 0),
+        empty=bool(snap.get("empty")),
+        summary=str(snap.get("summary") or ""),
+        send_policy=str(snap.get("send_policy") or "approve_then_send"),
+        notes=snap.get("notes"),
         error=snap.get("error"),
     )
 

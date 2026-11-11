@@ -73,7 +73,9 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | POST | `/v1/tasks/progress-notes/from-telegram` | Consume mid free-text reply when pending |
 | POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set) |
 | GET | `/v1/analytics/summary` | Shared lead-session summary (counts, with_email, last-seen, optional sample; `include_emails=true` for admin) |
-| POST | `/v1/chat` (`mode: admin`) | P3 orchestrator: allowlisted tools (`analytics_summary`, `analytics_leads_query`, `seo_summary`, `task_stats`) with intent auto-invoke + provider tool loop (Gemini/OpenAI/Anthropic/DeepSeek). Slash `/analytics` remains a WP/Telegram shortcut. |
+| GET | `/v1/analytics/traffic` | Page-view traffic depth from `visitor_events` (windows + top paths; not GA) |
+| GET | `/v1/analytics/email-audience` | Read-only Email Marketing audience (leads with email); Approve → Send unchanged; no AgentMail |
+| POST | `/v1/chat` (`mode: admin`) | P3/P4 orchestrator: allowlisted tools (`analytics_summary`, `analytics_leads_query`, `analytics_traffic`, `email_audience_summary`, `seo_summary`, `task_stats`) with intent auto-invoke + provider tool loop (Gemini/OpenAI/Anthropic/DeepSeek). Slash `/analytics` remains a WP/Telegram shortcut. |
 | GET | `/v1/analytics/leads` | Lead list for the admin page (optional `status`) |
 | GET | `/v1/analytics/leads/{session_id}/events` | Event timeline for one session |
 | GET | `/v1/email-marketing/threads` | FluentSMTP send/reply history threads (in `conversations.db`) |
