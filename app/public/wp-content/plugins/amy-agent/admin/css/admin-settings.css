@@ -599,6 +599,11 @@
 	font-weight: 500;
 }
 
+.amy-agent-settings__th-tip {
+	cursor: help;
+	border-bottom: 1px dotted rgba(201, 201, 201, 0.55);
+}
+
 .amy-agent-settings__table-input,
 .amy-agent-settings__table-select {
 	width: 100%;
