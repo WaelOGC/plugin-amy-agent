@@ -201,8 +201,8 @@
 ## 🚧 PARTIAL / NEXT
 
 - **Email Marketing** (`amy-email-marketing`) — audience UI wired (2026-11-10),
-  Send in **0.2.37**, history/opt-out/Amy propose in **0.2.47** (service
-  **0.2.10**). Flow: select audience → Approve draft → **Send now** →
+  Send in **0.2.37**, history/opt-out/Amy propose in **0.2.49** (service
+  **0.2.12**). Flow: select audience → Approve draft → **Send now** →
   `wp_mail` / FluentSMTP From **`hello@ogcnewfinity.com`**. Durable thread
   history + manual reply notes + unsubscribe footer. FluentSMTP is
   outbound-only (no AgentMail / Agentic Mail). Optional inbound webhook if

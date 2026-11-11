@@ -78,7 +78,7 @@ SPF includes your SMTP provider; DKIM published; DMARC recommended.
 
 ### 4. Deploy
 
-Deploy Amy Agent **0.2.47+** and amy-agent-service **0.2.10+**.
+Deploy Amy Agent **0.2.49+** and amy-agent-service **0.2.12+**.
 
 ## Hard rules
 

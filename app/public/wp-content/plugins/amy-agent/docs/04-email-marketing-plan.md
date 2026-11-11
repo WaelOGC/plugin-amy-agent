@@ -3,7 +3,7 @@
 > Location: `amy-agent/docs/04-email-marketing-plan.md`
 > Status: **Decisions locked.** Outbound = FluentSMTP / `wp_mail` From
 > **`hello@ogcnewfinity.com`**. History + opt-out + Amy propose hooks ship in
-> plugin **0.2.47** / service **0.2.10**. **No AgentMail**, no personal Gmail,
+> plugin **0.2.49** / service **0.2.12**. **No AgentMail**, no personal Gmail,
 > no Hostinger Agentic Mail client for marketing.
 > Priority: comes after Dashboard Chat (#3) and Analytics, since Email
 > Marketing consumes data Analytics produces and is triggered through the
@@ -108,7 +108,7 @@ Cold outreach has real legal considerations under Dutch/EU rules:
 - Legal review before cold outreach goes live with real recipients —
   scheduling decision, not a technical open item.
 
-## 5. Shipped surface (0.2.47 / service 0.2.10)
+## 5. Shipped surface (0.2.49 / service 0.2.12)
 
 | Piece | Where |
 | --- | --- |
