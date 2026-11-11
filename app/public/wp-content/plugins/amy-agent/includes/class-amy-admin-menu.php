@@ -697,24 +697,32 @@ class Amy_Admin_Menu {
 			return;
 		}
 
+		$metrics     = $this->fetch_overview_metrics();
 		$coming_soon = __( '(coming soon)', 'amy-agent' );
+		$unavailable = __( '(unavailable)', 'amy-agent' );
 
 		$top_stats = array(
-			// TODO: wire to Task Service once built.
 			array(
 				'label' => __( 'Tasks in Progress', 'amy-agent' ),
+				'value' => $metrics['tasks_in_progress'],
+				'note'  => null,
 			),
-			// TODO: wire to Task Service once built.
+			// No due-soon aggregate exists yet — urgent open tasks is the honest best available.
 			array(
-				'label' => __( 'Tasks Due Soon', 'amy-agent' ),
+				'label' => __( 'Urgent Tasks', 'amy-agent' ),
+				'value' => $metrics['urgent_tasks'],
+				'note'  => null,
 			),
-			// TODO: wire to Chat once built.
 			array(
 				'label' => __( 'Chats This Week', 'amy-agent' ),
+				'value' => $metrics['chats_this_week'],
+				'note'  => null,
 			),
-			// TODO: wire to SEO Tasks once built.
+			// No numeric SEO score API — show pending-approval issue count instead of inventing an average.
 			array(
-				'label' => __( 'Average SEO Score', 'amy-agent' ),
+				'label' => __( 'Open SEO Issues', 'amy-agent' ),
+				'value' => $metrics['seo_open'],
+				'note'  => null,
 			),
 		);
 
@@ -726,34 +734,47 @@ class Amy_Admin_Menu {
 				'icon'        => 'yes-alt',
 				'hero'        => true,
 				'metrics'     => array(
-					// TODO: wire to Task Service real counts once the data layer is built.
-					__( 'Open', 'amy-agent' ),
-					// TODO: wire to Task Service real counts once the data layer is built.
-					__( 'Urgent', 'amy-agent' ),
+					array(
+						'label' => __( 'Open', 'amy-agent' ),
+						'value' => $metrics['open_tasks'],
+					),
+					array(
+						'label' => __( 'Urgent', 'amy-agent' ),
+						'value' => $metrics['urgent_tasks'],
+					),
 				),
 			),
 			array(
-				'slug'        => 'amy-analytics',
+				'slug'        => self::ANALYTICS_PAGE_SLUG,
 				'title'       => __( 'Analytics', 'amy-agent' ),
 				'description' => __( 'Review site usage and performance insights.', 'amy-agent' ),
 				'icon'        => 'chart-bar',
 				'metrics'     => array(
-					// TODO: wire to Analytics once built.
-					__( 'Visitors', 'amy-agent' ),
-					// TODO: wire to Analytics once built.
-					__( 'Page views', 'amy-agent' ),
+					array(
+						'label' => __( 'Visitors', 'amy-agent' ),
+						'value' => $metrics['visitors'],
+					),
+					// No page-view summary endpoint — Hot lead count is a real field from list_leads.
+					array(
+						'label' => __( 'Hot leads', 'amy-agent' ),
+						'value' => $metrics['hot_leads'],
+					),
 				),
 			),
 			array(
-				'slug'        => 'amy-seo-tasks',
+				'slug'        => self::SEO_TASKS_PAGE_SLUG,
 				'title'       => __( 'SEO Tasks', 'amy-agent' ),
 				'description' => __( 'Find and fix SEO issues across your content.', 'amy-agent' ),
 				'icon'        => 'search',
 				'metrics'     => array(
-					// TODO: wire to SEO Tasks once built.
-					__( 'Open issues', 'amy-agent' ),
-					// TODO: wire to SEO Tasks once built.
-					__( 'Fixed', 'amy-agent' ),
+					array(
+						'label' => __( 'Open issues', 'amy-agent' ),
+						'value' => $metrics['seo_open'],
+					),
+					array(
+						'label' => __( 'Fixed', 'amy-agent' ),
+						'value' => $metrics['seo_fixed'],
+					),
 				),
 			),
 			array(
@@ -762,8 +783,16 @@ class Amy_Admin_Menu {
 				'description' => __( 'Audience from Analytics visitor emails — draft and approve, no auto-send.', 'amy-agent' ),
 				'icon'        => 'email',
 				'metrics'     => array(
-					__( 'Audience', 'amy-agent' ),
-					__( 'Drafts', 'amy-agent' ),
+					array(
+						'label' => __( 'Audience', 'amy-agent' ),
+						'value' => $metrics['email_audience'],
+					),
+					array(
+						'label' => __( 'Drafts', 'amy-agent' ),
+						'value' => null,
+						// Drafts live in browser localStorage only — no server draft count.
+						'note'  => __( '(browser only)', 'amy-agent' ),
+					),
 				),
 			),
 			array(
@@ -772,24 +801,35 @@ class Amy_Admin_Menu {
 				'description' => __( 'Talk with Amy the Leader from the dashboard.', 'amy-agent' ),
 				'icon'        => 'format-chat',
 				'metrics'     => array(
-					// TODO: wire to Chat once built.
-					__( 'Active now', 'amy-agent' ),
-					// TODO: wire to Chat once built.
-					__( 'This week', 'amy-agent' ),
+					array(
+						'label' => __( 'Active now', 'amy-agent' ),
+						'value' => $metrics['chats_active'],
+					),
+					array(
+						'label' => __( 'This week', 'amy-agent' ),
+						'value' => $metrics['chats_this_week'],
+					),
 				),
 			),
 			array(
-				// TODO: point to amy-admin-roles once its menu page exists.
+				// Admin Roles & Social is not built — keep honest stub (no fake page).
 				'slug'        => '',
 				'href'        => '#',
 				'title'       => __( 'Admin Roles & Social', 'amy-agent' ),
 				'description' => __( 'Team permissions and connected social platforms.', 'amy-agent' ),
 				'icon'        => 'groups',
+				'coming_soon' => true,
 				'metrics'     => array(
-					// TODO: wire to Admin Roles & Social once built.
-					__( 'Team members', 'amy-agent' ),
-					// TODO: wire to Admin Roles & Social once built.
-					__( 'Platforms', 'amy-agent' ),
+					array(
+						'label' => __( 'Team members', 'amy-agent' ),
+						'value' => null,
+						'note'  => $coming_soon,
+					),
+					array(
+						'label' => __( 'Platforms', 'amy-agent' ),
+						'value' => null,
+						'note'  => $coming_soon,
+					),
 				),
 			),
 			array(
@@ -797,12 +837,33 @@ class Amy_Admin_Menu {
 				'title'       => __( 'Settings', 'amy-agent' ),
 				'description' => __( 'Connect the Python service, shared secret, and AI provider.', 'amy-agent' ),
 				'icon'        => 'admin-generic',
+				'metrics'     => array(
+					array(
+						'label' => __( 'Service URL', 'amy-agent' ),
+						'value' => $metrics['service_configured']
+							? __( 'Configured', 'amy-agent' )
+							: __( 'Not set', 'amy-agent' ),
+					),
+					array(
+						'label' => __( 'Health', 'amy-agent' ),
+						'value' => $metrics['service_health'],
+						'note'  => empty( $metrics['service_configured'] )
+							? __( '(set URL + secret)', 'amy-agent' )
+							: null,
+					),
+				),
 			),
 			array(
 				'slug'        => self::BRAND_PAGE_SLUG,
 				'title'       => __( 'Brand & Avatar', 'amy-agent' ),
 				'description' => __( 'Manage Amy’s look, name, and avatar.', 'amy-agent' ),
 				'icon'        => 'admin-users',
+				'metrics'     => array(
+					array(
+						'label' => __( 'Avatar', 'amy-agent' ),
+						'value' => $metrics['brand_avatar'],
+					),
+				),
 			),
 		);
 		?>
@@ -827,13 +888,28 @@ class Amy_Admin_Menu {
 				</div>
 			</header>
 
+			<?php if ( ! empty( $metrics['connection_hint'] ) ) : ?>
+				<p class="amy-agent-overview__connection-hint" role="status">
+					<?php echo esc_html( $metrics['connection_hint'] ); ?>
+				</p>
+			<?php endif; ?>
+
 			<div class="amy-agent-overview__stats">
 				<?php foreach ( $top_stats as $stat ) : ?>
+					<?php
+					$display = $this->format_overview_metric_value( $stat['value'] ?? null );
+					$note    = isset( $stat['note'] ) ? $stat['note'] : null;
+					if ( null === ( $stat['value'] ?? null ) && null === $note ) {
+						$note = $unavailable;
+					}
+					?>
 					<div class="amy-agent-overview__stat">
 						<p class="amy-agent-overview__stat-label"><?php echo esc_html( $stat['label'] ); ?></p>
 						<p class="amy-agent-overview__stat-value">
-							—
-							<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $coming_soon ); ?></span>
+							<?php echo esc_html( $display ); ?>
+							<?php if ( null !== $note && '' !== $note ) : ?>
+								<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $note ); ?></span>
+							<?php endif; ?>
 						</p>
 					</div>
 				<?php endforeach; ?>
@@ -846,6 +922,9 @@ class Amy_Admin_Menu {
 					$card_classes = 'amy-agent-overview__card';
 					if ( $is_hero ) {
 						$card_classes .= ' amy-agent-overview__card--hero';
+					}
+					if ( ! empty( $card['coming_soon'] ) ) {
+						$card_classes .= ' amy-agent-overview__card--coming-soon';
 					}
 
 					if ( ! empty( $card['href'] ) ) {
@@ -867,24 +946,39 @@ class Amy_Admin_Menu {
 
 						<?php if ( ! empty( $card['metrics'] ) ) : ?>
 							<div class="amy-agent-overview__card-metrics">
-								<?php foreach ( $card['metrics'] as $metric_label ) : ?>
+								<?php foreach ( $card['metrics'] as $metric ) : ?>
+									<?php
+									$metric_value = array_key_exists( 'value', $metric ) ? $metric['value'] : null;
+									$metric_note  = isset( $metric['note'] ) ? $metric['note'] : null;
+									if ( null === $metric_value && null === $metric_note ) {
+										$metric_note = $unavailable;
+									}
+									?>
 									<div class="amy-agent-overview__card-metric">
-										<p class="amy-agent-overview__card-metric-label"><?php echo esc_html( $metric_label ); ?></p>
+										<p class="amy-agent-overview__card-metric-label"><?php echo esc_html( $metric['label'] ); ?></p>
 										<p class="amy-agent-overview__card-metric-value">
-											—
-											<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $coming_soon ); ?></span>
+											<?php echo esc_html( $this->format_overview_metric_value( $metric_value ) ); ?>
+											<?php if ( null !== $metric_note && '' !== $metric_note ) : ?>
+												<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $metric_note ); ?></span>
+											<?php endif; ?>
 										</p>
 									</div>
 								<?php endforeach; ?>
 							</div>
 						<?php endif; ?>
 
-						<a
-							class="amy-agent-overview__card-link"
-							href="<?php echo '#' === $card_url ? '#' : esc_url( $card_url ); ?>"
-						>
-							<?php echo esc_html__( 'See more →', 'amy-agent' ); ?>
-						</a>
+						<?php if ( ! empty( $card['coming_soon'] ) ) : ?>
+							<span class="amy-agent-overview__card-link amy-agent-overview__card-link--disabled">
+								<?php echo esc_html( $coming_soon ); ?>
+							</span>
+						<?php else : ?>
+							<a
+								class="amy-agent-overview__card-link"
+								href="<?php echo esc_url( $card_url ); ?>"
+							>
+								<?php echo esc_html__( 'See more →', 'amy-agent' ); ?>
+							</a>
+						<?php endif; ?>
 					</article>
 				<?php endforeach; ?>
 			</div>
@@ -1338,6 +1432,187 @@ class Amy_Admin_Menu {
 			</div>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Format an Overview metric for display.
+	 *
+	 * null → em dash (unavailable / not applicable). Integers and strings pass through.
+	 *
+	 * @param int|string|null $value Metric value.
+	 * @return string
+	 */
+	private function format_overview_metric_value( $value ) {
+		if ( null === $value ) {
+			return '—';
+		}
+		if ( is_int( $value ) ) {
+			return (string) $value;
+		}
+		return (string) $value;
+	}
+
+	/**
+	 * Server-side Overview metrics from existing Amy_Api_Client methods.
+	 *
+	 * Fail soft: API/connection failures yield null (rendered as —), not fake zeros.
+	 * Successful empty responses yield real 0. When /v1/health fails, skip further
+	 * tool fetches to avoid stacking request timeouts on Overview.
+	 *
+	 * @return array{
+	 *   tasks_in_progress: int|null,
+	 *   open_tasks: int|null,
+	 *   urgent_tasks: int|null,
+	 *   chats_active: int|null,
+	 *   chats_this_week: int|null,
+	 *   seo_open: int|null,
+	 *   seo_fixed: int|null,
+	 *   visitors: int|null,
+	 *   hot_leads: int|null,
+	 *   email_audience: int|null,
+	 *   service_configured: bool,
+	 *   service_health: string|null,
+	 *   brand_avatar: string,
+	 *   connection_hint: string|null
+	 * }
+	 */
+	private function fetch_overview_metrics() {
+		$out = array(
+			'tasks_in_progress'  => null,
+			'open_tasks'         => null,
+			'urgent_tasks'       => null,
+			'chats_active'       => null,
+			'chats_this_week'    => null,
+			'seo_open'           => null,
+			'seo_fixed'          => null,
+			'visitors'           => null,
+			'hot_leads'          => null,
+			'email_audience'     => null,
+			'service_configured' => $this->settings->is_service_configured(),
+			'service_health'     => null,
+			'brand_avatar'       => '' !== $this->settings->get_custom_avatar_url()
+				? __( 'Custom', 'amy-agent' )
+				: __( 'Default', 'amy-agent' ),
+			'connection_hint'    => null,
+		);
+
+		if ( ! $out['service_configured'] ) {
+			$out['connection_hint'] = __(
+				'Amy service URL or shared secret is not set — tool counts show as unavailable until Settings is configured.',
+				'amy-agent'
+			);
+			$out['service_health'] = __( 'n/a', 'amy-agent' );
+			return $out;
+		}
+
+		if ( ! function_exists( 'amy_agent' ) ) {
+			$out['connection_hint'] = __(
+				'Amy Agent bootstrap is unavailable — tool counts cannot be loaded.',
+				'amy-agent'
+			);
+			$out['service_health'] = __( 'n/a', 'amy-agent' );
+			return $out;
+		}
+
+		$client = amy_agent()->api_client;
+
+		$health = $client->health();
+		if ( empty( $health['ok'] ) ) {
+			$out['service_health']  = __( 'Down', 'amy-agent' );
+			$out['connection_hint'] = __(
+				'Could not reach the Amy Python service — Overview shows — instead of inventing zeros. Check Settings → Service URL.',
+				'amy-agent'
+			);
+			return $out;
+		}
+
+		$out['service_health'] = __( 'OK', 'amy-agent' );
+
+		$task_stats = $client->get_task_stats();
+		if ( ! empty( $task_stats['ok'] ) && is_array( $task_stats['body'] ) ) {
+			$body                = $task_stats['body'];
+			$out['open_tasks']   = isset( $body['open_tasks'] ) ? (int) $body['open_tasks'] : 0;
+			$out['urgent_tasks'] = isset( $body['urgent_tasks'] ) ? (int) $body['urgent_tasks'] : 0;
+		}
+
+		$in_progress = $client->list_tasks( array( 'status' => 'in_progress' ) );
+		if ( ! empty( $in_progress['ok'] ) && is_array( $in_progress['body'] ) ) {
+			$tasks = isset( $in_progress['body']['tasks'] ) && is_array( $in_progress['body']['tasks'] )
+				? $in_progress['body']['tasks']
+				: array();
+			$out['tasks_in_progress'] = count( $tasks );
+		}
+
+		$leads = $client->list_leads();
+		if ( ! empty( $leads['ok'] ) && is_array( $leads['body'] ) ) {
+			$lead_rows = isset( $leads['body']['leads'] ) && is_array( $leads['body']['leads'] )
+				? $leads['body']['leads']
+				: array();
+			$out['visitors'] = count( $lead_rows );
+			$hot             = 0;
+			$email_audience  = 0;
+			foreach ( $lead_rows as $lead ) {
+				if ( ! is_array( $lead ) ) {
+					continue;
+				}
+				if ( 'hot' === ( $lead['lead_status'] ?? '' ) ) {
+					++$hot;
+				}
+				if ( ! empty( $lead['lead_email'] ) ) {
+					++$email_audience;
+				}
+			}
+			$out['hot_leads']      = $hot;
+			$out['email_audience'] = $email_audience;
+		}
+
+		$seo = $client->list_seo_checks();
+		if ( ! empty( $seo['ok'] ) && is_array( $seo['body'] ) ) {
+			$checks = isset( $seo['body']['checks'] ) && is_array( $seo['body']['checks'] )
+				? $seo['body']['checks']
+				: array();
+			$open  = 0;
+			$fixed = 0;
+			foreach ( $checks as $check ) {
+				if ( ! is_array( $check ) ) {
+					continue;
+				}
+				$status = (string) ( $check['status'] ?? '' );
+				if ( 'pending_approval' === $status ) {
+					++$open;
+				} elseif ( 'approved' === $status ) {
+					++$fixed;
+				}
+			}
+			$out['seo_open']  = $open;
+			$out['seo_fixed'] = $fixed;
+		}
+
+		$user_id = get_current_user_id();
+		$chats   = $client->list_conversations( $user_id, true, 'admin', false );
+		if ( ! empty( $chats['ok'] ) && is_array( $chats['body'] ) ) {
+			$conversations = isset( $chats['body']['conversations'] ) && is_array( $chats['body']['conversations'] )
+				? $chats['body']['conversations']
+				: array();
+			$week_ago = time() - ( 7 * DAY_IN_SECONDS );
+			$active   = 0;
+			$week     = 0;
+			foreach ( $conversations as $conv ) {
+				if ( ! is_array( $conv ) ) {
+					continue;
+				}
+				// list_conversations(include_archived=false) already excludes archived/deleted.
+				++$active;
+				$updated = isset( $conv['updated_at'] ) ? (float) $conv['updated_at'] : 0.0;
+				if ( $updated >= $week_ago ) {
+					++$week;
+				}
+			}
+			$out['chats_active']    = $active;
+			$out['chats_this_week'] = $week;
+		}
+
+		return $out;
 	}
 
 	/**

@@ -9,12 +9,17 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-08-19 (amy-agent v0.2.21 / amy-agent-service v0.1.7).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.38 / amy-agent-service unchanged for this Overview pass).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
 > `seo_tasks.db`. Generated SEO copy/images are **not** stored in SQLite;
 > WordPress holds them in the modal until Approve.
+> **Overview (v0.2.38):** top strip + tool cards now show live metrics for built
+> tools (Task Service, Analytics leads, SEO checks, Email audience, Chat
+> conversations, Settings health, Brand avatar). Fail soft (`—` /
+> connection hint) when the Python service is unreachable — never fake zeros.
+> Admin Roles & Social remains an honest coming-soon stub (not started).
 
 ---
 
@@ -61,6 +66,12 @@
   (green/running as of last check), Nixpacks build, GitHub `plugin-amy-agent` repo,
   build path `/amy-agent-service`, branch `main`, autodeploy on push
 - Admin pages exist for: Overview, Settings, Brand & Avatar (all functional)
+- **Overview metrics (plugin 0.2.38):** live counts for built tools (Task Service
+  in-progress/open/urgent, Analytics visitors + hot leads, SEO open/fixed checks,
+  Email audience with email, Chat active/this-week). Settings shows service
+  configured + health; Brand shows custom vs default avatar. Service-down fails
+  soft with `—` / connection hint (never fake zeros). **Admin Roles & Social**
+  card remains honest coming-soon (tool not started).
 
 ### 4. Task Service — complete (Task 1 + Task 2)
 - Backend: persistent SQLite at `data/tasks.db` (no TTL), FastAPI CRUD + stats,
