@@ -63,12 +63,48 @@ _LIVE_TASKS = {
 }
 
 
+_LIVE_TRAFFIC = {
+    "ok": True,
+    "windows": {
+        "all_time": {"pageviews": 12, "unique_sessions": 4},
+        "last_24h": {"pageviews": 3, "unique_sessions": 2},
+        "last_7d": {"pageviews": 8, "unique_sessions": 3},
+        "last_30d": {"pageviews": 12, "unique_sessions": 4},
+    },
+    "top_paths_7d": [{"path": "/", "pageviews": 5, "unique_sessions": 3}],
+    "top_paths_all": [{"path": "/", "pageviews": 5, "unique_sessions": 3}],
+    "empty": False,
+    "summary": "Traffic depth (page_view events): all_time pageviews=12.",
+}
+
+_LIVE_EMAIL_AUDIENCE = {
+    "ok": True,
+    "total": 2,
+    "counts": {"hot": 1, "warm": 0, "cold": 1, "other": 0},
+    "email_captures": {"total": 2, "last_7d": 1},
+    "sample": [
+        {
+            "session_id": "abc",
+            "session_id_short": "abc",
+            "lead_status": "hot",
+            "lead_email": "a@example.com",
+        }
+    ],
+    "sample_count": 1,
+    "empty": False,
+    "summary": "Email audience (read-only): 2 leads with email.",
+    "send_policy": "approve_then_send",
+}
+
+
 def test_allowlisted_tool_specs() -> None:
     assert ADMIN_TOOL_NAMES == {
         "analytics_summary",
         "analytics_leads_query",
         "seo_summary",
         "task_stats",
+        "analytics_traffic",
+        "email_audience_summary",
     }
     assert {t.name for t in ADMIN_TOOL_SPECS} == ADMIN_TOOL_NAMES
 
@@ -86,6 +122,22 @@ def test_allowlisted_tool_specs() -> None:
         ),
         ("show me hot leads with email", ["analytics_summary", "analytics_leads_query"]),
         ("/analytics please", ["analytics_summary"]),
+        (
+            "how many pageviews this week?",
+            ["analytics_traffic"],
+        ),
+        (
+            "how's traffic looking?",
+            ["analytics_summary", "analytics_traffic"],
+        ),
+        (
+            "email audience size?",
+            ["email_audience_summary"],
+        ),
+        (
+            "who can we email for marketing?",
+            ["email_audience_summary"],
+        ),
     ],
 )
 def test_detect_admin_tool_intent(text: str, expected: list[str]) -> None:
@@ -106,16 +158,33 @@ def test_execute_analytics_and_seo_and_tasks() -> None:
             "app.services.admin_chat_tools.task_service_summary_for_chat",
             return_value=_LIVE_TASKS,
         ),
+        patch(
+            "app.services.admin_chat_tools.traffic_summary_for_chat",
+            return_value=_LIVE_TRAFFIC,
+        ),
+        patch(
+            "app.services.admin_chat_tools.email_audience_summary_for_chat",
+            return_value=_LIVE_EMAIL_AUDIENCE,
+        ),
     ):
         a = execute_admin_tool("analytics_summary", {})
         s = execute_admin_tool("seo_summary", {})
         t = execute_admin_tool("task_stats", {})
+        tr = execute_admin_tool("analytics_traffic", {})
+        e = execute_admin_tool("email_audience_summary", {})
     assert a["ok"] is True
     assert "total_sessions: 3" in a["chat_context"]
     assert s["ok"] is True
     assert "open (pending_approval): 1" in s["chat_context"]
     assert t["ok"] is True
     assert "urgent_tasks: 1" in t["chat_context"]
+    assert tr["ok"] is True
+    assert "page_view" in tr["chat_context"]
+    assert "all_time:" in tr["chat_context"]
+    assert e["ok"] is True
+    assert e["send_policy"] == "approve_then_send"
+    assert "Approve → Send" in e["chat_context"]
+    assert "AgentMail" in e["chat_context"]
 
 
 def test_execute_unknown_tool() -> None:

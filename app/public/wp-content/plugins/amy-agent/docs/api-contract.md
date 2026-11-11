@@ -199,7 +199,15 @@ There is no newsletter event type (the newsletter form has no working backend ye
 
 Shared Analytics summary for admin chat, Telegram `/analytics`, and (later) Overview. Returns lead-session `total`, `counts` (hot/warm/cold/other), `with_email`, `email_captures` (Submit Idea / contact capture totals + `last_7d`), `last_seen` windows (`last_24h` / `last_7d` / `most_recent`), optional `hot_sample` / `sample`, plus `summary` and deterministic `slash_reply` text. Optional query `include_emails=true` adds `lead_email` on sample rows (admin channels only). This is **not** GA pageviews.
 
-Admin `POST /v1/chat` (`mode: admin`) runs an orchestrator tool loop (service **0.2.15+**). Allowlisted report-only tools: `analytics_summary`, `analytics_leads_query`, `seo_summary`, `task_stats` (same Analytics / SEO / Task Service sources as Overview). Intent auto-invokes tools without slash; providers that support function calling (Gemini / OpenAI / Anthropic / DeepSeek) may request additional tools in the same turn. Response `meta.tools_used` lists tools invoked. Slash `/analytics` / `/Analytics` remains a WP/Telegram shortcut. Chat may cite figures but does not approve SEO writes or reassign tasks.
+Admin `POST /v1/chat` (`mode: admin`) runs an orchestrator tool loop (service **0.2.16+**). Allowlisted report-only tools: `analytics_summary`, `analytics_leads_query`, `analytics_traffic`, `email_audience_summary`, `seo_summary`, `task_stats` (same Analytics / SEO / Task Service / Email audience sources as Overview). Intent auto-invokes tools without slash; providers that support function calling (Gemini / OpenAI / Anthropic / DeepSeek) may request additional tools in the same turn. Response `meta.tools_used` lists tools invoked. Slash `/analytics` / `/Analytics` remains a WP/Telegram shortcut. Chat may cite figures but does not approve SEO writes, reassign tasks, or send Email Marketing (Approve → Send stays in wp-admin; no AgentMail).
+
+### `GET /v1/analytics/traffic`
+
+Page-view traffic depth from `visitor_events` (`event_type=page_view`). Returns `windows` (`all_time` / `last_24h` / `last_7d` / `last_30d` with `pageviews` + `unique_sessions`), `top_paths_7d` / `top_paths_all`, plus `summary`. Amy Analytics beacon data — **not** Google Analytics.
+
+### `GET /v1/analytics/email-audience`
+
+Read-only Email Marketing audience: Analytics leads with a stored `lead_email`, status breakdown, email-capture totals, small admin sample, and `send_policy: approve_then_send`. Does **not** send mail.
 
 ### `GET /v1/analytics/leads`
 

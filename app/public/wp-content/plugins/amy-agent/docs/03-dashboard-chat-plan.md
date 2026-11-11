@@ -103,12 +103,13 @@ one orchestrator.
 
 ## 4. What this is *not*, yet
 
-- **Specialist tools (P3 live for Analytics / SEO / Tasks):** Admin chat
-  (`mode: admin`) runs an Amy-the-Leader tool loop with allowlisted
-  `analytics_summary`, `analytics_leads_query`, `seo_summary`, and
+- **Specialist tools (P3/P4 live for Analytics / traffic / Email audience /
+  SEO / Tasks):** Admin chat (`mode: admin`) runs an Amy-the-Leader tool
+  loop with allowlisted `analytics_summary`, `analytics_leads_query`,
+  `analytics_traffic`, `email_audience_summary`, `seo_summary`, and
   `task_stats`. Intent auto-invokes without slash; `/analytics` /
-  `/Analytics` remain shortcuts. Email Marketing specialist + traffic-depth
-  aggregates are still later (P4).
+  `/Analytics` remain shortcuts. Email audience is read-only (Approve → Send
+  unchanged; no AgentMail).
 - **No attachment-source picker yet.** The attach control is a single
   "upload from your device" path only — not a menu to choose upload vs.
   screenshot vs. import from GitHub/Drive/etc. the way some AI chat products

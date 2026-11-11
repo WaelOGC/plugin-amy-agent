@@ -99,3 +99,59 @@ class AnalyticsSummaryResponse(BaseModel):
     hot_sample: list[AnalyticsSummarySampleItem] = []
     hot_sample_count: int = 0
     error: str | None = None
+
+
+class TrafficWindowCounts(BaseModel):
+    pageviews: int = 0
+    unique_sessions: int = 0
+
+
+class TrafficWindows(BaseModel):
+    all_time: TrafficWindowCounts = TrafficWindowCounts()
+    last_24h: TrafficWindowCounts = TrafficWindowCounts()
+    last_7d: TrafficWindowCounts = TrafficWindowCounts()
+    last_30d: TrafficWindowCounts = TrafficWindowCounts()
+
+
+class TrafficTopPathItem(BaseModel):
+    path: str
+    pageviews: int = 0
+    unique_sessions: int = 0
+
+
+class AnalyticsTrafficResponse(BaseModel):
+    """Page-view traffic depth from visitor_events (not GA)."""
+
+    ok: bool
+    windows: TrafficWindows = TrafficWindows()
+    top_paths_7d: list[TrafficTopPathItem] = []
+    top_paths_all: list[TrafficTopPathItem] = []
+    empty: bool = True
+    summary: str = ""
+    error: str | None = None
+
+
+class EmailAudienceSampleItem(BaseModel):
+    session_id: str | None = None
+    session_id_short: str | None = None
+    lead_status: str | None = None
+    lead_email: str | None = None
+    ip_country: str | None = None
+    ip_city: str | None = None
+    last_seen_at: float = 0
+
+
+class EmailAudienceResponse(BaseModel):
+    """Read-only Email Marketing audience (leads with email). No send from API."""
+
+    ok: bool
+    total: int = 0
+    counts: AnalyticsSummaryCounts = AnalyticsSummaryCounts()
+    email_captures: AnalyticsEmailCaptures = AnalyticsEmailCaptures()
+    sample: list[EmailAudienceSampleItem] = []
+    sample_count: int = 0
+    empty: bool = True
+    summary: str = ""
+    send_policy: str = "approve_then_send"
+    notes: str | None = None
+    error: str | None = None

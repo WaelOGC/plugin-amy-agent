@@ -276,6 +276,65 @@ def count_email_capture_sessions(*, since: float | None = None) -> int:
         conn.close()
 
 
+def count_page_views(*, since: float | None = None) -> dict[str, int]:
+    """Aggregate ``page_view`` events: total views + distinct sessions.
+
+    Optional ``since`` (unix seconds) limits to events at/after that time.
+    """
+    sql = (
+        "SELECT COUNT(*) AS pageviews, "
+        "COUNT(DISTINCT session_id) AS unique_sessions "
+        "FROM visitor_events WHERE event_type = 'page_view'"
+    )
+    params: list[Any] = []
+    if since is not None:
+        sql += " AND created_at >= ?"
+        params.append(since)
+    conn = _connect()
+    try:
+        row = conn.execute(sql, params).fetchone()
+        return {
+            "pageviews": int(row["pageviews"] if row is not None else 0),
+            "unique_sessions": int(row["unique_sessions"] if row is not None else 0),
+        }
+    finally:
+        conn.close()
+
+
+def top_page_paths(
+    *,
+    since: float | None = None,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    """Top ``page_path`` values by ``page_view`` count (NULLs as ``(unknown)``)."""
+    limit = max(1, min(int(limit), 50))
+    sql = (
+        "SELECT COALESCE(NULLIF(TRIM(page_path), ''), '(unknown)') AS path, "
+        "COUNT(*) AS pageviews, "
+        "COUNT(DISTINCT session_id) AS unique_sessions "
+        "FROM visitor_events WHERE event_type = 'page_view'"
+    )
+    params: list[Any] = []
+    if since is not None:
+        sql += " AND created_at >= ?"
+        params.append(since)
+    sql += " GROUP BY path ORDER BY pageviews DESC, path ASC LIMIT ?"
+    params.append(limit)
+    conn = _connect()
+    try:
+        rows = conn.execute(sql, params).fetchall()
+        return [
+            {
+                "path": str(row["path"]),
+                "pageviews": int(row["pageviews"]),
+                "unique_sessions": int(row["unique_sessions"]),
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
 def set_lead_status(session_id: str, status: LeadStatus) -> None:
     if status not in VALID_LEAD_STATUSES:
         raise ValueError("invalid lead_status")
