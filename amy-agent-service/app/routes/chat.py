@@ -16,6 +16,10 @@ from app.schemas.messages import (
     ChatSuccessResponse,
     ErrorBody,
 )
+from app.services.analytics_summary import (
+    analytics_summary_for_chat,
+    format_analytics_chat_context,
+)
 
 router = APIRouter(tags=["chat"])
 
@@ -45,14 +49,28 @@ def _admin_identity_message(
     )
 
 
+def _admin_analytics_context_message() -> ChatMessage:
+    snapshot = analytics_summary_for_chat()
+    return ChatMessage(
+        role="system",
+        content=format_analytics_chat_context(snapshot),
+    )
+
+
 def _messages_with_system(
     messages: list[ChatMessage],
     *,
     mode: str = "general",
     wp_user_name: str | None = None,
     wp_user_email: str | None = None,
+    include_analytics_snapshot: bool = True,
 ) -> list[ChatMessage]:
-    """Prepend Amy's persona prompt unless a system message is already first."""
+    """Prepend Amy's persona prompt unless a system message is already first.
+
+    Admin mode always attaches a live Analytics lead-session snapshot (when
+    ``include_analytics_snapshot`` is True) so Telegram + Dashboard Chat share
+    the same numbers Overview already shows.
+    """
     if messages and messages[0].role == "system":
         return messages
 
@@ -60,6 +78,8 @@ def _messages_with_system(
         system_msgs: list[ChatMessage] = [
             ChatMessage(role="system", content=AMY_ADMIN_SYSTEM_PROMPT)
         ]
+        if include_analytics_snapshot:
+            system_msgs.append(_admin_analytics_context_message())
         identity = _admin_identity_message(wp_user_name, wp_user_email)
         if identity is not None:
             system_msgs.append(identity)
