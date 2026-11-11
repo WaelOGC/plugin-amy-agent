@@ -16,6 +16,11 @@ from app.schemas.messages import (
     ChatSuccessResponse,
     ErrorBody,
 )
+from app.services.admin_chat_tools import (
+    detect_admin_tool_intent,
+    intent_context_messages,
+    run_admin_tool_loop,
+)
 from app.services.analytics_summary import (
     analytics_summary_for_chat,
     format_analytics_chat_context,
@@ -79,39 +84,71 @@ def _admin_task_service_context_message() -> ChatMessage:
     )
 
 
+def _latest_user_text(messages: list[ChatMessage]) -> str:
+    for msg in reversed(messages):
+        if msg.role == "user":
+            return msg.content or ""
+    return ""
+
+
 def _messages_with_system(
     messages: list[ChatMessage],
     *,
     mode: str = "general",
     wp_user_name: str | None = None,
     wp_user_email: str | None = None,
-    include_analytics_snapshot: bool = True,
-    include_seo_task_snapshots: bool = True,
-) -> list[ChatMessage]:
+    include_analytics_snapshot: bool = False,
+    include_seo_task_snapshots: bool = False,
+    auto_invoke_tools: bool = True,
+) -> tuple[list[ChatMessage], list[str]]:
     """Prepend Amy's persona prompt unless a system message is already first.
 
-    Admin mode always attaches live Analytics + SEO + Task Service snapshots
-    (when the matching include_* flags are True) so Telegram + Dashboard Chat
-    share the same Overview-class numbers. Snapshots are report-only.
+    Admin mode (P3): hybrid orchestrator —
+    - No always-on full snapshots by default (token-cheap).
+    - Intent auto-invoke injects live tool results for Analytics / SEO / Tasks.
+    - Optional ``include_*`` flags force the older P0–P2 snapshot inject.
+    - Provider tool loop (caller) can still call allowlisted tools on demand.
+    Slash ``/analytics`` remains a WP/Telegram shortcut outside this path.
+
+    Returns ``(messages, tools_auto_invoked)``.
     """
     if messages and messages[0].role == "system":
-        return messages
+        return messages, []
 
     if mode == "admin":
         system_msgs: list[ChatMessage] = [
             ChatMessage(role="system", content=AMY_ADMIN_SYSTEM_PROMPT)
         ]
+        tools_used: list[str] = []
+
         if include_analytics_snapshot:
             system_msgs.append(_admin_analytics_context_message())
         if include_seo_task_snapshots:
             system_msgs.append(_admin_seo_context_message())
             system_msgs.append(_admin_task_service_context_message())
+
+        if auto_invoke_tools and not (
+            include_analytics_snapshot and include_seo_task_snapshots
+        ):
+            # Skip tools already covered by forced snapshots.
+            intent_names = detect_admin_tool_intent(_latest_user_text(messages))
+            skip = set()
+            if include_analytics_snapshot:
+                skip.update({"analytics_summary", "analytics_leads_query"})
+            if include_seo_task_snapshots:
+                skip.update({"seo_summary", "task_stats"})
+            intent_names = [n for n in intent_names if n not in skip]
+            if intent_names:
+                ctx_msgs, used = intent_context_messages(intent_names)
+                system_msgs.extend(ctx_msgs)
+                tools_used.extend(used)
+
         identity = _admin_identity_message(wp_user_name, wp_user_email)
         if identity is not None:
             system_msgs.append(identity)
-        return [*system_msgs, *messages]
+        return [*system_msgs, *messages], tools_used
 
-    return [ChatMessage(role="system", content=AMY_SYSTEM_PROMPT), *messages]
+    return [ChatMessage(role="system", content=AMY_SYSTEM_PROMPT), *messages], []
 
 
 def _content_for_provider(msg: ChatMessage) -> str:
@@ -123,9 +160,19 @@ def _content_for_provider(msg: ChatMessage) -> str:
 
 
 def _messages_for_provider(messages: list[ChatMessage]) -> list[ChatMessage]:
-    return [
-        ChatMessage(role=m.role, content=_content_for_provider(m)) for m in messages
-    ]
+    out: list[ChatMessage] = []
+    for m in messages:
+        out.append(
+            ChatMessage(
+                role=m.role,
+                content=_content_for_provider(m) if m.role != "tool" else m.content,
+                attachments=list(m.attachments or []),
+                tool_calls=list(m.tool_calls or []),
+                tool_call_id=m.tool_call_id,
+                name=m.name,
+            )
+        )
+    return out
 
 
 def _error(code: str, message: str, http_status: int) -> JSONResponse:
@@ -202,21 +249,32 @@ async def chat(body: ChatRequest) -> JSONResponse:
 
     provider = get_provider(provider_slug)
     resolved_model = provider.resolve_model(body.ai.model)
-    messages = _messages_for_provider(
-        _messages_with_system(
-            history_for_completion,
-            mode=body.mode,
-            wp_user_name=body.wp_user_name,
-            wp_user_email=body.wp_user_email,
-        )
+    prepared, auto_tools = _messages_with_system(
+        history_for_completion,
+        mode=body.mode,
+        wp_user_name=body.wp_user_name,
+        wp_user_email=body.wp_user_email,
     )
+    messages = _messages_for_provider(prepared)
 
+    tools_used: list[str] = list(auto_tools)
     try:
-        text = await provider.complete(
-            messages,
-            api_key=api_key,
-            model=body.ai.model,
-        )
+        if body.mode == "admin":
+            text, loop_tools = await run_admin_tool_loop(
+                provider,
+                messages,
+                api_key=api_key,
+                model=body.ai.model,
+            )
+            for name in loop_tools:
+                if name not in tools_used:
+                    tools_used.append(name)
+        else:
+            text = await provider.complete(
+                messages,
+                api_key=api_key,
+                model=body.ai.model,
+            )
     except ProviderError as exc:
         return _error(
             exc.code,
@@ -243,6 +301,10 @@ async def chat(body: ChatRequest) -> JSONResponse:
         session_id=body.session_id,
         reply=ChatReply(content=text),
         actions=[],
-        meta=ChatMeta(provider=provider_slug, model=resolved_model),
+        meta=ChatMeta(
+            provider=provider_slug,
+            model=resolved_model,
+            tools_used=tools_used,
+        ),
     )
     return JSONResponse(status_code=status.HTTP_200_OK, content=payload.model_dump())

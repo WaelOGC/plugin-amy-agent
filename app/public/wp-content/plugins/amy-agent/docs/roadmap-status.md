@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.46 / amy-agent-service v0.2.9 — BotFather setup help + Task Service P4).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.55 / amy-agent-service v0.2.15 — admin chat P3 tool loop).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -245,9 +245,12 @@ Given the agreed priority order and what's already live:
   shipped in plugin **0.2.40** (see `docs/03-dashboard-chat-plan.md` §7).
   Admin Analytics: P0 snapshot inject (service) + **P1** richer Q&A / `/analytics`
   + `/Analytics` slash + `GET /v1/analytics/summary` + **P2** SEO Tasks + Task
-  Service report-only summaries in admin chat (plugin **0.2.54** / service
-  **0.2.14**). Still open: Support Bot, News Channel, website→Telegram link-code
-  expiry. Full multi-tool specialists / tool-calling remain later (P3+).
+  Service report-only summaries + **P3** admin tool-calling loop / Amy the Leader
+  specialists live for Analytics / SEO / Tasks (plugin **0.2.55** / service
+  **0.2.15**; allowlisted `analytics_summary`, `analytics_leads_query`,
+  `seo_summary`, `task_stats`; intent auto-invoke; slash remains shortcut).
+  Still open: Support Bot, News Channel, website→Telegram link-code expiry;
+  Email Marketing / traffic-depth tools (P4).
 - **Theme-side Analytics Task 2** (does not block the plugin/service pipeline):
   Clarity script tag + Contact form `window.amyTrack(...)` hooks so
   `contact_form_*` events actually fire. Cookie-policy copy update
