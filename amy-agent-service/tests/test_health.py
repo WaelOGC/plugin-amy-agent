@@ -26,6 +26,8 @@ def test_health_requires_secret(client: TestClient) -> None:
 
 
 def test_health_ok_with_secret(client: TestClient) -> None:
+    from app import __version__
+
     response = client.get(
         "/v1/health",
         headers={"X-Amy-Secret": "test-secret-phase1"},
@@ -33,7 +35,8 @@ def test_health_ok_with_secret(client: TestClient) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["ok"] is True
-    assert "version" in data
+    assert data["version"] == __version__
+    assert client.app.openapi()["info"]["version"] == __version__
 
 
 def test_config_validate_rejects_empty_key(client: TestClient) -> None:
