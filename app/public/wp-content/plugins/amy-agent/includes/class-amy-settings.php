@@ -43,6 +43,16 @@ class Amy_Settings {
 	const DEFAULT_MARKETING_FROM_NAME = 'OGC NewFinity';
 
 	/**
+	 * FluentSMTP plugin basename (wp-admin → Plugins).
+	 */
+	const FLUENTSMTP_PLUGIN_FILE = 'fluent-smtp/fluent-smtp.php';
+
+	/**
+	 * FluentSMTP wp-admin page slug (Connections SPA).
+	 */
+	const FLUENTSMTP_PAGE_SLUG = 'fluent-mail';
+
+	/**
 	 * Hook suffix returned by add_submenu_page() for Settings.
 	 *
 	 * @var string|false|null
@@ -639,6 +649,99 @@ class Amy_Settings {
 	}
 
 	/**
+	 * Whether FluentSMTP is active (required transport for Marketing From).
+	 *
+	 * @return bool
+	 */
+	public static function is_fluentsmtp_active() {
+		if ( defined( 'FLUENTMAIL' ) || class_exists( '\FluentMail\App\App', false ) ) {
+			return true;
+		}
+		if ( ! function_exists( 'is_plugin_active' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+		}
+		return function_exists( 'is_plugin_active' ) && is_plugin_active( self::FLUENTSMTP_PLUGIN_FILE );
+	}
+
+	/**
+	 * FluentSMTP → Connections admin URL (SPA hash).
+	 *
+	 * @return string
+	 */
+	public static function get_fluentsmtp_connections_url() {
+		return admin_url( 'admin.php?page=' . self::FLUENTSMTP_PAGE_SLUG . '#/connections' );
+	}
+
+	/**
+	 * Plugin install search URL for FluentSMTP when inactive.
+	 *
+	 * @return string
+	 */
+	public static function get_fluentsmtp_install_url() {
+		return admin_url( 'plugin-install.php?s=FluentSMTP&tab=search&type=term' );
+	}
+
+	/**
+	 * Compact buyer playbook: mailbox → FluentSMTP → SPF/DKIM → Amy From → test.
+	 * hello@ is only an example default for this site — never AgentMail.
+	 *
+	 * @param string $example_email Example From shown in step 1 (usually plugin default).
+	 */
+	public static function render_fluentsmtp_buyer_playbook( $example_email = '' ) {
+		$example_email = sanitize_email( (string) $example_email );
+		if ( '' === $example_email ) {
+			$example_email = self::DEFAULT_MARKETING_FROM_EMAIL;
+		}
+		$active = self::is_fluentsmtp_active();
+		?>
+		<ol class="amy-agent-settings__steps">
+			<li>
+				<?php
+				echo esc_html(
+					sprintf(
+						/* translators: %s: example domain mailbox (e.g. hello@ogcnewfinity.com) */
+						__( 'Mailbox: create a mailbox on your domain (example on this site: %s).', 'amy-agent' ),
+						$example_email
+					)
+				);
+				?>
+			</li>
+			<li>
+				<?php echo esc_html__( 'FluentSMTP: authorize send as that mailbox under FluentSMTP → Connections (SMTP or provider OAuth).', 'amy-agent' ); ?>
+			</li>
+			<li>
+				<?php echo esc_html__( 'DNS: ensure SPF and DKIM for the domain (and DMARC when ready). Use Force From Email only if you understand it overrides other plugins.', 'amy-agent' ); ?>
+			</li>
+			<li>
+				<?php echo esc_html__( 'Amy: Settings → General → Marketing From email / name = that mailbox → Save settings.', 'amy-agent' ); ?>
+			</li>
+			<li>
+				<?php echo esc_html__( 'Prove it: send FluentSMTP’s own test email From your mailbox, then optionally Amy Email Marketing → Approve → Send to a personal test address only.', 'amy-agent' ); ?>
+			</li>
+		</ol>
+		<p class="amy-agent-settings__hint">
+			<?php if ( $active ) : ?>
+				<?php echo esc_html__( 'Where:', 'amy-agent' ); ?>
+				<a href="<?php echo esc_url( self::get_fluentsmtp_connections_url() ); ?>">
+					<?php echo esc_html__( 'FluentSMTP → Connections', 'amy-agent' ); ?>
+				</a>
+				<?php echo esc_html__( '— authorize this mailbox, then use FluentSMTP’s test email (do not reinvent a separate Amy test).', 'amy-agent' ); ?>
+			<?php else : ?>
+				<strong><?php echo esc_html__( 'FluentSMTP is not active.', 'amy-agent' ); ?></strong>
+				<?php echo esc_html__( 'Install and activate FluentSMTP, then open FluentSMTP → Connections.', 'amy-agent' ); ?>
+				<a href="<?php echo esc_url( self::get_fluentsmtp_install_url() ); ?>">
+					<?php echo esc_html__( 'Install FluentSMTP', 'amy-agent' ); ?>
+				</a>
+				·
+				<a href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>">
+					<?php echo esc_html__( 'Plugins', 'amy-agent' ); ?>
+				</a>
+			<?php endif; ?>
+		</p>
+		<?php
+	}
+
+	/**
 	 * Sanitize site default task owner WP user id.
 	 *
 	 * @param mixed $value Raw option.
@@ -1129,16 +1232,25 @@ class Amy_Settings {
 								autocomplete="organization"
 							/>
 							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Display name shown on marketing sends. Defaults to OGC NewFinity when empty.', 'amy-agent' ); ?>
+								<?php
+								echo esc_html(
+									sprintf(
+										/* translators: %s: example display name */
+										__( 'Display name recipients see (example: %s).', 'amy-agent' ),
+										self::DEFAULT_MARKETING_FROM_NAME
+									)
+								);
+								?>
 							</p>
 						</div>
-						<p class="amy-agent-settings__hint">
-							<?php echo esc_html__( 'Where:', 'amy-agent' ); ?>
-							<a href="<?php echo esc_url( admin_url( 'admin.php?page=fluent-mail' ) ); ?>">
-								<?php echo esc_html__( 'FluentSMTP → Connections', 'amy-agent' ); ?>
-							</a>
-							<?php echo esc_html__( '— authorize send as this mailbox, then prove it with FluentSMTP’s test email.', 'amy-agent' ); ?>
+					</div>
+
+					<div class="amy-agent-settings__card amy-agent-settings__card--help amy-agent-settings__card--fluentsmtp" id="general-from-playbook">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Instructions — set your Marketing From', 'amy-agent' ); ?></h3>
+						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
+							<?php echo esc_html__( 'Per-site From via FluentSMTP. hello@ is only an example default for this install — use your own domain mailbox. Never personal Gmail or AgentMail.', 'amy-agent' ); ?>
 						</p>
+						<?php self::render_fluentsmtp_buyer_playbook( self::DEFAULT_MARKETING_FROM_EMAIL ); ?>
 					</div>
 
 					<?php
