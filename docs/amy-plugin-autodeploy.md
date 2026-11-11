@@ -67,6 +67,8 @@ Do **not** put these values in the repo, `.env`, or PR descriptions.
 
 If the job fails with “Missing GitHub secret”, complete step 3. If `Permission denied (publickey)`, the private key secret and Hostinger authorized key do not match.
 
+Do **not** pass `-o IdentitiesOnly=yes` in the rsync SSH options when using `webfactory/ssh-agent` (key only in the agent, no `IdentityFile`): on current OpenSSH that blocks agent-only keys and causes `Permission denied (publickey)` even when the correct key is loaded.
+
 ## Monorepo layout (why not Dokploy alone)
 
 ```text
