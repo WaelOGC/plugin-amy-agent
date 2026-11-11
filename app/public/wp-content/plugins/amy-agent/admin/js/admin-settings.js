@@ -61,7 +61,7 @@
 		if (h === 'connection' || h === 'ai-key') {
 			return 'connection';
 		}
-		if (h === 'general-from' || h === 'enable-amy') {
+		if (h === 'general-from' || h === 'general-from-playbook' || h === 'enable-amy') {
 			return 'general';
 		}
 		return '';

@@ -772,6 +772,67 @@
 	color: var(--amy-accent, #ffd27a);
 }
 
+.amy-agent-email__from-playbook {
+	margin: 0.75rem 0 0;
+	padding: 0.65rem 0.75rem;
+	border: 1px solid rgba(255, 210, 122, 0.35);
+	border-radius: 10px;
+	background: rgba(10, 10, 10, 0.35);
+}
+
+.amy-agent-email__from-playbook-summary {
+	cursor: pointer;
+	color: #ffd27a;
+	font-family: var(--amy-font-heading);
+	font-size: 0.8125rem;
+	font-weight: 700;
+	line-height: 1.35;
+	list-style: none;
+}
+
+.amy-agent-email__from-playbook-summary::-webkit-details-marker {
+	display: none;
+}
+
+.amy-agent-email__from-playbook-summary::before {
+	content: '▸';
+	display: inline-block;
+	margin-right: 0.4rem;
+	color: var(--amy-border);
+}
+
+.amy-agent-email__from-playbook[open] .amy-agent-email__from-playbook-summary::before {
+	content: '▾';
+}
+
+.amy-agent-email__from-playbook-body {
+	margin-top: 0.65rem;
+}
+
+.amy-agent-email__from-playbook-body .amy-agent-settings__steps {
+	margin: 0 0 0.65rem;
+	padding: 0 0 0 1.15rem;
+	color: var(--amy-text-muted);
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	max-width: 40rem;
+}
+
+.amy-agent-email__from-playbook-body .amy-agent-settings__steps li {
+	margin: 0 0 0.3rem;
+}
+
+.amy-agent-email__from-playbook-body .amy-agent-settings__hint {
+	margin: 0;
+	color: var(--amy-text-muted);
+	font-size: 0.8125rem;
+	line-height: 1.45;
+}
+
+.amy-agent-email__from-playbook-body .amy-agent-settings__hint a {
+	color: var(--amy-accent, #ffd27a);
+}
+
 .amy-agent-email__to-meta {
 	margin: -0.35rem 0 0.85rem;
 	color: var(--amy-text-muted);

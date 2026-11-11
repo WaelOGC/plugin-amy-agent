@@ -2874,14 +2874,28 @@ class Amy_Admin_Menu {
 						)
 					);
 					?>
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG ) ); ?>">
+					<a href="<?php echo esc_url( $this->settings->settings_deep_link( 'general', 'general-from' ) ); ?>">
 						<?php echo esc_html__( 'Change in Settings', 'amy-agent' ); ?>
 					</a>
 					·
-					<a href="<?php echo esc_url( admin_url( 'admin.php?page=fluent-mail' ) ); ?>">
-						<?php echo esc_html__( 'FluentSMTP → Connections', 'amy-agent' ); ?>
-					</a>
+					<?php if ( Amy_Settings::is_fluentsmtp_active() ) : ?>
+						<a href="<?php echo esc_url( Amy_Settings::get_fluentsmtp_connections_url() ); ?>">
+							<?php echo esc_html__( 'FluentSMTP → Connections', 'amy-agent' ); ?>
+						</a>
+					<?php else : ?>
+						<a href="<?php echo esc_url( Amy_Settings::get_fluentsmtp_install_url() ); ?>">
+							<?php echo esc_html__( 'Install FluentSMTP', 'amy-agent' ); ?>
+						</a>
+					<?php endif; ?>
 				</p>
+				<details class="amy-agent-email__from-playbook">
+					<summary class="amy-agent-email__from-playbook-summary">
+						<?php echo esc_html__( 'Instructions — set your Marketing From', 'amy-agent' ); ?>
+					</summary>
+					<div class="amy-agent-email__from-playbook-body">
+						<?php Amy_Settings::render_fluentsmtp_buyer_playbook( Amy_Settings::DEFAULT_MARKETING_FROM_EMAIL ); ?>
+					</div>
+				</details>
 			</div>
 
 			<div class="amy-agent-email__notice" role="note">

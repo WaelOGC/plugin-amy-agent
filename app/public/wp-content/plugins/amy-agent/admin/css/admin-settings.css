@@ -620,6 +620,19 @@
 	margin: 0;
 }
 
+.amy-agent-settings__card--help .amy-agent-settings__hint--card {
+	margin-bottom: 0.75rem;
+}
+
+.amy-agent-settings__card--help .amy-agent-settings__steps {
+	margin-bottom: 0.75rem;
+}
+
+.amy-agent-settings__card--fluentsmtp {
+	border-color: rgba(247, 148, 29, 0.55);
+	background: linear-gradient(180deg, rgba(247, 148, 29, 0.08) 0%, var(--amy-panel) 52%);
+}
+
 .amy-agent-settings__card--botfather {
 	border-color: rgba(247, 148, 29, 0.55);
 	background: linear-gradient(180deg, rgba(247, 148, 29, 0.1) 0%, var(--amy-panel) 48%);
