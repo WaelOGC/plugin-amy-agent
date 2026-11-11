@@ -18,6 +18,7 @@ class TaskCreateRequest(BaseModel):
     priority: Priority = "normal"
     status: TaskStatus = "todo"
     due_date: str | None = None
+    amy_capable: bool = False
 
 
 class TaskUpdateRequest(BaseModel):
@@ -30,6 +31,7 @@ class TaskUpdateRequest(BaseModel):
     priority: Priority | None = None
     status: TaskStatus | None = None
     due_date: str | None = None
+    amy_capable: bool | None = None
 
 
 class TaskResponse(BaseModel):
@@ -42,6 +44,7 @@ class TaskResponse(BaseModel):
     priority: Priority
     status: TaskStatus
     due_date: str | None = None
+    amy_capable: bool = False
     created_at: float
     updated_at: float
     escalation_stage: str = "none"

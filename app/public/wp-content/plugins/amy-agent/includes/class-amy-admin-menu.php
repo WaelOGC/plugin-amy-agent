@@ -307,7 +307,7 @@ class Amy_Admin_Menu {
 						'editTask'         => __( 'Edit Task', 'amy-agent' ),
 						'error'            => __( 'Something went wrong. Please try again.', 'amy-agent' ),
 						'titleRequired'    => __( 'Title is required.', 'amy-agent' ),
-						'assigneeRequired' => __( 'Please select an assignee.', 'amy-agent' ),
+						'assigneeRequired' => __( 'Please select who should do this.', 'amy-agent' ),
 						'statusTodo'       => __( 'To Do', 'amy-agent' ),
 						'statusInProgress' => __( 'In Progress', 'amy-agent' ),
 						'statusWaiting'    => __( 'Waiting on Extension', 'amy-agent' ),
@@ -319,6 +319,9 @@ class Amy_Admin_Menu {
 						'extensionAuto'    => __( 'Extension granted automatically. Due date updated.', 'amy-agent' ),
 						'extensionPending' => __( 'Extension request sent — awaiting creator approval.', 'amy-agent' ),
 						'extensionInvalid' => __( 'Enter a positive number of hours.', 'amy-agent' ),
+						'modeAmy'          => __( 'Amy', 'amy-agent' ),
+						'modeHuman'        => __( 'Human', 'amy-agent' ),
+						'amyCapableBadge'  => __( 'Amy-capable', 'amy-agent' ),
 					),
 				)
 			);
@@ -1198,17 +1201,43 @@ class Amy_Admin_Menu {
 							<input type="text" id="amy-agent-task-title" name="title" required placeholder="<?php echo esc_attr__( 'What needs to be done?', 'amy-agent' ); ?>" />
 						</label>
 
-						<label class="amy-agent-task-service__field" for="amy-agent-task-assignee">
+						<fieldset class="amy-agent-task-service__field amy-agent-task-service__field--mode">
+							<legend class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Who does this?', 'amy-agent' ); ?></legend>
+							<label class="amy-agent-task-service__radio">
+								<input type="radio" name="assignee_mode" value="amy" id="amy-agent-task-mode-amy" />
+								<span><?php echo esc_html__( 'Amy does this', 'amy-agent' ); ?></span>
+							</label>
+							<label class="amy-agent-task-service__radio">
+								<input type="radio" name="assignee_mode" value="human" id="amy-agent-task-mode-human" checked />
+								<span><?php echo esc_html__( 'Someone does this', 'amy-agent' ); ?></span>
+							</label>
+							<p class="amy-agent-task-service__field-hint" id="amy-agent-task-amy-mode-hint" hidden>
+								<?php echo esc_html__( 'Amy is assigned only — automatic execution comes later. Status stays honest (no fake complete).', 'amy-agent' ); ?>
+							</p>
+						</fieldset>
+
+						<label class="amy-agent-task-service__field" for="amy-agent-task-assignee" id="amy-agent-task-human-assignee-field">
 							<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Assignee', 'amy-agent' ); ?></span>
-							<select id="amy-agent-task-assignee" name="assignee" required>
-								<option value=""><?php echo esc_html__( 'Select assignee…', 'amy-agent' ); ?></option>
+							<select id="amy-agent-task-assignee" name="assignee">
+								<option value=""><?php echo esc_html__( 'Select someone…', 'amy-agent' ); ?></option>
 								<?php foreach ( $assignees as $assignee ) : ?>
+									<?php if ( 'amy' === ( $assignee['type'] ?? '' ) ) : ?>
+										<?php continue; ?>
+									<?php endif; ?>
 									<option value="<?php echo esc_attr( $assignee['key'] ); ?>">
 										<?php echo esc_html( $assignee['label'] ); ?>
 									</option>
 								<?php endforeach; ?>
 							</select>
 						</label>
+
+						<label class="amy-agent-task-service__check" for="amy-agent-task-amy-capable">
+							<input type="checkbox" id="amy-agent-task-amy-capable" name="amy_capable" value="1" />
+							<span><?php echo esc_html__( 'Amy can do this work (digital / in-system)', 'amy-agent' ); ?></span>
+						</label>
+						<p class="amy-agent-task-service__field-hint">
+							<?php echo esc_html__( 'Used later on timeout: Amy may take capable tasks; otherwise the owner reassigns. Categories come later.', 'amy-agent' ); ?>
+						</p>
 
 						<label class="amy-agent-task-service__field" for="amy-agent-task-status" id="amy-agent-task-status-field" hidden>
 							<span class="amy-agent-task-service__field-label"><?php echo esc_html__( 'Status', 'amy-agent' ); ?></span>

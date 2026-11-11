@@ -45,6 +45,7 @@ _TASK_COLUMN_DEFAULTS: dict[str, str] = {
     "escalation_stage_updated_at": "REAL",
     "acknowledged_at": "REAL",
     "extension_total_seconds": "REAL NOT NULL DEFAULT 0",
+    "amy_capable": "INTEGER NOT NULL DEFAULT 0",
 }
 
 
@@ -97,6 +98,9 @@ def _migrate_tasks_columns(conn: sqlite3.Connection) -> None:
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     keys = set(row.keys())
+    amy_capable_raw = (
+        row["amy_capable"] if "amy_capable" in keys and row["amy_capable"] is not None else 0
+    )
     return {
         "id": row["id"],
         "title": row["title"],
@@ -107,6 +111,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "priority": row["priority"],
         "status": row["status"],
         "due_date": row["due_date"],
+        "amy_capable": bool(int(amy_capable_raw)),
         "created_at": float(row["created_at"]),
         "updated_at": float(row["updated_at"]),
         "escalation_stage": row["escalation_stage"] if "escalation_stage" in keys else "none",
@@ -138,6 +143,7 @@ def create_task(
     priority: Priority = "normal",
     status: TaskStatus = "todo",
     due_date: str | None = None,
+    amy_capable: bool = False,
 ) -> dict[str, Any]:
     """Insert a new task and return the full row dict."""
     title = (title or "").strip()
@@ -156,6 +162,7 @@ def create_task(
 
     now = time.time()
     task_id = str(uuid.uuid4())
+    amy_capable_int = 1 if amy_capable else 0
     conn = _connect()
     try:
         with conn:
@@ -163,11 +170,11 @@ def create_task(
                 """
                 INSERT INTO tasks (
                     id, title, description, assignee_type, assignee_wp_user_id,
-                    created_by_wp_user_id, priority, status, due_date,
+                    created_by_wp_user_id, priority, status, due_date, amy_capable,
                     created_at, updated_at,
                     escalation_stage, escalation_stage_updated_at,
                     acknowledged_at, extension_total_seconds
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'none', NULL, NULL, 0)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'none', NULL, NULL, 0)
                 """,
                 (
                     task_id,
@@ -179,6 +186,7 @@ def create_task(
                     priority,
                     status,
                     due_date,
+                    amy_capable_int,
                     now,
                     now,
                 ),
@@ -249,6 +257,7 @@ def update_task(task_id: str, fields: dict[str, Any]) -> dict[str, Any] | None:
         "priority",
         "status",
         "due_date",
+        "amy_capable",
         "escalation_stage",
         "escalation_stage_updated_at",
         "acknowledged_at",
@@ -275,6 +284,8 @@ def update_task(task_id: str, fields: dict[str, Any]) -> dict[str, Any] | None:
         and updates["escalation_stage"] not in VALID_ESCALATION_STAGES
     ):
         raise ValueError("invalid escalation_stage")
+    if "amy_capable" in updates:
+        updates["amy_capable"] = 1 if updates["amy_capable"] else 0
 
     existing = get_task(task_id)
     if existing is None:

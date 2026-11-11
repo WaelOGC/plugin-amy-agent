@@ -57,6 +57,20 @@ class Amy_Tasks_Ajax {
 	}
 
 	/**
+	 * Parse a POST boolean (1/true/yes/on).
+	 *
+	 * @param string $key POST key.
+	 * @return bool
+	 */
+	private function parse_bool_post( $key ) {
+		if ( ! isset( $_POST[ $key ] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in guard().
+			return false;
+		}
+		$value = strtolower( trim( (string) wp_unslash( $_POST[ $key ] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+		return in_array( $value, array( '1', 'true', 'yes', 'on' ), true );
+	}
+
+	/**
 	 * Forward a failed API response as JSON error.
 	 *
 	 * @param array{ok: bool, status_code: int, body: array|null, error: string|null} $result API result.
@@ -155,6 +169,8 @@ class Amy_Tasks_Ajax {
 			$created_by = get_current_user_id();
 		}
 
+		$amy_capable = $this->parse_bool_post( 'amy_capable' );
+
 		$payload = array(
 			'title'                 => $title,
 			'description'           => $description,
@@ -164,6 +180,7 @@ class Amy_Tasks_Ajax {
 			'priority'              => $priority,
 			'status'                => $status_val,
 			'due_date'              => $due_date,
+			'amy_capable'           => $amy_capable,
 		);
 
 		$result = $this->api_client->create_task( $payload );
@@ -249,6 +266,10 @@ class Amy_Tasks_Ajax {
 		if ( array_key_exists( 'due_date', $_POST ) ) {
 			$due_date = sanitize_text_field( wp_unslash( $_POST['due_date'] ) );
 			$payload['due_date'] = '' !== $due_date ? $due_date : null;
+		}
+
+		if ( array_key_exists( 'amy_capable', $_POST ) ) {
+			$payload['amy_capable'] = $this->parse_bool_post( 'amy_capable' );
 		}
 
 		if ( empty( $payload ) ) {

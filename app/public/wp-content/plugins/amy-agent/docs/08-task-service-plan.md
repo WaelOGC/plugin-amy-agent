@@ -2,7 +2,7 @@
 
 > Priority #6 in `roadmap-status.md`.
 
-## Status: Complete (Task 2 of 2), 2026-08-11
+## Status: Complete (Task 2 of 2), 2026-08-11 — plus P0 create UX (2026-11-11)
 
 **Task 1:** persistent SQLite store (`data/tasks.db`), FastAPI CRUD + stats,
 WordPress API client + admin-ajax proxies, real assignees, board/list CRUD,
@@ -12,6 +12,12 @@ My Profile **+ New Task** entry point, My Profile per-user stat cards.
 notifications for creators, urgent check-ins + simplified reassignment,
 extension requests (auto-cap for normal / always-approve for urgent), dashboard
 notification bell on Task Service + My Profile, 5-minute background scheduler.
+
+**P0 (plugin 0.2.41 / service 0.2.5):** create/edit modal primary choice
+**Amy does this** vs **Someone does this** (human picker) wired to
+`assignee_type`; boolean `amy_capable` stored and returned by API; light
+mode + Amy-capable badges on board/list. No outbound channels or Amy
+execution in P0 — see store multiplan / escalation epic for P1–P4.
 
 ## Implementation notes (scoping vs original plan)
 

@@ -29,6 +29,9 @@
 		var $extensionHours = $('#amy-agent-task-extension-hours');
 		var $extensionSubmit = $('#amy-agent-task-extension-submit');
 		var $extensionResult = $('#amy-agent-task-extension-result');
+		var $humanAssigneeField = $('#amy-agent-task-human-assignee-field');
+		var $amyModeHint = $('#amy-agent-task-amy-mode-hint');
+		var $amyCapable = $('#amy-agent-task-amy-capable');
 		var noticeTimer = null;
 		var defaultStatus = 'todo';
 		var currentUserId = parseInt(cfg.currentUserId, 10) || 0;
@@ -138,6 +141,7 @@
 				assigneeKey: meta.key,
 				assigneeType: raw.assignee_type,
 				assigneeWpUserId: raw.assignee_wp_user_id,
+				amyCapable: !!raw.amy_capable,
 				initials: meta.initials,
 				color: meta.color,
 				avatarUrl: raw.assignee_type === 'amy' ? cfg.amyAvatarUrl || '' : '',
@@ -152,6 +156,28 @@
 				acknowledgedAt: raw.acknowledged_at,
 				extensionTotalSeconds: raw.extension_total_seconds || 0,
 			};
+		}
+
+		function modeBadgeHtml(task) {
+			var isAmy = task.assigneeType === 'amy';
+			return (
+				'<span class="amy-agent-task-service__mode-badge' +
+				(isAmy ? ' is-amy' : ' is-human') +
+				'">' +
+				escapeHtml(isAmy ? i18n.modeAmy || 'Amy' : i18n.modeHuman || 'Human') +
+				'</span>'
+			);
+		}
+
+		function capableBadgeHtml(task) {
+			if (!task.amyCapable) {
+				return '';
+			}
+			return (
+				'<span class="amy-agent-task-service__capable-badge">' +
+				escapeHtml(i18n.amyCapableBadge || 'Amy-capable') +
+				'</span>'
+			);
 		}
 
 		function avatarHtml(task) {
@@ -190,7 +216,11 @@
 				'<h3 class="amy-agent-task-service__card-title">' +
 				escapeHtml(task.title) +
 				'</h3>' +
+				'<span class="amy-agent-task-service__card-badges">' +
+				modeBadgeHtml(task) +
+				capableBadgeHtml(task) +
 				(urgent ? '<span class="amy-agent-task-service__urgent-badge">Urgent</span>' : '') +
+				'</span>' +
 				'</div>' +
 				'<div class="amy-agent-task-service__card-meta">' +
 				'<span class="amy-agent-task-service__assignee">' +
@@ -222,9 +252,13 @@
 				'" tabindex="0" role="button">' +
 				'<td class="amy-agent-task-service__table-task">' +
 				escapeHtml(task.title) +
+				' <span class="amy-agent-task-service__card-badges">' +
+				modeBadgeHtml(task) +
+				capableBadgeHtml(task) +
 				(urgent
-					? ' <span class="amy-agent-task-service__urgent-badge">Urgent</span>'
+					? '<span class="amy-agent-task-service__urgent-badge">Urgent</span>'
 					: '') +
+				'</span>' +
 				'</td>' +
 				'<td><span class="amy-agent-task-service__assignee">' +
 				avatarHtml(task) +
@@ -346,10 +380,27 @@
 			$formError.prop('hidden', true).text('');
 		}
 
-		function parseAssigneeValue(value) {
-			if (value === 'amy') {
+		function getAssigneeMode() {
+			var mode = String($form.find('input[name="assignee_mode"]:checked').val() || 'human');
+			return mode === 'amy' ? 'amy' : 'human';
+		}
+
+		function syncAssigneeModeUi() {
+			var mode = getAssigneeMode();
+			var isAmy = mode === 'amy';
+			$humanAssigneeField.prop('hidden', isAmy);
+			$amyModeHint.prop('hidden', !isAmy);
+			if (isAmy) {
+				$('#amy-agent-task-assignee').val('');
+			}
+		}
+
+		function parseAssigneeSelection() {
+			var mode = getAssigneeMode();
+			if (mode === 'amy') {
 				return { assignee_type: 'amy', assignee_wp_user_id: null };
 			}
+			var value = String($('#amy-agent-task-assignee').val() || '');
 			if (value && value.indexOf('user:') === 0) {
 				return {
 					assignee_type: 'human',
@@ -362,7 +413,9 @@
 		function resetForm(presetStatus) {
 			$('#amy-agent-task-id').val('');
 			$('#amy-agent-task-title').val('');
+			$form.find('input[name="assignee_mode"][value="human"]').prop('checked', true);
 			$('#amy-agent-task-assignee').val('');
+			$amyCapable.prop('checked', false);
 			$('#amy-agent-task-description').val('');
 			$('#amy-agent-task-due').val('');
 			$form.find('input[name="priority"][value="normal"]').prop('checked', true);
@@ -375,6 +428,7 @@
 			$modalTitle.text(i18n.newTask || 'New Task');
 			$submitBtn.text(i18n.create || 'Create Task');
 			clearFormError();
+			syncAssigneeModeUi();
 			defaultStatus = presetStatus || 'todo';
 		}
 
@@ -409,7 +463,13 @@
 			resetForm(task.status);
 			$('#amy-agent-task-id').val(task.id);
 			$('#amy-agent-task-title').val(task.title);
-			$('#amy-agent-task-assignee').val(task.assigneeKey);
+			var mode = task.assigneeType === 'amy' ? 'amy' : 'human';
+			$form.find('input[name="assignee_mode"][value="' + mode + '"]').prop('checked', true);
+			syncAssigneeModeUi();
+			if (mode === 'human') {
+				$('#amy-agent-task-assignee').val(task.assigneeKey);
+			}
+			$amyCapable.prop('checked', !!task.amyCapable);
 			$('#amy-agent-task-description').val(task.description || '');
 			$('#amy-agent-task-due').val(dueInputValue(task.dueDate));
 			$form.find('input[name="priority"][value="' + (task.priority || 'normal') + '"]').prop('checked', true);
@@ -537,6 +597,10 @@
 
 		$assigneeFilter.add($priorityFilter).on('change', render);
 		$search.on('input', render);
+
+		$form.on('change', 'input[name="assignee_mode"]', function () {
+			syncAssigneeModeUi();
+		});
 
 		$('#amy-agent-task-new').on('click', function (event) {
 			event.preventDefault();
@@ -666,11 +730,11 @@
 
 			var id = String($('#amy-agent-task-id').val() || '');
 			var title = String($('#amy-agent-task-title').val() || '').trim();
-			var assigneeVal = String($('#amy-agent-task-assignee').val() || '');
-			var parsed = parseAssigneeValue(assigneeVal);
+			var parsed = parseAssigneeSelection();
 			var priority = String($form.find('input[name="priority"]:checked').val() || 'normal');
 			var dueDate = String($('#amy-agent-task-due').val() || '');
 			var description = String($('#amy-agent-task-description').val() || '');
+			var amyCapable = $amyCapable.is(':checked');
 			var statusVal = id
 				? String($('#amy-agent-task-status').val() || 'todo')
 				: defaultStatus || 'todo';
@@ -681,8 +745,10 @@
 				return;
 			}
 			if (!parsed || (parsed.assignee_type === 'human' && !parsed.assignee_wp_user_id)) {
-				showFormError(i18n.assigneeRequired || 'Please select an assignee.');
-				$('#amy-agent-task-assignee').trigger('focus');
+				showFormError(i18n.assigneeRequired || 'Please select who should do this.');
+				if (getAssigneeMode() === 'human') {
+					$('#amy-agent-task-assignee').trigger('focus');
+				}
 				return;
 			}
 
@@ -695,6 +761,7 @@
 				status: statusVal,
 				due_date: dueDate,
 				description: description,
+				amy_capable: amyCapable ? '1' : '0',
 			};
 
 			if (parsed.assignee_type === 'human') {
