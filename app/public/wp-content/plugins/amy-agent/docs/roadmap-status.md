@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.45 / amy-agent-service v0.2.9 — Task Service P4 Amy execution).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.46 / amy-agent-service v0.2.9 — BotFather setup help + Task Service P4).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -22,9 +22,10 @@
 > Admin Roles & Social remains an honest coming-soon stub (not started).
 > **Settings (v0.2.39):** dark Amy theme + General / Connection tabs, readiness
 > banner, health check button, marketing From UI validation.
-> **Telegram Admin Bot (v0.2.40):** Settings → Telegram tab; WP webhook +
-> whitelist; shared admin conversations with Dashboard Chat — **reused** by
-> Task Service outbound (no second bot).
+> **Telegram Admin Bot (v0.2.40 / help v0.2.46):** Settings → Telegram tab; WP
+> webhook + whitelist; shared admin conversations with Dashboard Chat —
+> **reused** by Task Service outbound (no second bot). v0.2.46 adds BotFather
+> deeplink + create-bot/token steps (tokens are buyer-created; no API mint).
 > **Task Service P0 (v0.2.41 / service 0.2.5):** Amy vs Someone create/edit mode
 > + `amy_capable` + board/list badges.
 > **Task Service P1 (v0.2.42 / service 0.2.6):** assign/mid/expiry templates;
