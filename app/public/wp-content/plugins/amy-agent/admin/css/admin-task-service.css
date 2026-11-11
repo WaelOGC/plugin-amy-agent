@@ -114,6 +114,41 @@
 	border-color: rgba(239, 68, 68, 0.35);
 }
 
+.amy-agent-task-service__help {
+	margin: 0 0 1rem;
+	padding: 0.85rem 1rem;
+	border-radius: 10px;
+	border: 1px solid rgba(247, 148, 29, 0.4);
+	background: rgba(247, 148, 29, 0.08);
+}
+
+.amy-agent-task-service__help-text {
+	margin: 0 0 0.55rem;
+	color: var(--amy-text-muted);
+	font-size: 0.875rem;
+	line-height: 1.45;
+}
+
+.amy-agent-task-service__help-links {
+	margin: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem 0.55rem;
+	align-items: center;
+	font-size: 0.8125rem;
+}
+
+.amy-agent-task-service__help-links a {
+	color: var(--amy-grad-start);
+	text-decoration: underline;
+	text-underline-offset: 0.12em;
+}
+
+.amy-agent-task-service__help-links a:hover,
+.amy-agent-task-service__help-links a:focus {
+	color: var(--amy-text);
+}
+
 .amy-agent-task-service__form-error {
 	margin: 0;
 	padding: 0.55rem 0.75rem;

@@ -794,9 +794,32 @@ class Amy_Settings {
 	}
 
 	/**
+	 * Admin URL into a Settings tab + optional fragment (deep-link targets).
+	 *
+	 * @param string $tab      general|connection|telegram.
+	 * @param string $fragment Hash without leading # (e.g. general-from).
+	 * @return string
+	 */
+	public function settings_deep_link( $tab = 'general', $fragment = '' ) {
+		$tab = sanitize_key( (string) $tab );
+		if ( ! in_array( $tab, array( 'general', 'connection', 'telegram' ), true ) ) {
+			$tab = 'general';
+		}
+		$url = admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&tab=' . $tab );
+		$fragment = sanitize_title( (string) $fragment );
+		if ( '' !== $fragment ) {
+			$url .= '#' . $fragment;
+		}
+		return $url;
+	}
+
+	/**
 	 * Readiness summary for the Settings header banner.
 	 *
-	 * @return array{state:string,badge:string,title:string,text:string,missing:string[]}
+	 * Core Ready still means Enable Amy + service URL + shared secret (widget/Submit Idea).
+	 * Missing list also covers Telegram (alerts), optional Marketing From, and optional AI key.
+	 *
+	 * @return array{state:string,badge:string,title:string,text:string,missing:array<int,array{label:string,href:string}>}
 	 */
 	private function get_readiness_summary() {
 		$enabled    = $this->is_enabled();
@@ -805,22 +828,94 @@ class Amy_Settings {
 		$missing    = array();
 
 		if ( ! $enabled ) {
-			$missing[] = __( 'Enable Amy is off', 'amy-agent' );
+			$missing[] = array(
+				'label'    => __( 'Enable Amy is off', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'general', 'enable-amy' ),
+				'optional' => false,
+			);
 		}
 		if ( '' === $this->get_service_url() ) {
-			$missing[] = __( 'Python service URL is empty', 'amy-agent' );
+			$missing[] = array(
+				'label'    => __( 'Python service URL is empty', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'connection', 'connection' ),
+				'optional' => false,
+			);
 		}
 		if ( '' === $this->get_shared_secret() ) {
-			$missing[] = __( 'Shared secret is empty', 'amy-agent' );
+			$missing[] = array(
+				'label'    => __( 'Shared secret is empty', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'connection', 'connection' ),
+				'optional' => false,
+			);
 		}
 
-		if ( $ready ) {
+		$tg_enabled  = $this->is_telegram_enabled();
+		$tg_token    = '' !== $this->get_telegram_token();
+		$tg_webhook  = Amy_Telegram::is_webhook_connected();
+		$tg_complete = $tg_enabled && $tg_token && $tg_webhook;
+
+		if ( ! $tg_enabled ) {
+			$missing[] = array(
+				'label'    => __( 'Telegram Admin Bot is disabled', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'telegram', 'telegram' ),
+				'optional' => false,
+			);
+		}
+		if ( ! $tg_token ) {
+			$missing[] = array(
+				'label'    => __( 'Telegram bot token is missing', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'telegram', 'telegram' ),
+				'optional' => false,
+			);
+		}
+		if ( $tg_token && ! $tg_webhook ) {
+			$missing[] = array(
+				'label'    => __( 'Telegram webhook is not connected', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'telegram', 'telegram' ),
+				'optional' => false,
+			);
+		}
+
+		$from_raw = sanitize_email( trim( (string) get_option( self::OPTION_MARKETING_FROM_EMAIL, '' ) ) );
+		if ( '' === $from_raw ) {
+			$missing[] = array(
+				'label'    => __( 'Marketing From not set (optional — using plugin default)', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'general', 'general-from' ),
+				'optional' => true,
+			);
+		}
+
+		if ( '' === $this->get_ai_api_key() ) {
+			$missing[] = array(
+				'label'    => __( 'AI API key not set (optional — needed for Chat)', 'amy-agent' ),
+				'href'     => $this->settings_deep_link( 'connection', 'ai-key' ),
+				'optional' => true,
+			);
+		}
+
+		if ( $ready && $tg_complete ) {
+			$optional_only = array();
+			foreach ( $missing as $item ) {
+				if ( ! empty( $item['optional'] ) ) {
+					$optional_only[] = $item;
+				}
+			}
 			return array(
 				'state'   => 'ready',
 				'badge'   => __( 'Ready', 'amy-agent' ),
 				'title'   => __( 'Amy is ready on the site', 'amy-agent' ),
-				'text'    => __( 'Enable Amy is on and the service URL + shared secret are set. The floating widget and Amy Submit Idea can load.', 'amy-agent' ),
-				'missing' => array(),
+				'text'    => __( 'Enable Amy, service connection, and Telegram bot are set. Optional items below still help Email Marketing and Chat.', 'amy-agent' ),
+				'missing' => $optional_only,
+			);
+		}
+
+		if ( $ready && ! $tg_complete ) {
+			return array(
+				'state'   => 'warn',
+				'badge'   => __( 'Ready · Alerts incomplete', 'amy-agent' ),
+				'title'   => __( 'Widget can load — Telegram alerts need setup', 'amy-agent' ),
+				'text'    => __( 'Enable Amy and the Python service are set. Finish Telegram (token → Enable → Connect) for Task Service alerts, then link chat id under My Profile.', 'amy-agent' ),
+				'missing' => $missing,
 			);
 		}
 
@@ -838,7 +933,7 @@ class Amy_Settings {
 			'state'   => 'off',
 			'badge'   => __( 'Not ready', 'amy-agent' ),
 			'title'   => __( 'Amy is not ready yet', 'amy-agent' ),
-			'text'    => __( 'Enable Amy plus a service URL and shared secret are required. Widget and Submit Idea stay hidden until then.', 'amy-agent' ),
+			'text'    => __( 'Enable Amy plus a service URL and shared secret are required. Fix each item below — links jump to the right Settings card.', 'amy-agent' ),
 			'missing' => $missing,
 		);
 	}
@@ -891,7 +986,22 @@ class Amy_Settings {
 					<?php if ( ! empty( $readiness['missing'] ) ) : ?>
 						<ul class="amy-agent-settings__readiness-list">
 							<?php foreach ( $readiness['missing'] as $item ) : ?>
-								<li><?php echo esc_html( $item ); ?></li>
+								<?php
+								$label = is_array( $item ) ? (string) ( $item['label'] ?? '' ) : (string) $item;
+								$href  = is_array( $item ) ? (string) ( $item['href'] ?? '' ) : '';
+								if ( '' === $label ) {
+									continue;
+								}
+								?>
+								<li>
+									<?php if ( '' !== $href ) : ?>
+										<a class="amy-agent-settings__readiness-link" href="<?php echo esc_url( $href ); ?>">
+											<?php echo esc_html( $label ); ?>
+										</a>
+									<?php else : ?>
+										<?php echo esc_html( $label ); ?>
+									<?php endif; ?>
+								</li>
 							<?php endforeach; ?>
 						</ul>
 					<?php endif; ?>
@@ -954,7 +1064,7 @@ class Amy_Settings {
 						<?php echo esc_html__( 'Rarely touched site switches and the marketing From identity used by Email Marketing sends.', 'amy-agent' ); ?>
 					</p>
 
-					<div class="amy-agent-settings__card">
+					<div class="amy-agent-settings__card" id="enable-amy">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Site presence', 'amy-agent' ); ?></h3>
 						<div class="amy-agent-settings__field">
 							<label class="amy-agent-settings__toggle" for="amy_agent_enabled">
@@ -976,7 +1086,7 @@ class Amy_Settings {
 						</div>
 					</div>
 
-					<div class="amy-agent-settings__card" id="amy-settings-general-from">
+					<div class="amy-agent-settings__card" id="general-from">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Email Marketing From', 'amy-agent' ); ?></h3>
 						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
 							<?php echo esc_html__( 'Each WordPress site configures its own Marketing From. Buyers: use a mailbox on your domain and authorize that address in FluentSMTP (SPF/DKIM). Sends go through wp_mail → FluentSMTP — never personal Gmail, AgentMail (@agentmail.to), or free webmail.', 'amy-agent' ); ?>
@@ -1080,7 +1190,7 @@ class Amy_Settings {
 						<?php echo esc_html__( 'Python service URL, shared secret, and the AI provider used for chat and tools. Keys stay in the WordPress database and are never printed back into the page.', 'amy-agent' ); ?>
 					</p>
 
-					<div class="amy-agent-settings__card">
+					<div class="amy-agent-settings__card" id="connection">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Python service', 'amy-agent' ); ?></h3>
 						<div class="amy-agent-settings__field">
 							<label class="amy-agent-settings__field-label" for="amy_agent_service_url">
@@ -1140,7 +1250,7 @@ class Amy_Settings {
 						</p>
 					</div>
 
-					<div class="amy-agent-settings__card">
+					<div class="amy-agent-settings__card" id="ai-key">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'AI provider', 'amy-agent' ); ?></h3>
 						<div class="amy-agent-settings__field">
 							<label class="amy-agent-settings__field-label" for="amy_agent_ai_provider">
@@ -1257,7 +1367,7 @@ class Amy_Settings {
 						</p>
 					</div>
 
-					<div class="amy-agent-settings__card">
+					<div class="amy-agent-settings__card" id="telegram">
 						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Bot connection', 'amy-agent' ); ?></h3>
 						<div class="amy-agent-settings__field">
 							<label class="amy-agent-settings__toggle" for="amy_agent_telegram_enabled">

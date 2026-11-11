@@ -53,6 +53,33 @@
 		}
 	}
 
+	function tabForHash(hash) {
+		var h = String(hash || '').replace(/^#/, '');
+		if (h === 'telegram') {
+			return 'telegram';
+		}
+		if (h === 'connection' || h === 'ai-key') {
+			return 'connection';
+		}
+		if (h === 'general-from' || h === 'enable-amy') {
+			return 'general';
+		}
+		return '';
+	}
+
+	function scrollToHashTarget(hash) {
+		var id = String(hash || '').replace(/^#/, '');
+		if (!id) {
+			return;
+		}
+		var el = document.getElementById(id);
+		if (el && typeof el.scrollIntoView === 'function') {
+			window.setTimeout(function () {
+				el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}, 60);
+		}
+	}
+
 	function initTabs() {
 		var tabs = qsa('.amy-agent-settings__tab');
 		if (!tabs.length) {
@@ -60,15 +87,24 @@
 		}
 
 		var initial = 'general';
+		var hash = '';
 		try {
-			var fromUrl = new URL(window.location.href).searchParams.get('tab');
+			var url = new URL(window.location.href);
+			var fromUrl = url.searchParams.get('tab');
+			hash = url.hash || window.location.hash || '';
+			var fromHash = tabForHash(hash);
 			if (fromUrl === 'connection' || fromUrl === 'general' || fromUrl === 'telegram') {
 				initial = fromUrl;
+			} else if (fromHash) {
+				initial = fromHash;
 			}
 		} catch (e) {
 			/* ignore */
 		}
 		setActiveTab(initial);
+		if (hash) {
+			scrollToHashTarget(hash);
+		}
 
 		tabs.forEach(function (btn) {
 			btn.addEventListener('click', function () {
@@ -76,6 +112,46 @@
 				setActiveTab(id);
 				if (id === 'telegram') {
 					loadTelegramStatus();
+				}
+			});
+		});
+
+		// Readiness deep-links on the same page: switch tab + scroll without full reload.
+		qsa('.amy-agent-settings__readiness-link').forEach(function (link) {
+			link.addEventListener('click', function (ev) {
+				var href = link.getAttribute('href') || '';
+				var tab = '';
+				var frag = '';
+				try {
+					var u = new URL(href, window.location.origin);
+					tab = u.searchParams.get('tab') || '';
+					frag = u.hash || '';
+					if (!tab) {
+						tab = tabForHash(frag);
+					}
+				} catch (err) {
+					return;
+				}
+				if (!tab || !qs('#amy-settings-panel-' + tab)) {
+					return;
+				}
+				ev.preventDefault();
+				setActiveTab(tab);
+				if (tab === 'telegram') {
+					loadTelegramStatus();
+				}
+				if (frag) {
+					scrollToHashTarget(frag);
+					try {
+						if (window.history && window.history.replaceState) {
+							var next = new URL(window.location.href);
+							next.searchParams.set('tab', tab);
+							next.hash = frag.replace(/^#/, '');
+							window.history.replaceState({}, '', next.toString());
+						}
+					} catch (err2) {
+						/* ignore */
+					}
 				}
 			});
 		});

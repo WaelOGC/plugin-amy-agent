@@ -146,6 +146,17 @@
 	line-height: 1.45;
 }
 
+.amy-agent-settings__readiness-link {
+	color: var(--amy-accent, #f7941d);
+	text-decoration: underline;
+	text-underline-offset: 0.12em;
+}
+
+.amy-agent-settings__readiness-link:hover,
+.amy-agent-settings__readiness-link:focus {
+	color: var(--amy-text, #fff);
+}
+
 .amy-agent-settings__controls-note {
 	margin: 0 0 1.25rem;
 	padding: 0.85rem 1rem;

@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.49
+Stable tag: 0.2.50
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,11 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 6. For Task Service outbound: set `WORDPRESS_BASE_URL` on the Python service; enable Telegram under Amy → Settings → Telegram; assignees link chat id from Amy → My Profile. Create the Admin Bot via BotFather (Settings → Telegram has the deeplink + steps).
 
 == Changelog ==
+
+= 0.2.50 =
+* Client help P1: Settings readiness lists Telegram (enabled / token / webhook), optional Marketing From, and optional AI key — each item deep-links to the fix card (#telegram, #general-from, Connection, #ai-key).
+* Task Service empty-state and load-error point to Settings → Connection plus Telegram + My Profile.
+* My Profile: clearer Amy → Settings → Telegram path; three-step bot status (token → Enable → Connect).
 
 = 0.2.49 =
 * Email Marketing: FluentSMTP send history + reply notes in Amy service (no AgentMail / Agentic Mail).

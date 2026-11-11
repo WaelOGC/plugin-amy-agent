@@ -315,9 +315,18 @@ class Amy_Admin_Menu {
 					'assignees'     => $this->get_task_assignees_for_js(),
 					'amyAvatarUrl'  => $this->settings->get_avatar_url(),
 					'openNewTask'   => isset( $_GET['amy_new_task'] ) && '1' === (string) wp_unslash( $_GET['amy_new_task'] ), // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only UI flag
+					'settingsUrls'  => array(
+						'connection' => $this->settings->settings_deep_link( 'connection', 'connection' ),
+						'telegram'   => $this->settings->settings_deep_link( 'telegram', 'telegram' ),
+						'myProfile'  => admin_url( 'admin.php?page=' . self::MY_PROFILE_PAGE_SLUG ),
+					),
 					'i18n'          => array(
 						'noResults'        => __( 'No tasks match your filters.', 'amy-agent' ),
-						'loadError'        => __( 'Could not load tasks. Check the Amy Agent service connection.', 'amy-agent' ),
+						'emptyBoard'       => __( 'No tasks yet. Create one with + New Task. If the board will not load, check Amy → Settings → Connection. For Telegram alerts: Settings → Telegram, then My Profile → Telegram.', 'amy-agent' ),
+						'loadError'        => __( 'Could not load tasks. Check Amy → Settings → Connection (service URL + shared secret). Telegram alerts: Settings → Telegram + My Profile → Telegram.', 'amy-agent' ),
+						'helpConnection'   => __( 'Settings → Connection', 'amy-agent' ),
+						'helpTelegram'     => __( 'Settings → Telegram', 'amy-agent' ),
+						'helpMyProfile'    => __( 'My Profile → Telegram', 'amy-agent' ),
 						'createSuccess'    => __( 'Task created.', 'amy-agent' ),
 						'updateSuccess'    => __( 'Task updated.', 'amy-agent' ),
 						'deleteSuccess'    => __( 'Task deleted.', 'amy-agent' ),
@@ -1112,6 +1121,23 @@ class Amy_Admin_Menu {
 			</header>
 
 			<p class="amy-agent-task-service__notice" id="amy-agent-task-notice" hidden role="status"></p>
+
+			<div class="amy-agent-task-service__help" id="amy-agent-task-help" hidden>
+				<p class="amy-agent-task-service__help-text" id="amy-agent-task-help-text"></p>
+				<p class="amy-agent-task-service__help-links">
+					<a id="amy-agent-task-help-connection" href="<?php echo esc_url( $this->settings->settings_deep_link( 'connection', 'connection' ) ); ?>">
+						<?php echo esc_html__( 'Settings → Connection', 'amy-agent' ); ?>
+					</a>
+					<span aria-hidden="true">·</span>
+					<a id="amy-agent-task-help-telegram" href="<?php echo esc_url( $this->settings->settings_deep_link( 'telegram', 'telegram' ) ); ?>">
+						<?php echo esc_html__( 'Settings → Telegram', 'amy-agent' ); ?>
+					</a>
+					<span aria-hidden="true">·</span>
+					<a id="amy-agent-task-help-profile" href="<?php echo esc_url( admin_url( 'admin.php?page=' . self::MY_PROFILE_PAGE_SLUG ) ); ?>">
+						<?php echo esc_html__( 'My Profile → Telegram', 'amy-agent' ); ?>
+					</a>
+				</p>
+			</div>
 
 			<div class="amy-agent-task-service__stats">
 				<?php foreach ( $stats as $stat ) : ?>
@@ -1970,6 +1996,9 @@ class Amy_Admin_Menu {
 			$tg_chat_id      = (int) get_user_meta( (int) $user->ID, Amy_Task_Notify::USER_META_CHAT_ID, true );
 			$tg_bot_username = (string) get_option( Amy_Telegram::OPTION_BOT_USERNAME, '' );
 			$tg_enabled      = $this->settings->is_telegram_enabled();
+			$tg_has_token    = '' !== $this->settings->get_telegram_token();
+			$tg_webhook_ok   = Amy_Telegram::is_webhook_connected();
+			$tg_settings_url = $this->settings->settings_deep_link( 'telegram', 'telegram' );
 			?>
 			<?php
 			$backup_id    = (int) get_user_meta( (int) $user->ID, self::USER_TASK_BACKUP_META, true );
@@ -2024,11 +2053,48 @@ class Amy_Admin_Menu {
 					);
 					?>
 				</p>
-				<?php if ( ! $tg_enabled ) : ?>
+				<ol class="amy-agent-my-profile__bot-status" aria-label="<?php echo esc_attr__( 'Telegram bot setup status', 'amy-agent' ); ?>">
+					<li class="<?php echo $tg_has_token ? 'is-done' : 'is-todo'; ?>">
+						<?php
+						echo $tg_has_token
+							? esc_html__( '1. Bot token saved', 'amy-agent' )
+							: esc_html__( '1. Paste BotFather token in Settings → Telegram → Save', 'amy-agent' );
+						?>
+					</li>
+					<li class="<?php echo $tg_enabled ? 'is-done' : 'is-todo'; ?>">
+						<?php
+						echo $tg_enabled
+							? esc_html__( '2. Telegram Admin Bot enabled', 'amy-agent' )
+							: esc_html__( '2. Enable Telegram Admin Bot in Settings → Telegram', 'amy-agent' );
+						?>
+					</li>
+					<li class="<?php echo $tg_webhook_ok ? 'is-done' : 'is-todo'; ?>">
+						<?php
+						echo $tg_webhook_ok
+							? esc_html__( '3. Webhook connected', 'amy-agent' )
+							: esc_html__( '3. Click Connect in Settings → Telegram (HTTPS required)', 'amy-agent' );
+						?>
+					</li>
+				</ol>
+				<p class="amy-agent-my-profile__telegram-settings-path">
+					<a href="<?php echo esc_url( $tg_settings_url ); ?>">
+						<?php echo esc_html__( 'Amy → Settings → Telegram', 'amy-agent' ); ?>
+					</a>
+					<?php echo esc_html__( '— token, Enable, and Connect live here.', 'amy-agent' ); ?>
+				</p>
+				<?php if ( ! $tg_enabled || ! $tg_has_token || ! $tg_webhook_ok ) : ?>
 					<p class="amy-agent-my-profile__telegram-status" role="status">
-						<?php echo esc_html__( 'Telegram bot is disabled. Amy → Settings → Telegram → Enable Telegram Admin Bot, then Connect.', 'amy-agent' ); ?>
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG . '&tab=telegram' ) ); ?>">
-							<?php echo esc_html__( 'Open Settings', 'amy-agent' ); ?>
+						<?php
+						if ( ! $tg_has_token ) {
+							echo esc_html__( 'Bot token is missing. Finish step 1 in Settings → Telegram, then return here to link your chat.', 'amy-agent' );
+						} elseif ( ! $tg_enabled ) {
+							echo esc_html__( 'Telegram bot is disabled. Finish step 2 (Enable), then Connect.', 'amy-agent' );
+						} else {
+							echo esc_html__( 'Webhook is not connected. Finish step 3 (Connect, HTTPS required), then return here.', 'amy-agent' );
+						}
+						?>
+						<a href="<?php echo esc_url( $tg_settings_url ); ?>">
+							<?php echo esc_html__( 'Open Settings → Telegram', 'amy-agent' ); ?>
 						</a>
 					</p>
 				<?php elseif ( $tg_chat_id > 0 ) : ?>
@@ -2058,7 +2124,7 @@ class Amy_Admin_Menu {
 								)
 							);
 						} else {
-							echo esc_html__( 'Your Telegram is not linked. Amy → Settings → Telegram → Connect the bot (HTTPS required), then return here and generate a connect link.', 'amy-agent' );
+							echo esc_html__( 'Bot is connected but username is still syncing. Generate a connect link below, or reopen Settings → Telegram.', 'amy-agent' );
 						}
 						?>
 					</p>
@@ -2068,9 +2134,9 @@ class Amy_Admin_Menu {
 						</button>
 						<a
 							class="amy-agent-my-profile__btn amy-agent-my-profile__btn--outline"
-							href="<?php echo esc_url( admin_url( 'admin.php?page=' . Amy_Settings::PAGE_SLUG . '&tab=telegram' ) ); ?>"
+							href="<?php echo esc_url( $tg_settings_url ); ?>"
 						>
-							<?php echo esc_html__( 'Settings path', 'amy-agent' ); ?>
+							<?php echo esc_html__( 'Open Settings → Telegram', 'amy-agent' ); ?>
 						</a>
 					</div>
 					<p class="amy-agent-my-profile__telegram-deep" id="amy-my-profile-tg-deep" hidden></p>

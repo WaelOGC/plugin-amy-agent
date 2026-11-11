@@ -708,6 +708,40 @@ a.amy-agent-my-profile__btn--accent:focus-visible {
 	max-width: 48rem;
 }
 
+.amy-agent-my-profile__bot-status {
+	margin: 0 0 0.85rem;
+	padding: 0 0 0 1.2rem;
+	color: var(--amy-text-muted);
+	font-size: 0.9rem;
+	line-height: 1.5;
+	max-width: 48rem;
+}
+
+.amy-agent-my-profile__bot-status li {
+	margin: 0 0 0.35rem;
+}
+
+.amy-agent-my-profile__bot-status li.is-done {
+	color: #9af0cb;
+}
+
+.amy-agent-my-profile__bot-status li.is-todo {
+	color: #ffd27a;
+}
+
+.amy-agent-my-profile__telegram-settings-path {
+	margin: 0 0 0.85rem;
+	color: var(--amy-text-muted);
+	font-size: 0.9rem;
+	line-height: 1.45;
+}
+
+.amy-agent-my-profile__telegram-settings-path a {
+	color: var(--amy-grad-start);
+	text-decoration: underline;
+	text-underline-offset: 0.12em;
+}
+
 .amy-agent-my-profile__telegram-status {
 	margin: 0 0 0.85rem;
 	color: var(--amy-text-muted);
