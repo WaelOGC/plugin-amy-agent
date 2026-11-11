@@ -244,9 +244,10 @@ Given the agreed priority order and what's already live:
 - **Priority #3 — Dashboard Chat**: WP admin chat is live; **Telegram Admin Bot**
   shipped in plugin **0.2.40** (see `docs/03-dashboard-chat-plan.md` §7).
   Admin Analytics: P0 snapshot inject (service) + **P1** richer Q&A / `/analytics`
-  + `/Analytics` slash + `GET /v1/analytics/summary` (plugin **0.2.53** / service
-  **0.2.13**). Still open: Support Bot, News Channel, website→Telegram link-code
-  expiry. Full multi-tool specialists remain later (P2–P3).
+  + `/Analytics` slash + `GET /v1/analytics/summary` + **P2** SEO Tasks + Task
+  Service report-only summaries in admin chat (plugin **0.2.54** / service
+  **0.2.14**). Still open: Support Bot, News Channel, website→Telegram link-code
+  expiry. Full multi-tool specialists / tool-calling remain later (P3+).
 - **Theme-side Analytics Task 2** (does not block the plugin/service pipeline):
   Clarity script tag + Contact form `window.amyTrack(...)` hooks so
   `contact_form_*` events actually fire. Cookie-policy copy update

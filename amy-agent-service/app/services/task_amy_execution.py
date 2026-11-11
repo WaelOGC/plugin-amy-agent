@@ -13,9 +13,10 @@ import logging
 from typing import Any, Callable, Literal
 
 from app import config_task_rules as rules
-from app.db import notifications_db, progress_notes_db, seo_tasks_db, tasks_db
+from app.db import notifications_db, progress_notes_db, tasks_db
 from app.services import task_owner
 from app.services.analytics_summary import build_analytics_summary
+from app.services.seo_task_summary import build_seo_review_summary
 
 logger = logging.getLogger(__name__)
 
@@ -152,25 +153,26 @@ def _run_analytics_summary(task: dict[str, Any]) -> dict[str, Any]:
 
 
 def _run_seo_review_summary(task: dict[str, Any]) -> dict[str, Any]:
-    checks = seo_tasks_db.list_checks()
-    by_verdict: dict[str, int] = {}
-    by_status: dict[str, int] = {}
-    for row in checks:
-        v = str(row.get("verdict") or "unknown")
-        s = str(row.get("status") or "unknown")
-        by_verdict[v] = by_verdict.get(v, 0) + 1
-        by_status[s] = by_status.get(s, 0) + 1
-    summary = (
-        f"SEO review summary: {len(checks)} stored checks. "
-        f"Verdicts={by_verdict or {'none': 0}}; statuses={by_status or {'none': 0}}."
-    )
+    snap = build_seo_review_summary()
+    if not snap.get("ok"):
+        summary = snap.get("summary") or "SEO Tasks unavailable."
+        note = _write_audit(task["id"], summary)
+        return {
+            "capability": "seo_review_summary",
+            "ok": False,
+            "summary": summary,
+            "verdicts": snap.get("verdicts") or {},
+            "statuses": snap.get("statuses") or {},
+            "audit_note_id": note["id"],
+        }
+    summary = str(snap["summary"])
     note = _write_audit(task["id"], summary)
     return {
         "capability": "seo_review_summary",
         "ok": True,
         "summary": summary,
-        "verdicts": by_verdict,
-        "statuses": by_status,
+        "verdicts": snap.get("verdicts") or {},
+        "statuses": snap.get("statuses") or {},
         "audit_note_id": note["id"],
     }
 

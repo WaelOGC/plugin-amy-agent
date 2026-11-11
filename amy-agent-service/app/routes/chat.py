@@ -20,6 +20,12 @@ from app.services.analytics_summary import (
     analytics_summary_for_chat,
     format_analytics_chat_context,
 )
+from app.services.seo_task_summary import (
+    format_seo_chat_context,
+    format_task_service_chat_context,
+    seo_review_summary_for_chat,
+    task_service_summary_for_chat,
+)
 
 router = APIRouter(tags=["chat"])
 
@@ -57,6 +63,22 @@ def _admin_analytics_context_message() -> ChatMessage:
     )
 
 
+def _admin_seo_context_message() -> ChatMessage:
+    snapshot = seo_review_summary_for_chat()
+    return ChatMessage(
+        role="system",
+        content=format_seo_chat_context(snapshot),
+    )
+
+
+def _admin_task_service_context_message() -> ChatMessage:
+    snapshot = task_service_summary_for_chat()
+    return ChatMessage(
+        role="system",
+        content=format_task_service_chat_context(snapshot),
+    )
+
+
 def _messages_with_system(
     messages: list[ChatMessage],
     *,
@@ -64,12 +86,13 @@ def _messages_with_system(
     wp_user_name: str | None = None,
     wp_user_email: str | None = None,
     include_analytics_snapshot: bool = True,
+    include_seo_task_snapshots: bool = True,
 ) -> list[ChatMessage]:
     """Prepend Amy's persona prompt unless a system message is already first.
 
-    Admin mode always attaches a live Analytics lead-session snapshot (when
-    ``include_analytics_snapshot`` is True) so Telegram + Dashboard Chat share
-    the same numbers Overview already shows.
+    Admin mode always attaches live Analytics + SEO + Task Service snapshots
+    (when the matching include_* flags are True) so Telegram + Dashboard Chat
+    share the same Overview-class numbers. Snapshots are report-only.
     """
     if messages and messages[0].role == "system":
         return messages
@@ -80,6 +103,9 @@ def _messages_with_system(
         ]
         if include_analytics_snapshot:
             system_msgs.append(_admin_analytics_context_message())
+        if include_seo_task_snapshots:
+            system_msgs.append(_admin_seo_context_message())
+            system_msgs.append(_admin_task_service_context_message())
         identity = _admin_identity_message(wp_user_name, wp_user_email)
         if identity is not None:
             system_msgs.append(identity)

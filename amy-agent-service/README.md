@@ -73,6 +73,7 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | POST | `/v1/tasks/progress-notes/from-telegram` | Consume mid free-text reply when pending |
 | POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set) |
 | GET | `/v1/analytics/summary` | Shared lead-session summary (counts, with_email, last-seen, optional sample; `include_emails=true` for admin) |
+| POST | `/v1/chat` (`mode: admin`) | Also injects report-only SEO Tasks + Task Service snapshots (open/urgent/in_progress; SEO pending_approval) alongside Analytics |
 | GET | `/v1/analytics/leads` | Lead list for the admin page (optional `status`) |
 | GET | `/v1/analytics/leads/{session_id}/events` | Event timeline for one session |
 | GET | `/v1/email-marketing/threads` | FluentSMTP send/reply history threads (in `conversations.db`) |
