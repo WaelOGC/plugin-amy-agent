@@ -209,6 +209,20 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * GET /v1/analytics/summary — shared counts + optional admin-safe samples.
+	 *
+	 * @param bool $include_emails When true, include lead_email on hot/sample rows.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function get_analytics_summary( $include_emails = false ) {
+		$path = '/v1/analytics/summary';
+		if ( $include_emails ) {
+			$path .= '?include_emails=true';
+		}
+		return $this->request( 'GET', $path );
+	}
+
+	/**
 	 * POST /v1/seo-tasks/check — rule-based snapshot check.
 	 *
 	 * @param array<string, mixed> $payload SeoCheckRequest body.

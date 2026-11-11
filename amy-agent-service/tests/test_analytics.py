@@ -309,6 +309,43 @@ def test_extract_captured_whatsapp() -> None:
     )
 
 
+def test_analytics_summary_endpoint(client: TestClient) -> None:
+    _ingest(client, "sum-hot", "submit_idea_started")
+    _ingest(
+        client,
+        "sum-hot",
+        "submit_idea_completed",
+        event_data={"email": "sum@example.com"},
+    )
+    _ingest(client, "sum-cold", "page_view", page_path="/")
+
+    bare = client.get("/v1/analytics/summary", headers=AUTH)
+    assert bare.status_code == 200, bare.text
+    data = bare.json()
+    assert data["ok"] is True
+    assert data["total"] == 2
+    assert data["with_email"] == 1
+    assert data["counts"]["hot"] == 1
+    assert data["counts"]["cold"] == 1
+    assert "slash_reply" in data and data["slash_reply"]
+    assert data["hot_sample_count"] >= 1
+    assert data["hot_sample"][0].get("lead_email") in (None, "")
+    assert data["hot_sample"][0]["has_email"] is True
+    assert "sum@example.com" not in data["slash_reply"]
+
+    rich = client.get(
+        "/v1/analytics/summary",
+        headers=AUTH,
+        params={"include_emails": "true"},
+    )
+    assert rich.status_code == 200, rich.text
+    rich_data = rich.json()
+    assert rich_data["hot_sample"][0].get("lead_email") == "sum@example.com"
+    assert "sum@example.com" in rich_data["slash_reply"]
+    assert "last_seen" in rich_data
+    assert "email_captures" in rich_data
+
+
 def test_existing_db_gains_lead_whatsapp_column(tmp_path, monkeypatch) -> None:
     db_path = tmp_path / "legacy_analytics.db"
     monkeypatch.setattr(analytics_db, "_DB_PATH", db_path)

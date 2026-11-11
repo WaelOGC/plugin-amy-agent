@@ -312,6 +312,16 @@ class Amy_Rest {
 				'permission_callback' => $perm,
 			)
 		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/admin-chat/analytics-summary',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_admin_chat_analytics_summary' ),
+				'permission_callback' => $perm,
+			)
+		);
 	}
 
 	/**
@@ -520,6 +530,67 @@ class Amy_Rest {
 	}
 
 	/**
+	 * GET /admin-chat/analytics-summary — fresh Analytics pull for /Analytics slash.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_admin_chat_analytics_summary( $request ) {
+		unset( $request );
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Analytics unavailable right now. Check Amy → Settings → Connection / Overview.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$result = $this->api_client->get_analytics_summary( true );
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+		$body = is_array( $result['body'] ) ? $result['body'] : array(
+			'error'   => 'upstream_error',
+			'message' => __( 'Analytics unavailable right now. Check Amy → Settings → Connection / Overview.', 'amy-agent' ),
+		);
+		if ( ! empty( $result['error'] ) && empty( $body['message'] ) ) {
+			$body['message'] = __( 'Analytics unavailable right now. Check Amy → Settings → Connection / Overview.', 'amy-agent' );
+		}
+		return new WP_REST_Response( $body, $status );
+	}
+
+	/**
+	 * Normalize Dashboard Chat /Analytics slash into a clear Analytics ask.
+	 *
+	 * Bare `/Analytics` becomes a summary request (admin chat still injects a
+	 * fresh snapshot). `/Analytics …` keeps the custom follow-up.
+	 *
+	 * @param string $content Raw composer text.
+	 * @return string
+	 */
+	private function normalize_admin_analytics_slash( $content ) {
+		$trimmed = trim( (string) $content );
+		if ( ! preg_match( '/^\/analytics(?:@\S+)?(?:\s+([\s\S]*))?$/i', $trimmed, $m ) ) {
+			return $content;
+		}
+		$arg = isset( $m[1] ) ? trim( (string) $m[1] ) : '';
+		if ( '' === $arg ) {
+			return __(
+				'Please report the live Amy Analytics snapshot (sessions, hot/warm/cold, with_email, last-seen, Submit Idea email captures, hot sample).',
+				'amy-agent'
+			);
+		}
+		return sprintf(
+			/* translators: %s: admin Analytics follow-up question */
+			__( 'Regarding Amy Analytics: %s', 'amy-agent' ),
+			$arg
+		);
+	}
+
+	/**
 	 * POST /admin-chat/conversations/{id}/messages
 	 *
 	 * @param WP_REST_Request $request Request.
@@ -549,6 +620,7 @@ class Amy_Rest {
 		}
 
 		$attachments = $this->sanitize_admin_chat_attachments( $request->get_param( 'attachments' ) );
+		$content     = $this->normalize_admin_analytics_slash( $content );
 
 		$payload = array(
 			'session_id'      => $id,

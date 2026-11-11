@@ -254,6 +254,28 @@ def list_events(session_id: str) -> list[dict[str, Any]]:
         conn.close()
 
 
+def count_email_capture_sessions(*, since: float | None = None) -> int:
+    """Distinct sessions with a Submit Idea / contact-form email capture event.
+
+    Optional ``since`` (unix seconds) limits to captures at/after that time.
+    """
+    placeholders = ", ".join("?" for _ in EMAIL_CAPTURE_EVENT_TYPES)
+    sql = (
+        "SELECT COUNT(DISTINCT session_id) AS n FROM visitor_events "
+        f"WHERE event_type IN ({placeholders})"
+    )
+    params: list[Any] = list(EMAIL_CAPTURE_EVENT_TYPES)
+    if since is not None:
+        sql += " AND created_at >= ?"
+        params.append(since)
+    conn = _connect()
+    try:
+        row = conn.execute(sql, params).fetchone()
+        return int(row["n"] if row is not None else 0)
+    finally:
+        conn.close()
+
+
 def set_lead_status(session_id: str, status: LeadStatus) -> None:
     if status not in VALID_LEAD_STATUSES:
         raise ValueError("invalid lead_status")

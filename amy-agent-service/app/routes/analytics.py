@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from app.auth import require_amy_secret
 from app.db import analytics_db
 from app.schemas.analytics import (
+    AnalyticsSummaryResponse,
+    AnalyticsSummarySampleItem,
     EventIngestRequest,
     EventIngestResponse,
     LeadEventItem,
@@ -17,6 +19,10 @@ from app.schemas.analytics import (
 )
 from app.schemas.messages import ErrorBody
 from app.services import geolocation, lead_scoring
+from app.services.analytics_summary import (
+    build_analytics_summary,
+    format_analytics_slash_reply,
+)
 
 router = APIRouter(tags=["analytics"])
 
@@ -105,6 +111,59 @@ async def ingest_event(body: EventIngestRequest) -> EventIngestResponse | JSONRe
     analytics_db.set_lead_status(session_id, lead_status)
 
     return EventIngestResponse(ok=True, session_id=session_id, lead_status=lead_status)
+
+
+@router.get(
+    "/v1/analytics/summary",
+    response_model=AnalyticsSummaryResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def analytics_summary(
+    include_emails: bool = Query(
+        default=False,
+        description="When true, include lead_email on hot/sample rows (admin channels only).",
+    ),
+) -> AnalyticsSummaryResponse:
+    """Thin shared contract: visitors, hot/warm/cold, with_email, last-seen windows."""
+    snap = build_analytics_summary(
+        include_sample=True,
+        include_emails_in_sample=include_emails,
+    )
+
+    def _items(raw: list) -> list[AnalyticsSummarySampleItem]:
+        out: list[AnalyticsSummarySampleItem] = []
+        for item in raw:
+            out.append(
+                AnalyticsSummarySampleItem(
+                    session_id=item.get("session_id"),
+                    session_id_short=item.get("session_id_short"),
+                    lead_status=item.get("lead_status"),
+                    has_email=bool(item.get("has_email")),
+                    lead_email=item.get("lead_email") if include_emails else None,
+                    last_seen_at=float(item.get("last_seen_at") or 0),
+                    last_seen=item.get("last_seen"),
+                    ip_country=item.get("ip_country"),
+                    ip_city=item.get("ip_city"),
+                )
+            )
+        return out
+
+    return AnalyticsSummaryResponse(
+        ok=bool(snap.get("ok")),
+        total=int(snap.get("total") or 0),
+        counts=snap.get("counts") or {},
+        with_email=int(snap.get("with_email") or 0),
+        email_captures=snap.get("email_captures") or {},
+        last_seen=snap.get("last_seen") or {},
+        empty=bool(snap.get("empty")),
+        summary=str(snap.get("summary") or ""),
+        slash_reply=format_analytics_slash_reply(snap),
+        sample=_items(list(snap.get("sample") or [])),
+        sample_count=int(snap.get("sample_count") or 0),
+        hot_sample=_items(list(snap.get("hot_sample") or [])),
+        hot_sample_count=int(snap.get("hot_sample_count") or 0),
+        error=snap.get("error"),
+    )
 
 
 @router.get(

@@ -29,6 +29,15 @@ _EMPTY_ANALYTICS_SNAP = {
     "total": 0,
     "counts": {"hot": 0, "warm": 0, "cold": 0, "other": 0},
     "with_email": 0,
+    "email_captures": {"total": 0, "last_7d": 0},
+    "last_seen": {
+        "last_24h": 0,
+        "last_7d": 0,
+        "most_recent_at": None,
+        "most_recent": None,
+    },
+    "hot_sample": [],
+    "hot_sample_count": 0,
     "empty": True,
     "summary": "Analytics summary: 0 lead sessions (hot=0, warm=0, cold=0; with_email=0).",
 }
@@ -38,6 +47,26 @@ _LIVE_ANALYTICS_SNAP = {
     "total": 5,
     "counts": {"hot": 2, "warm": 1, "cold": 2, "other": 0},
     "with_email": 3,
+    "email_captures": {"total": 3, "last_7d": 1},
+    "last_seen": {
+        "last_24h": 2,
+        "last_7d": 4,
+        "most_recent_at": 1_700_000_000.0,
+        "most_recent": "2h ago",
+    },
+    "hot_sample": [
+        {
+            "session_id": "hot-1",
+            "session_id_short": "hot1",
+            "lead_status": "hot",
+            "has_email": True,
+            "lead_email": "hot@example.com",
+            "last_seen": "2h ago",
+            "ip_city": "The Hague",
+            "ip_country": "NL",
+        }
+    ],
+    "hot_sample_count": 1,
     "empty": False,
     "summary": (
         "Analytics summary: 5 lead sessions "
@@ -52,6 +81,13 @@ _ERROR_ANALYTICS_SNAP = {
     "total": 0,
     "counts": {"hot": 0, "warm": 0, "cold": 0, "other": 0},
     "with_email": 0,
+    "email_captures": {"total": 0, "last_7d": 0},
+    "last_seen": {
+        "last_24h": 0,
+        "last_7d": 0,
+        "most_recent_at": None,
+        "most_recent": None,
+    },
     "empty": True,
 }
 
@@ -530,9 +566,22 @@ def test_format_analytics_chat_context_live_and_fallbacks() -> None:
     live = format_analytics_chat_context(_LIVE_ANALYTICS_SNAP)
     assert "total_sessions: 5" in live
     assert "with_email: 3" in live
+    assert "email_captures:" in live
+    assert "last_seen windows:" in live
+    assert "hot@example.com" in live
+    assert "hot lead sample" in live
     empty = format_analytics_chat_context(_EMPTY_ANALYTICS_SNAP)
     assert "EMPTY" in empty
     assert "No visitor sessions recorded yet" in empty
     err = format_analytics_chat_context(_ERROR_ANALYTICS_SNAP)
     assert "UNAVAILABLE" in err
     assert "could not reach Analytics" in err
+
+
+def test_admin_prompt_mentions_richer_analytics_fields() -> None:
+    lower = AMY_ADMIN_SYSTEM_PROMPT.lower()
+    assert "with_email" in lower
+    assert "last-seen" in lower or "last_seen" in lower
+    assert "submit idea" in lower
+    assert "/analytics" in lower
+    assert "you have no live access" not in lower

@@ -195,6 +195,10 @@ There is no newsletter event type (the newsletter form has no working backend ye
 
 **Response `200`:** `{ "ok": true, "session_id": "…", "lead_status": "cold"|"warm"|"hot" }`
 
+### `GET /v1/analytics/summary`
+
+Shared Analytics summary for admin chat, Telegram `/analytics`, and (later) Overview. Returns lead-session `total`, `counts` (hot/warm/cold/other), `with_email`, `email_captures` (Submit Idea / contact capture totals + `last_7d`), `last_seen` windows (`last_24h` / `last_7d` / `most_recent`), optional `hot_sample` / `sample`, plus `summary` and deterministic `slash_reply` text. Optional query `include_emails=true` adds `lead_email` on sample rows (admin channels only). This is **not** GA pageviews.
+
 ### `GET /v1/analytics/leads`
 
 Optional query `status=cold|warm|hot`. Ranked hot → warm → cold, then `last_seen_at` descending. Each item includes truncated session id, location, last seen, lead email if captured, and a server-built `signal` string.
@@ -299,6 +303,7 @@ Namespace: `amy-agent/v1`
 | Method | Path | Permission | Purpose |
 | --- | --- | --- | --- |
 | `GET` | `/wp-json/amy-agent/v1/health` | `manage_options` | Settings presence + Python `/v1/health` reachability |
+| `GET` | `/wp-json/amy-agent/v1/admin-chat/analytics-summary` | `manage_options` | Fresh Analytics summary for Dashboard Chat `/Analytics` (proxies Python `GET /v1/analytics/summary?include_emails=true`) |
 | `POST` | `/wp-json/amy-agent/v1/chat` | Valid `X-WP-Nonce` (`wp_rest`) | Public widget chat; proxies to Python |
 | `POST` | `/wp-json/amy-agent/v1/track` | Public (unauthenticated); REST nonce still sent so logged-in visitors are not blocked by cookie CSRF | Tracking beacon; proxies to Python `/v1/analytics/event` |
 
