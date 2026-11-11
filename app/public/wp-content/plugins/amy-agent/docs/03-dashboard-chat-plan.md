@@ -72,10 +72,13 @@ not just a Q&A widget.
 same slash commands, same specialist agents. Effectively two front doors to
 one orchestrator.
 - Telegram Admin Bot is **private**: authenticated via a **whitelist of
-  Telegram User IDs** held on the Python service. Any message from a
-  `user_id` not on the whitelist is ignored / gets an "unauthorized" reply.
-  No OAuth or login flow needed for a single admin (or a small, known set of
-  admins).
+  Telegram User IDs** stored in WordPress (`amy_agent_telegram_admins`).
+  Telegram posts updates to
+  `POST /wp-json/amy-agent/v1/telegram/webhook` (secret header); WordPress
+  proxies to Python `POST /v1/chat` with `mode: "admin"` and replies via
+  `sendMessage`. Any message from a `user_id` not on the whitelist gets a
+  one-per-minute reply with that user's Telegram ID and setup instructions.
+  No OAuth or login flow needed for a small, known admin set.
 - Slash-command autocomplete should work in this bot too, not just in
   WordPress.
 
@@ -146,10 +149,25 @@ sequence stays as previously agreed:
 4. Telegram Support Bot and News Channel can be built in parallel or after,
    depending on priority — not blocking the admin-side orchestrator.
 
-## 7. Still to decide before a Cursor prompt is written
+## 7. Telegram Admin Bot (implemented — plugin 0.2.40)
 
-- Exact Telegram bot setup steps (BotFather config for both bots) and where
-  the whitelist of admin User IDs is stored/managed on the Python side.
-- Exact schema for conversation storage on the Python service (conversation
-  list, messages, timestamps) — not yet designed, just located (Python side).
+- **Webhook:** Telegram → WordPress
+  `POST /wp-json/amy-agent/v1/telegram/webhook` with header
+  `X-Telegram-Bot-Api-Secret-Token`. Wrong/missing secret → 403.
+- **Ownership:** Bot token, webhook secret, and admin whitelist live in
+  WordPress options only; Python is unchanged (no stored Telegram or AI
+  secrets on the service).
+- **Conversations:** Same Python `conversations` rows as Dashboard Chat
+  (`mode: "admin"`, linked `wp_user_id`). Chat→conversation map in
+  `amy_agent_telegram_chats`.
+- **Settings UI:** Amy → Settings → **Telegram** tab — enable flag, token,
+  Connect / Disconnect / status / test, whitelist table (max 10).
+- **Commands:** `/start`, `/help`, `/whoami`, `/new` (other `/` → unknown).
+  Plain text → Amy reply (HTML from Markdown). Non-text → text-only notice.
+- **Not built yet:** Telegram Support Bot, News/Announcements Channel (still
+  §3.3 concepts only).
+
+## 8. Still to decide
+
+- Exact BotFather steps for the **Support** bot (when built).
 - Whether website→Telegram session-link codes expire, and after how long.

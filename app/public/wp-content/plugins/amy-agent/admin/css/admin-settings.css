@@ -499,6 +499,116 @@
 	color: #ffd27a;
 }
 
+/* —— Telegram tab —— */
+
+.amy-agent-settings__notice {
+	margin: 0 0 1rem;
+	padding: 0.85rem 1rem;
+	border-radius: 10px;
+	border: 1px solid rgba(255, 197, 66, 0.45);
+	background: rgba(255, 197, 66, 0.1);
+	color: var(--amy-text);
+	font-size: 0.9rem;
+}
+
+.amy-agent-settings__notice--warn {
+	border-color: rgba(255, 197, 66, 0.45);
+}
+
+.amy-agent-settings__telegram-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 0.65rem;
+	margin: 0.75rem 0 0.35rem;
+}
+
+.amy-agent-settings__telegram-status {
+	margin: 0.5rem 0 0;
+	color: var(--amy-text-muted);
+	font-size: 0.9rem;
+}
+
+.amy-agent-settings__telegram-feedback {
+	margin: 0.5rem 0 0;
+	font-size: 0.88rem;
+	color: var(--amy-ok);
+}
+
+.amy-agent-settings__telegram-feedback.is-error {
+	color: var(--amy-urgent);
+}
+
+.amy-agent-settings__tg-badge {
+	display: inline-block;
+	padding: 0.15rem 0.45rem;
+	border-radius: 6px;
+	font-size: 0.75rem;
+	font-weight: 600;
+	vertical-align: middle;
+}
+
+.amy-agent-settings__tg-badge--green {
+	background: rgba(61, 220, 151, 0.2);
+	color: var(--amy-ok);
+}
+
+.amy-agent-settings__tg-badge--amber {
+	background: rgba(255, 197, 66, 0.2);
+	color: #ffc542;
+}
+
+.amy-agent-settings__tg-badge--red {
+	background: rgba(227, 93, 106, 0.2);
+	color: var(--amy-urgent);
+}
+
+.amy-agent-settings__table-wrap {
+	overflow-x: auto;
+	margin: 0.5rem 0 0.75rem;
+	max-width: 100%;
+}
+
+.amy-agent-settings__table {
+	width: 100%;
+	min-width: 32rem;
+	border-collapse: collapse;
+	font-size: 0.88rem;
+}
+
+.amy-agent-settings__table th,
+.amy-agent-settings__table td {
+	padding: 0.5rem 0.4rem;
+	border-bottom: 1px solid rgba(247, 148, 29, 0.25);
+	text-align: left;
+	vertical-align: middle;
+}
+
+.amy-agent-settings__table th {
+	color: var(--amy-text-muted);
+	font-weight: 500;
+}
+
+.amy-agent-settings__table-input,
+.amy-agent-settings__table-select {
+	width: 100%;
+	min-width: 6rem;
+	max-width: 14rem;
+	padding: 0.35rem 0.5rem;
+	border: 1px solid rgba(247, 148, 29, 0.35);
+	border-radius: 8px;
+	background: #1a1a1a;
+	color: var(--amy-text);
+}
+
+.amy-agent-settings__btn--small {
+	padding: 0.25rem 0.55rem;
+	font-size: 0.8rem;
+}
+
+.amy-agent-settings__card--help .amy-agent-settings__hint {
+	margin: 0;
+}
+
 @media (max-width: 782px) {
 	.amy-agent-settings {
 		margin: 1rem 0.75rem 1rem 0;

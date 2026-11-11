@@ -24,6 +24,10 @@ class Amy_Settings {
 	const OPTION_MARKETING_FROM_EMAIL = 'amy_agent_marketing_from_email';
 	const OPTION_MARKETING_FROM_NAME  = 'amy_agent_marketing_from_name';
 
+	const OPTION_TELEGRAM_ENABLED = 'amy_agent_telegram_enabled';
+	const OPTION_TELEGRAM_TOKEN   = 'amy_agent_telegram_bot_token';
+	const OPTION_TELEGRAM_ADMINS  = 'amy_agent_telegram_admins';
+
 	/**
 	 * Default marketing From when Settings field is empty.
 	 */
@@ -88,6 +92,7 @@ class Amy_Settings {
 	public function register() {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_init', array( $this, 'normalize_enabled_checkbox_post' ), 0 );
+		add_action( 'admin_init', array( $this, 'normalize_telegram_enabled_checkbox_post' ), 0 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( AMY_AGENT_FILE ), array( $this, 'add_settings_link' ) );
 	}
@@ -119,6 +124,32 @@ class Amy_Settings {
 		}
 
 		$_POST[ self::OPTION_ENABLED ] = ( '1' === (string) $raw ) ? '1' : '0';
+	}
+
+	/**
+	 * Ensure Telegram enable checkbox posts as "0" or "1".
+	 */
+	public function normalize_telegram_enabled_checkbox_post() {
+		if ( ! isset( $_POST['option_page'] ) || 'amy_agent_settings' !== $_POST['option_page'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$raw = isset( $_POST[ self::OPTION_TELEGRAM_ENABLED ] ) ? wp_unslash( $_POST[ self::OPTION_TELEGRAM_ENABLED ] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		if ( is_array( $raw ) ) {
+			$_POST[ self::OPTION_TELEGRAM_ENABLED ] = in_array( '1', array_map( 'strval', $raw ), true ) ? '1' : '0';
+			return;
+		}
+
+		if ( null === $raw ) {
+			$_POST[ self::OPTION_TELEGRAM_ENABLED ] = '0';
+			return;
+		}
+
+		$_POST[ self::OPTION_TELEGRAM_ENABLED ] = ( '1' === (string) $raw ) ? '1' : '0';
 	}
 
 	/**
@@ -233,6 +264,36 @@ class Amy_Settings {
 				'default'           => self::DEFAULT_MARKETING_FROM_NAME,
 			)
 		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_TELEGRAM_ENABLED,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+				'default'           => '0',
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_TELEGRAM_TOKEN,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_telegram_token' ),
+				'default'           => '',
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_TELEGRAM_ADMINS,
+			array(
+				'type'              => 'array',
+				'sanitize_callback' => array( $this, 'sanitize_telegram_admins' ),
+				'default'           => array(),
+			)
+		);
 	}
 
 	/**
@@ -273,6 +334,9 @@ class Amy_Settings {
 			array(
 				'healthUrl'         => esc_url_raw( rest_url( 'amy-agent/v1/health' ) ),
 				'restNonce'         => wp_create_nonce( 'wp_rest' ),
+				'ajaxUrl'           => admin_url( 'admin-ajax.php' ),
+				'telegramNonce'     => wp_create_nonce( Amy_Telegram::NONCE_ACTION ),
+				'isHttps'           => is_ssl(),
 				'blockedFromHosts'  => self::blocked_marketing_from_hosts(),
 				'i18n'              => array(
 					'fromBlocked'       => __( 'Marketing From cannot be personal Gmail, AgentMail, or free webmail. Use a domain mailbox such as hello@ogcnewfinity.com.', 'amy-agent' ),
@@ -287,6 +351,16 @@ class Amy_Settings {
 					'keySaved'          => __( 'key saved', 'amy-agent' ),
 					'noApiKey'          => __( 'AI API key not set.', 'amy-agent' ),
 					'pluginVersion'     => __( 'Plugin', 'amy-agent' ),
+					'tgSaveFirst'       => __( 'Save settings first so the bot token is stored.', 'amy-agent' ),
+					'tgConnecting'      => __( 'Connecting…', 'amy-agent' ),
+					'tgDisconnecting'   => __( 'Disconnecting…', 'amy-agent' ),
+					'tgTesting'         => __( 'Sending test messages…', 'amy-agent' ),
+					'tgStatusLoading'   => __( 'Loading Telegram status…', 'amy-agent' ),
+					'tgConnected'       => __( 'Connected', 'amy-agent' ),
+					'tgNotConnected'    => __( 'Not connected', 'amy-agent' ),
+					'tgError'           => __( 'Error', 'amy-agent' ),
+					'tgHttpsRequired'   => __( 'Telegram webhooks require HTTPS. Connect is disabled until the site uses HTTPS.', 'amy-agent' ),
+					'tgMaxAdmins'       => __( 'Maximum 10 admins.', 'amy-agent' ),
 				),
 			)
 		);
@@ -394,6 +468,109 @@ class Amy_Settings {
 		$name = sanitize_text_field( trim( (string) $value ) );
 		$name = str_replace( array( '<', '>' ), '', $name );
 		return '' !== $name ? $name : self::DEFAULT_MARKETING_FROM_NAME;
+	}
+
+	/**
+	 * Telegram bot token — blank keeps existing; invalid format keeps old value.
+	 *
+	 * @param mixed $value Submitted token.
+	 * @return string
+	 */
+	public function sanitize_telegram_token( $value ) {
+		$value = is_string( $value ) ? trim( $value ) : '';
+		if ( '' === $value ) {
+			$existing = get_option( self::OPTION_TELEGRAM_TOKEN, '' );
+			return is_string( $existing ) ? $existing : '';
+		}
+		if ( ! preg_match( '/^\d{6,12}:[A-Za-z0-9_-]{30,}$/', $value ) ) {
+			add_settings_error(
+				'amy_agent_settings',
+				'amy_telegram_token_invalid',
+				__( 'Telegram bot token format is invalid. The previous saved token was kept.', 'amy-agent' ),
+				'error'
+			);
+			$existing = get_option( self::OPTION_TELEGRAM_TOKEN, '' );
+			return is_string( $existing ) ? $existing : '';
+		}
+		return sanitize_text_field( $value );
+	}
+
+	/**
+	 * Sanitize Telegram admin whitelist (max 10 unique rows).
+	 *
+	 * @param mixed $value Raw rows from POST.
+	 * @return array<int, array{telegram_id:int,label:string,wp_user_id:int}>
+	 */
+	public function sanitize_telegram_admins( $value ) {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$clean   = array();
+		$seen_ids = array();
+
+		foreach ( $value as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$telegram_raw = isset( $row['telegram_id'] ) ? $row['telegram_id'] : '';
+			if ( ! is_numeric( $telegram_raw ) ) {
+				continue;
+			}
+			$telegram_id = (int) $telegram_raw;
+			if ( $telegram_id <= 0 ) {
+				continue;
+			}
+			if ( isset( $seen_ids[ $telegram_id ] ) ) {
+				continue;
+			}
+
+			$wp_user_id = isset( $row['wp_user_id'] ) ? (int) $row['wp_user_id'] : 0;
+			if ( $wp_user_id <= 0 || ! user_can( $wp_user_id, 'manage_options' ) ) {
+				continue;
+			}
+
+			$label = isset( $row['label'] ) ? sanitize_text_field( (string) $row['label'] ) : '';
+			if ( strlen( $label ) > 60 ) {
+				$label = substr( $label, 0, 60 );
+			}
+
+			$seen_ids[ $telegram_id ] = true;
+			$clean[] = array(
+				'telegram_id' => $telegram_id,
+				'label'       => $label,
+				'wp_user_id'  => $wp_user_id,
+			);
+
+			if ( count( $clean ) >= 10 ) {
+				break;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * @return bool
+	 */
+	public function is_telegram_enabled() {
+		return '1' === (string) get_option( self::OPTION_TELEGRAM_ENABLED, '0' );
+	}
+
+	/**
+	 * @return string
+	 */
+	public function get_telegram_token() {
+		return (string) get_option( self::OPTION_TELEGRAM_TOKEN, '' );
+	}
+
+	/**
+	 * @return array<int, array{telegram_id:int,label:string,wp_user_id:int}>
+	 */
+	public function get_telegram_admins() {
+		$rows = get_option( self::OPTION_TELEGRAM_ADMINS, array() );
+		return is_array( $rows ) ? $rows : array();
 	}
 
 	/**
@@ -611,11 +788,20 @@ class Amy_Settings {
 		}
 
 		$readiness  = $this->get_readiness_summary();
-		$has_secret = '' !== $this->get_shared_secret();
-		$has_key    = '' !== $this->get_ai_api_key();
-		$model      = (string) get_option( self::OPTION_AI_MODEL, '' );
+		$has_secret       = '' !== $this->get_shared_secret();
+		$has_key          = '' !== $this->get_ai_api_key();
+		$has_tg_token     = '' !== $this->get_telegram_token();
+		$model            = (string) get_option( self::OPTION_AI_MODEL, '' );
+		$telegram_admins  = $this->get_telegram_admins();
+		$wp_admin_users   = get_users(
+			array(
+				'capability' => 'manage_options',
+				'orderby'    => 'display_name',
+				'order'      => 'ASC',
+			)
+		);
 		$active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'general'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( 'connection' !== $active_tab ) {
+		if ( ! in_array( $active_tab, array( 'general', 'connection', 'telegram' ), true ) ) {
 			$active_tab = 'general';
 		}
 		?>
@@ -675,6 +861,17 @@ class Amy_Settings {
 					aria-selected="<?php echo 'connection' === $active_tab ? 'true' : 'false'; ?>"
 				>
 					<?php echo esc_html__( 'Connection', 'amy-agent' ); ?>
+				</button>
+				<button
+					type="button"
+					class="amy-agent-settings__tab<?php echo 'telegram' === $active_tab ? ' is-active' : ''; ?>"
+					role="tab"
+					id="amy-settings-tab-telegram"
+					data-amy-settings-tab="telegram"
+					aria-controls="amy-settings-panel-telegram"
+					aria-selected="<?php echo 'telegram' === $active_tab ? 'true' : 'false'; ?>"
+				>
+					<?php echo esc_html__( 'Telegram', 'amy-agent' ); ?>
 				</button>
 			</div>
 
@@ -882,6 +1079,197 @@ class Amy_Settings {
 								autocomplete="off"
 							/>
 						</div>
+					</div>
+				</div>
+
+				<div
+					class="amy-agent-settings__panel"
+					id="amy-settings-panel-telegram"
+					role="tabpanel"
+					aria-labelledby="amy-settings-tab-telegram"
+					<?php echo 'telegram' === $active_tab ? '' : 'hidden'; ?>
+				>
+					<h2 class="amy-agent-settings__panel-title"><?php echo esc_html__( 'Telegram', 'amy-agent' ); ?></h2>
+					<p class="amy-agent-settings__panel-intro">
+						<?php echo esc_html__( 'Private admin bot — same Amy and conversations as Dashboard Chat. Token and webhook secret stay in WordPress only.', 'amy-agent' ); ?>
+					</p>
+
+					<?php if ( ! is_ssl() ) : ?>
+						<div class="amy-agent-settings__notice amy-agent-settings__notice--warn" role="status">
+							<?php echo esc_html__( 'This site is not using HTTPS. Telegram only accepts HTTPS webhooks — Connect is disabled until the site is served over HTTPS.', 'amy-agent' ); ?>
+						</div>
+					<?php endif; ?>
+
+					<div class="amy-agent-settings__card">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Bot connection', 'amy-agent' ); ?></h3>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__toggle" for="amy_agent_telegram_enabled">
+								<input
+									type="checkbox"
+									id="amy_agent_telegram_enabled"
+									name="<?php echo esc_attr( self::OPTION_TELEGRAM_ENABLED ); ?>"
+									value="1"
+									<?php checked( $this->is_telegram_enabled(), true ); ?>
+								/>
+								<span class="amy-agent-settings__toggle-copy">
+									<strong><?php echo esc_html__( 'Enable Telegram Admin Bot', 'amy-agent' ); ?></strong>
+									<span><?php echo esc_html__( 'When off, the webhook acknowledges updates but does not reply.', 'amy-agent' ); ?></span>
+								</span>
+							</label>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__field-label" for="amy_agent_telegram_bot_token">
+								<?php echo esc_html__( 'Bot token', 'amy-agent' ); ?>
+							</label>
+							<input
+								type="password"
+								id="amy_agent_telegram_bot_token"
+								name="<?php echo esc_attr( self::OPTION_TELEGRAM_TOKEN ); ?>"
+								value=""
+								autocomplete="new-password"
+								data-amy-tg-token-input
+								placeholder="<?php echo $has_tg_token ? esc_attr__( 'Enter a new token to replace the saved one', 'amy-agent' ) : esc_attr__( 'Paste token from @BotFather', 'amy-agent' ); ?>"
+							/>
+							<?php if ( $has_tg_token ) : ?>
+								<p class="amy-agent-settings__saved">
+									<?php
+									echo esc_html(
+										sprintf(
+											/* translators: %s: masked token ending */
+											__( 'Token is stored in the database (%s). Leave blank when saving to keep it.', 'amy-agent' ),
+											$this->mask_secret( $this->get_telegram_token() )
+										)
+									);
+									?>
+								</p>
+							<?php else : ?>
+								<p class="amy-agent-settings__hint">
+									<?php echo esc_html__( 'Create the bot with @BotFather. Never share this token.', 'amy-agent' ); ?>
+								</p>
+							<?php endif; ?>
+						</div>
+
+						<p class="amy-agent-settings__telegram-status" id="amy-settings-telegram-status" role="status" aria-live="polite"></p>
+
+						<div class="amy-agent-settings__telegram-actions">
+							<button
+								type="button"
+								class="amy-agent-settings__btn amy-agent-settings__btn--primary"
+								id="amy-settings-telegram-connect"
+								<?php disabled( ! is_ssl() ); ?>
+							>
+								<?php echo esc_html__( 'Connect', 'amy-agent' ); ?>
+							</button>
+							<button type="button" class="amy-agent-settings__btn amy-agent-settings__btn--ghost" id="amy-settings-telegram-disconnect">
+								<?php echo esc_html__( 'Disconnect', 'amy-agent' ); ?>
+							</button>
+							<button type="button" class="amy-agent-settings__btn amy-agent-settings__btn--ghost" id="amy-settings-telegram-test">
+								<?php echo esc_html__( 'Send test message', 'amy-agent' ); ?>
+							</button>
+						</div>
+						<p class="amy-agent-settings__telegram-feedback" id="amy-settings-telegram-feedback" hidden role="status"></p>
+					</div>
+
+					<div class="amy-agent-settings__card">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Allowed admins (whitelist)', 'amy-agent' ); ?></h3>
+						<div class="amy-agent-settings__table-wrap">
+							<table class="amy-agent-settings__table" id="amy-telegram-admins-table">
+								<thead>
+									<tr>
+										<th scope="col"><?php echo esc_html__( 'Telegram user ID', 'amy-agent' ); ?></th>
+										<th scope="col"><?php echo esc_html__( 'Label', 'amy-agent' ); ?></th>
+										<th scope="col"><?php echo esc_html__( 'Linked WordPress user', 'amy-agent' ); ?></th>
+										<th scope="col"><span class="screen-reader-text"><?php echo esc_html__( 'Remove', 'amy-agent' ); ?></span></th>
+									</tr>
+								</thead>
+								<tbody id="amy-telegram-admins-body">
+									<?php
+									$index = 0;
+									foreach ( $telegram_admins as $row ) :
+										if ( ! is_array( $row ) ) {
+											continue;
+										}
+										?>
+										<tr class="amy-agent-settings__admin-row" data-amy-admin-row>
+											<td>
+												<input
+													type="number"
+													min="1"
+													step="1"
+													name="<?php echo esc_attr( 'amy_agent_telegram_admins[' . $index . '][telegram_id]' ); ?>"
+													value="<?php echo esc_attr( (string) ( $row['telegram_id'] ?? '' ) ); ?>"
+													class="amy-agent-settings__table-input"
+												/>
+											</td>
+											<td>
+												<input
+													type="text"
+													maxlength="60"
+													name="<?php echo esc_attr( 'amy_agent_telegram_admins[' . $index . '][label]' ); ?>"
+													value="<?php echo esc_attr( (string) ( $row['label'] ?? '' ) ); ?>"
+													class="amy-agent-settings__table-input"
+												/>
+											</td>
+											<td>
+												<select name="<?php echo esc_attr( 'amy_agent_telegram_admins[' . $index . '][wp_user_id]' ); ?>" class="amy-agent-settings__table-select">
+													<option value=""><?php echo esc_html__( '— Select —', 'amy-agent' ); ?></option>
+													<?php foreach ( $wp_admin_users as $user ) : ?>
+														<option value="<?php echo esc_attr( (string) $user->ID ); ?>" <?php selected( (int) ( $row['wp_user_id'] ?? 0 ), (int) $user->ID ); ?>>
+															<?php echo esc_html( $user->display_name . ' (' . $user->user_email . ')' ); ?>
+														</option>
+													<?php endforeach; ?>
+												</select>
+											</td>
+											<td>
+												<button type="button" class="amy-agent-settings__btn amy-agent-settings__btn--ghost amy-agent-settings__btn--small" data-amy-remove-admin>
+													<?php echo esc_html__( 'Remove', 'amy-agent' ); ?>
+												</button>
+											</td>
+										</tr>
+										<?php
+										++$index;
+									endforeach;
+									?>
+								</tbody>
+							</table>
+						</div>
+						<p>
+							<button type="button" class="amy-agent-settings__btn amy-agent-settings__btn--ghost" id="amy-telegram-add-admin">
+								<?php echo esc_html__( 'Add admin', 'amy-agent' ); ?>
+							</button>
+						</p>
+						<template id="amy-telegram-admin-row-template">
+							<tr class="amy-agent-settings__admin-row" data-amy-admin-row>
+								<td>
+									<input type="number" min="1" step="1" data-field="telegram_id" class="amy-agent-settings__table-input" />
+								</td>
+								<td>
+									<input type="text" maxlength="60" data-field="label" class="amy-agent-settings__table-input" />
+								</td>
+								<td>
+									<select data-field="wp_user_id" class="amy-agent-settings__table-select">
+										<option value=""><?php echo esc_html__( '— Select —', 'amy-agent' ); ?></option>
+										<?php foreach ( $wp_admin_users as $user ) : ?>
+											<option value="<?php echo esc_attr( (string) $user->ID ); ?>">
+												<?php echo esc_html( $user->display_name . ' (' . $user->user_email . ')' ); ?>
+											</option>
+										<?php endforeach; ?>
+									</select>
+								</td>
+								<td>
+									<button type="button" class="amy-agent-settings__btn amy-agent-settings__btn--ghost amy-agent-settings__btn--small" data-amy-remove-admin>
+										<?php echo esc_html__( 'Remove', 'amy-agent' ); ?>
+									</button>
+								</td>
+							</tr>
+						</template>
+					</div>
+
+					<div class="amy-agent-settings__card amy-agent-settings__card--help">
+						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'How to find your Telegram ID', 'amy-agent' ); ?></h3>
+						<p class="amy-agent-settings__hint">
+							<?php echo esc_html__( 'Open your bot in Telegram and send /start — it replies with your ID. Paste it above, save, then press Connect.', 'amy-agent' ); ?>
+						</p>
 					</div>
 				</div>
 

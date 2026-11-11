@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.39 / amy-agent-service unchanged).
+> Last verified against code: 2026-11-11 (amy-agent v0.2.40 / amy-agent-service unchanged).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -22,6 +22,8 @@
 > Admin Roles & Social remains an honest coming-soon stub (not started).
 > **Settings (v0.2.39):** dark Amy theme + General / Connection tabs, readiness
 > banner, health check button, marketing From UI validation.
+> **Telegram Admin Bot (v0.2.40):** Settings → Telegram tab; WP webhook +
+> whitelist; shared admin conversations with Dashboard Chat.
 
 ---
 
@@ -201,11 +203,10 @@
 
 Given the agreed priority order and what's already live:
 
-- **Priority #3 — Dashboard Chat** (default next): WP admin chat + Telegram Admin
-  Bot → Amy the Leader, multi-conversation memory on Python side, `mode: "admin"`.
-  Spec: `docs/03-dashboard-chat-plan.md`. Still open before a Cursor prompt:
-  BotFather setup + admin User ID whitelist storage, conversation schema,
-  website→Telegram link-code expiry. No working `/` specialists in this phase.
+- **Priority #3 — Dashboard Chat**: WP admin chat is live; **Telegram Admin Bot**
+  shipped in plugin **0.2.40** (see `docs/03-dashboard-chat-plan.md` §7).
+  Still open: Support Bot, News Channel, website→Telegram link-code expiry.
+  No working `/` specialists in this phase.
 - **Theme-side Analytics Task 2** (does not block the plugin/service pipeline):
   Clarity script tag + Contact form `window.amyTrack(...)` hooks so
   `contact_form_*` events actually fire. Cookie-policy copy update
