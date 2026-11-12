@@ -15,7 +15,28 @@ from app.schemas.messages import (
     ChatRequest,
     ChatSuccessResponse,
     ErrorBody,
+    sanitize_pricing_catalogue,
 )
+
+PRICING_CATALOGUE_PROMPT_HEADER = (
+    "----- Current public price list (source of truth; do not invent beyond this) -----"
+)
+PRICING_CATALOGUE_PROMPT_FOOTER = (
+    "----- End public price list -----"
+)
+
+
+def _public_system_content(pricing_catalogue: str | None = None) -> str:
+    """Public Amy system prompt, optionally with a delimited live price list."""
+    catalogue = sanitize_pricing_catalogue(pricing_catalogue)
+    if not catalogue:
+        return AMY_SYSTEM_PROMPT
+    return (
+        f"{AMY_SYSTEM_PROMPT}\n\n"
+        f"{PRICING_CATALOGUE_PROMPT_HEADER}\n"
+        f"{catalogue}\n"
+        f"{PRICING_CATALOGUE_PROMPT_FOOTER}"
+    )
 from app.services.admin_chat_tools import (
     detect_admin_tool_intent,
     intent_context_messages,
@@ -100,6 +121,7 @@ def _messages_with_system(
     include_analytics_snapshot: bool = False,
     include_seo_task_snapshots: bool = False,
     auto_invoke_tools: bool = True,
+    pricing_catalogue: str | None = None,
 ) -> tuple[list[ChatMessage], list[str]]:
     """Prepend Amy's persona prompt unless a system message is already first.
 
@@ -109,6 +131,9 @@ def _messages_with_system(
     - Optional ``include_*`` flags force the older P0–P2 snapshot inject.
     - Provider tool loop (caller) can still call allowlisted tools on demand.
     Slash ``/analytics`` remains a WP/Telegram shortcut outside this path.
+
+    Public modes may append a delimited live theme price list when
+    ``pricing_catalogue`` is non-empty. Admin mode never receives it.
 
     Returns ``(messages, tools_auto_invoked)``.
     """
@@ -148,7 +173,13 @@ def _messages_with_system(
             system_msgs.append(identity)
         return [*system_msgs, *messages], tools_used
 
-    return [ChatMessage(role="system", content=AMY_SYSTEM_PROMPT), *messages], []
+    return [
+        ChatMessage(
+            role="system",
+            content=_public_system_content(pricing_catalogue),
+        ),
+        *messages,
+    ], []
 
 
 def _content_for_provider(msg: ChatMessage) -> str:
@@ -254,6 +285,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
         mode=body.mode,
         wp_user_name=body.wp_user_name,
         wp_user_email=body.wp_user_email,
+        pricing_catalogue=body.pricing_catalogue if body.mode != "admin" else None,
     )
     messages = _messages_for_provider(prepared)
 

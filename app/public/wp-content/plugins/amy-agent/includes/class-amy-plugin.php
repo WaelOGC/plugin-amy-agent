@@ -135,8 +135,8 @@ class Amy_Plugin {
 		$this->seo_batches_ajax     = new Amy_Seo_Batches_Ajax( $this->api_client );
 		$this->telegram             = new Amy_Telegram( $this->settings, $this->api_client );
 		$this->task_notify          = new Amy_Task_Notify( $this->settings, $this->telegram );
-		$this->rest                 = new Amy_Rest( $this->api_client, $this->settings );
 		$this->theme_bridge         = new Amy_Theme_Bridge( $this->settings );
+		$this->rest                 = new Amy_Rest( $this->api_client, $this->settings, $this->theme_bridge );
 		$this->assets               = new Amy_Assets( $this->settings );
 		$this->submit_idea          = new Amy_Submit_Idea( $this->settings );
 		$this->submit_idea_mail     = new Amy_Submit_Idea_Mail();

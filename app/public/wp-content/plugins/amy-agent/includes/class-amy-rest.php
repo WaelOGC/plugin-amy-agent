@@ -52,12 +52,19 @@ class Amy_Rest {
 	private $settings;
 
 	/**
-	 * @param Amy_Api_Client $api_client API client.
-	 * @param Amy_Settings   $settings   Settings.
+	 * @var Amy_Theme_Bridge
 	 */
-	public function __construct( Amy_Api_Client $api_client, Amy_Settings $settings ) {
-		$this->api_client = $api_client;
-		$this->settings   = $settings;
+	private $theme_bridge;
+
+	/**
+	 * @param Amy_Api_Client   $api_client    API client.
+	 * @param Amy_Settings     $settings      Settings.
+	 * @param Amy_Theme_Bridge $theme_bridge  Theme bridge (pricing catalogue).
+	 */
+	public function __construct( Amy_Api_Client $api_client, Amy_Settings $settings, Amy_Theme_Bridge $theme_bridge ) {
+		$this->api_client    = $api_client;
+		$this->settings      = $settings;
+		$this->theme_bridge  = $theme_bridge;
 	}
 
 	/**
@@ -821,6 +828,14 @@ class Amy_Rest {
 				'url'  => isset( $page['url'] ) ? esc_url_raw( (string) $page['url'] ) : null,
 				'slug' => isset( $page['slug'] ) ? sanitize_title( (string) $page['slug'] ) : null,
 			);
+		}
+
+		// Live theme price list for public general chat only (not admin / Submit Idea).
+		if ( 'general' === $mode ) {
+			$catalogue = $this->theme_bridge->get_pricing_catalogue();
+			if ( '' !== $catalogue ) {
+				$payload['pricing_catalogue'] = $catalogue;
+			}
 		}
 
 		$result = $this->api_client->chat( $payload );

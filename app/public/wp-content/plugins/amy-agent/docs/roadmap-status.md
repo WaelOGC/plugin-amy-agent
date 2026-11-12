@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-12 (amy-agent v0.2.57 / amy-agent-service v0.2.17 — Gemini tool schema sanitizer; admin chat P4 traffic + email audience).
+> Last verified against code: 2026-11-12 (amy-agent v0.2.58 / amy-agent-service v0.2.18 — live theme pricing catalogue on public chat).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -79,6 +79,15 @@
 - Rate-limited 20 req/IP/60s, nonce-protected, only loads when `ogc_amy_agent_is_active`
 - Gated behind: `amy_agent_enabled` option = on + Service URL + Shared Secret set in
   `Settings → Amy Agent` (wp-admin)
+- **Live theme pricing (plugin 0.2.58 / service 0.2.18):** public general chat
+  attaches optional `pricing_catalogue` from theme `ogc_get_pricing_data()` via
+  `Amy_Theme_Bridge` (1h transient; cleared on theme switch / theme+plugin
+  update). Service sanitizes + appends a delimited “Current public price list”
+  to `AMY_SYSTEM_PROMPT`. Amy quotes listed EUR figures (excl. VAT), links
+  [Pricing](https://ogcnewfinity.com/pricing/), and still sends ready-to-start
+  visitors to Submit Your Idea. Admin chat and Submit Idea never receive the
+  catalogue. If the theme helper is missing, behaviour matches the old
+  “link only, no numbers” path.
 
 ### 3. Infrastructure
 - Python service deployed on **Dokploy**, separate from the WP host, always-on
@@ -148,11 +157,11 @@
 - Admin: `amy-analytics` is a real lead list (Visitor / Location / Last seen /
   Signal / Status) with All / Hot / Warm / Cold filter. No charts, no fake
   numbers. Empty state is a genuine empty table when no sessions exist.
-- **Theme-side Contact form hooks are NOT in this task.** The backend accepts
-  `contact_form_*` events, but nothing fires them until the separate theme
-  task lands. The admin page will show real data for page views, widget, and
-  Submit Idea immediately; Contact-form-based leads will not populate until
-  then.
+- **Theme-side Contact form + Clarity:** the active `ogc-newfinity` theme already
+  ships Contact form `window.amyTrack(...)` hooks and the Clarity option, so
+  `contact_form_*` events can fire from the live site. Plugin/service continue
+  to accept those event types; no further theme work is required for that
+  Analytics gap.
 - **Newsletter tracking is excluded** until the newsletter subscribe feature
   itself has a working backend (would be fake data today). See
   `07-analytics-plan.md`.
@@ -252,10 +261,12 @@ Given the agreed priority order and what's already live:
   `seo_summary`, `task_stats`; intent auto-invoke; Gemini tool params sanitized;
   slash remains shortcut; Approve → Send unchanged; no AgentMail).
   Still open: Support Bot, News Channel, website→Telegram link-code expiry.
-- **Theme-side Analytics Task 2** (does not block the plugin/service pipeline):
-  Clarity script tag + Contact form `window.amyTrack(...)` hooks so
-  `contact_form_*` events actually fire. Cookie-policy copy update
-  (`legal-cookie-policy.md`) is also still outstanding from `07-analytics-plan.md` §5.
+- **Public Amy live pricing** (plugin **0.2.58** / service **0.2.18**): theme
+  price list → public chat system prompt (see Frontend Amy Assistant above).
+- **Theme-side Analytics Task 2** — **done in theme** (Clarity + Contact
+  `amyTrack` hooks already ship on `ogc-newfinity`). Remaining from
+  `07-analytics-plan.md` §5 if still needed: cookie-policy copy update
+  (`legal-cookie-policy.md`) only.
 - **Submit Your Idea 4.2 improvements** (still priority #1 territory): autosave draft,
   follow-up if visitor abandons page — lead scoring now lives under Analytics
   (`07-analytics-plan.md`) and is implemented for Task 1.
@@ -274,8 +285,8 @@ pre-filled AI suggestions before approval. Email Marketing (#8)
 stays after Dashboard Chat. Email Marketing still depends on Dashboard Chat +
 Analytics; cold-outreach compliance still open before that goes live.
 Specialist `/` commands stay off until Analytics + SEO + Email Marketing all
-exist (Analytics Task 1 is the plugin/service half; theme Contact hooks are
-the remaining Analytics gap).
+exist (Analytics Task 1 plugin/service + theme Contact/Clarity hooks are in
+place).
 
 ---
 

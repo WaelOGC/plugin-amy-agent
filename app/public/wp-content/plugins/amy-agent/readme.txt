@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.57
+Stable tag: 0.2.58
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,10 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 6. For Task Service outbound: set `WORDPRESS_BASE_URL` on the Python service; enable Telegram under Amy → Settings → Telegram; assignees link chat id from Amy → My Profile. Create the Admin Bot via BotFather (Settings → Telegram has the deeplink + steps).
 
 == Changelog ==
+
+= 0.2.58 =
+* Public chat: live theme price catalogue (`pricing_catalogue`) from `ogc_get_pricing_data()` via theme bridge; cached 1h.
+* Service 0.2.18: optional `pricing_catalogue` on `/v1/chat`; append delimited price list to public system prompt; Amy quotes listed EUR prices.
 
 = 0.2.57 =
 * Fix admin chat 502 with Gemini: strip unsupported JSON Schema keys (e.g. additionalProperties) from functionDeclarations.parameters before generateContent.
