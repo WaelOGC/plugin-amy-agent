@@ -14,8 +14,17 @@ from app.main import app  # noqa: E402
 from app.prompts import AMY_ADMIN_SYSTEM_PROMPT, AMY_SYSTEM_PROMPT  # noqa: E402
 from app.providers.base import BaseProvider  # noqa: E402
 from app.providers.errors import ProviderError  # noqa: E402
-from app.routes.chat import _messages_with_system  # noqa: E402
-from app.schemas.messages import ChatMessage  # noqa: E402
+from app.routes.chat import (  # noqa: E402
+    PRICING_CATALOGUE_PROMPT_HEADER,
+    _messages_with_system,
+    _public_system_content,
+)
+from app.schemas.messages import (  # noqa: E402
+    ChatMessage,
+    ChatRequest,
+    PRICING_CATALOGUE_MAX_CHARS,
+    sanitize_pricing_catalogue,
+)
 from app.services.analytics_summary import (  # noqa: E402
     format_analytics_chat_context,
 )
@@ -454,6 +463,66 @@ def test_general_mode_system_prompt_unchanged() -> None:
     assert messages[0].content != AMY_ADMIN_SYSTEM_PROMPT
 
 
+def test_general_mode_appends_pricing_catalogue_when_present() -> None:
+    catalogue = "Custom WordPress Development\nStarter Website — €549, one-off"
+    messages, tools_used = _messages_with_system(
+        [ChatMessage(role="user", content="How much is a starter site?")],
+        mode="general",
+        pricing_catalogue=catalogue,
+    )
+    assert tools_used == []
+    assert messages[0].role == "system"
+    assert messages[0].content.startswith(AMY_SYSTEM_PROMPT)
+    assert messages[0].content != AMY_SYSTEM_PROMPT
+    assert PRICING_CATALOGUE_PROMPT_HEADER in messages[0].content
+    assert "Starter Website — €549, one-off" in messages[0].content
+    assert "Current public price list" in messages[0].content
+
+
+def test_general_mode_without_catalogue_keeps_base_prompt() -> None:
+    assert _public_system_content(None) == AMY_SYSTEM_PROMPT
+    assert _public_system_content("") == AMY_SYSTEM_PROMPT
+    assert _public_system_content("   ") == AMY_SYSTEM_PROMPT
+    messages, _ = _messages_with_system(
+        [ChatMessage(role="user", content="hello")],
+        mode="general",
+        pricing_catalogue="",
+    )
+    assert messages[0].content == AMY_SYSTEM_PROMPT
+
+
+def test_pricing_catalogue_over_long_input_is_capped() -> None:
+    huge = "A" * (PRICING_CATALOGUE_MAX_CHARS + 500)
+    cleaned = sanitize_pricing_catalogue(huge)
+    assert len(cleaned) == PRICING_CATALOGUE_MAX_CHARS
+    # Control characters stripped; newlines preserved.
+    dirty = "Line1\n\x00Line2\x07\tOK"
+    assert sanitize_pricing_catalogue(dirty) == "Line1\nLine2\tOK"
+    req = ChatRequest(
+        session_id="550e8400-e29b-41d4-a716-446655440000",
+        messages=[ChatMessage(role="user", content="hi")],
+        ai={"provider": "openai", "api_key": "sk-test", "model": None},
+        pricing_catalogue=huge,
+    )
+    assert req.pricing_catalogue is not None
+    assert len(req.pricing_catalogue) == PRICING_CATALOGUE_MAX_CHARS
+
+
+def test_admin_mode_never_receives_pricing_catalogue() -> None:
+    catalogue = "Custom WordPress Development\nStarter Website — €549, one-off"
+    messages, tools_used = _messages_with_system(
+        [ChatMessage(role="user", content="What are our WP prices?")],
+        mode="admin",
+        pricing_catalogue=catalogue,
+    )
+    assert tools_used == []
+    joined = "\n".join(m.content for m in messages if m.role == "system")
+    assert AMY_ADMIN_SYSTEM_PROMPT in joined
+    assert PRICING_CATALOGUE_PROMPT_HEADER not in joined
+    assert "€549" not in joined
+    assert "Current public price list" not in joined
+
+
 def test_support_mode_uses_public_prompt_not_admin() -> None:
     messages, tools_used = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
@@ -791,6 +860,59 @@ def test_chat_general_mode_sends_public_prompt_to_provider(client: TestClient) -
     assert "Live Amy Analytics snapshot" not in system_msgs[0].content
     assert "Live SEO Tasks snapshot" not in system_msgs[0].content
     assert "Live Task Service snapshot" not in system_msgs[0].content
+
+
+def test_chat_general_mode_includes_pricing_catalogue_in_system(
+    client: TestClient,
+) -> None:
+    captured: list = []
+    catalogue = "UI/UX Design\nUI Starter — €350, one-off"
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
+    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("€350")):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(mode="general", pricing_catalogue=catalogue),
+        )
+
+    assert response.status_code == 200
+    system_msgs = [m for m in captured if m.role == "system"]
+    assert len(system_msgs) == 1
+    assert PRICING_CATALOGUE_PROMPT_HEADER in system_msgs[0].content
+    assert "UI Starter — €350, one-off" in system_msgs[0].content
+
+
+def test_chat_admin_mode_ignores_pricing_catalogue_field(client: TestClient) -> None:
+    captured: list = []
+    catalogue = "Custom WordPress Development\nStarter Website — €549, one-off"
+
+    class _CaptureProvider(_FakeProvider):
+        async def complete(self, messages, api_key: str, model: str | None = None) -> str:
+            captured.extend(messages)
+            return await super().complete(messages, api_key, model)
+
+    with patch("app.routes.chat.get_provider", return_value=_CaptureProvider("ok")):
+        response = client.post(
+            "/v1/chat",
+            headers=HEADERS,
+            json=_chat_body(
+                mode="admin",
+                pricing_catalogue=catalogue,
+                wp_user_name="Wael",
+                messages=[{"role": "user", "content": "hello"}],
+            ),
+        )
+
+    assert response.status_code == 200
+    joined = "\n".join(m.content for m in captured if m.role == "system")
+    assert "€549" not in joined
+    assert PRICING_CATALOGUE_PROMPT_HEADER not in joined
+    assert captured[0].content == AMY_ADMIN_SYSTEM_PROMPT
 
 
 def test_format_analytics_chat_context_live_and_fallbacks() -> None:

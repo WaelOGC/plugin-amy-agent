@@ -126,16 +126,18 @@ Routes messages to the selected provider adapter and returns the assistant reply
     "api_key": "…",
     "model": null
   },
-  "context": {}
+  "context": {},
+  "pricing_catalogue": "Custom WordPress Development\nStarter Website — €549, one-off\n…"
 }
 ```
 
 | Field | Notes |
 | --- | --- |
-| `mode` | `general` \| `submit_idea` \| `support` (Phase 2 always sends `general`) |
+| `mode` | `general` \| `submit_idea` \| `support` \| `admin` |
 | `page` | Current page context for routing (later phases) |
 | `messages` | Chronological chat turns |
 | `context` | Extensible bag for later features |
+| `pricing_catalogue` | Optional. Compact plain-text live price list from the active theme (`ogc_get_pricing_data()`), sent by WordPress on **public general** chat only (not admin, not Submit Idea). Service treats it as untrusted: strips control characters and hard-caps at ~6,000 characters. When non-empty, Python appends it to the public system prompt as a delimited “Current public price list” block. When absent/empty, Amy keeps the base public prompt (link to Pricing page, no quoted numbers). |
 
 **Success `200`:**
 
@@ -330,6 +332,7 @@ Namespace: `amy-agent/v1`
 - Rate limit: **20 requests per IP per 60 seconds** (WordPress transient). Exceeded → `429`.
 - Browser never receives AI API keys; PHP injects `ai` when calling Python.
 - Widget only enqueues when `ogc_amy_agent_is_active` / Amy is ready.
+- On each public `general` chat proxy, PHP may attach `pricing_catalogue` from `Amy_Theme_Bridge::get_pricing_catalogue()` (theme helper `ogc_get_pricing_data()`, 1-hour transient cache, cleared on theme switch and theme/plugin update). Cap ~6,000 characters. Admin chat and Submit Idea never send this field.
 
 ---
 

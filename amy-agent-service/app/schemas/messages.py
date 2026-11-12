@@ -2,11 +2,27 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 ProviderSlug = Literal["gemini", "openai", "anthropic", "deepseek"]
 ChatMode = Literal["general", "submit_idea", "support", "admin"]
 MessageRole = Literal["user", "assistant", "system", "tool"]
+
+# Hard cap for optional live theme price list (plugin also caps ~6000).
+PRICING_CATALOGUE_MAX_CHARS = 6000
+
+
+def sanitize_pricing_catalogue(value: str | None) -> str:
+    """Treat catalogue as untrusted: strip control chars and cap length."""
+    if value is None:
+        return ""
+    text = str(value)
+    cleaned = "".join(
+        ch for ch in text if ch in ("\n", "\t") or ord(ch) >= 32
+    )
+    if len(cleaned) > PRICING_CATALOGUE_MAX_CHARS:
+        cleaned = cleaned[:PRICING_CATALOGUE_MAX_CHARS]
+    return cleaned.strip()
 
 
 class AiConfig(BaseModel):
@@ -71,6 +87,13 @@ class ChatRequest(BaseModel):
     wp_user_name: str | None = None
     wp_user_email: str | None = None
     visitor_id: str | None = None
+    # Optional compact plain-text price list from the active theme (public chat).
+    pricing_catalogue: str | None = None
+
+    @field_validator("pricing_catalogue", mode="before")
+    @classmethod
+    def _sanitize_pricing_catalogue(cls, value: Any) -> str:
+        return sanitize_pricing_catalogue(value if value is None else str(value))
 
 
 class HealthResponse(BaseModel):
