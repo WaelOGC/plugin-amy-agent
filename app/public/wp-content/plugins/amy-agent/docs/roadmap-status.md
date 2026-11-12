@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-11 (amy-agent v0.2.56 / amy-agent-service v0.2.16 — admin chat P4 traffic + email audience).
+> Last verified against code: 2026-11-12 (amy-agent v0.2.57 / amy-agent-service v0.2.17 — Gemini tool schema sanitizer; admin chat P4 traffic + email audience).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -247,10 +247,10 @@ Given the agreed priority order and what's already live:
   + `/Analytics` slash + `GET /v1/analytics/summary` + **P2** SEO Tasks + Task
   Service report-only summaries + **P3** admin tool-calling loop / Amy the Leader
   + **P4** page_view traffic depth + read-only Email Marketing audience
-  (plugin **0.2.56** / service **0.2.16**; allowlisted `analytics_summary`,
+  (plugin **0.2.57** / service **0.2.17**; allowlisted `analytics_summary`,
   `analytics_leads_query`, `analytics_traffic`, `email_audience_summary`,
-  `seo_summary`, `task_stats`; intent auto-invoke; slash remains shortcut;
-  Approve → Send unchanged; no AgentMail).
+  `seo_summary`, `task_stats`; intent auto-invoke; Gemini tool params sanitized;
+  slash remains shortcut; Approve → Send unchanged; no AgentMail).
   Still open: Support Bot, News Channel, website→Telegram link-code expiry.
 - **Theme-side Analytics Task 2** (does not block the plugin/service pipeline):
   Clarity script tag + Contact form `window.amyTrack(...)` hooks so

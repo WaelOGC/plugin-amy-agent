@@ -15,6 +15,64 @@ _TIMEOUT = httpx.Timeout(45.0, connect=10.0)
 _IMAGE_MODEL = "gemini-3.1-flash-image"  # verify against a real key before shipping
 _IMAGE_TIMEOUT = httpx.Timeout(60.0, connect=10.0)
 
+# Gemini functionDeclarations.parameters is a narrow Schema subset — not full JSON Schema.
+# Unknown keys (e.g. additionalProperties) cause HTTP 400 "Cannot find field".
+_GEMINI_SCHEMA_UNSUPPORTED_KEYS = frozenset(
+    {
+        "additionalProperties",
+        "additionalItems",
+        "$schema",
+        "$id",
+        "$ref",
+        "$defs",
+        "definitions",
+        "examples",
+        "example",
+        "default",
+        "const",
+        "contentMediaType",
+        "contentEncoding",
+        "if",
+        "then",
+        "else",
+        "dependentRequired",
+        "dependentSchemas",
+        "unevaluatedProperties",
+        "unevaluatedItems",
+        "prefixItems",
+        "propertyNames",
+        "patternProperties",
+        "not",
+        "oneOf",
+        "allOf",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "uniqueItems",
+        "writeOnly",
+        "readOnly",
+        "deprecated",
+        "title",
+    }
+)
+
+
+def sanitize_gemini_schema(node: Any) -> Any:
+    """Recursively strip JSON Schema keys Gemini's Schema proto rejects.
+
+    Keeps internal/OpenAPI tool specs intact; only the Gemini request payload
+    should pass through this helper.
+    """
+    if isinstance(node, list):
+        return [sanitize_gemini_schema(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    out: dict[str, Any] = {}
+    for key, value in node.items():
+        if key in _GEMINI_SCHEMA_UNSUPPORTED_KEYS:
+            continue
+        out[key] = sanitize_gemini_schema(value)
+    return out
+
 
 class GeminiImageResult:
     def __init__(self, data_base64: str, mime_type: str) -> None:
@@ -30,7 +88,7 @@ def _tools_payload(tools: Sequence[ToolSpec] | None) -> dict[str, Any] | None:
             {
                 "name": t.name,
                 "description": t.description,
-                "parameters": t.parameters,
+                "parameters": sanitize_gemini_schema(t.parameters),
             }
             for t in tools
         ]
