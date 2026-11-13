@@ -147,6 +147,85 @@ amy_assert(
 	$escaped
 );
 
+// --- Real AA-19 fixture: full assembly path (not converter-only) ---
+$real_rec = <<<'MD'
+**Recommendations**
+**Finding**
+7 visitor sessions are scored hot (high-intent).
+**Evidence**
+234 lead sessions total; hot=7, warm=5, cold=222; with_email=3; hot_with_email=2; hot_without_email=5; seen_7d=43.
+**Confidence: high**
+**Limitations**
+Hot scoring is rule-based; having an email does not prove consent for marketing — use Approve → Send in Email Marketing.
+**Next step**
+Prioritize the hot leads that already left an email, then review the remaining hot sessions in Analytics.
+MD;
+
+$model_body = <<<'MD'
+**Activity Overview**
+Here is today's picture of potential clients.
+
+**Lead Status Breakdown**
+🔥 7 hot · 🌤️ 5 warm · ❄️ 222 cold
+
+**Hot Leads Sample**
+• Visitor abc12345: (email on file)
+MD;
+
+$outbound = $model_body . "\n\n" . $real_rec;
+$html_e2e = Amy_Telegram::markdown_to_telegram_html( $outbound );
+
+amy_assert( 'e2e: Activity Overview bold', false !== strpos( $html_e2e, '<b>Activity Overview</b>' ), $html_e2e );
+amy_assert( 'e2e: Recommendations bold', false !== strpos( $html_e2e, '<b>Recommendations</b>' ), $html_e2e );
+amy_assert( 'e2e: Finding bold', false !== strpos( $html_e2e, '<b>Finding</b>' ), $html_e2e );
+amy_assert( 'e2e: Evidence bold', false !== strpos( $html_e2e, '<b>Evidence</b>' ), $html_e2e );
+amy_assert( 'e2e: Confidence bold', false !== strpos( $html_e2e, '<b>Confidence: high</b>' ), $html_e2e );
+amy_assert( 'e2e: Limitations bold', false !== strpos( $html_e2e, '<b>Limitations</b>' ), $html_e2e );
+amy_assert( 'e2e: Next step bold', false !== strpos( $html_e2e, '<b>Next step</b>' ), $html_e2e );
+amy_assert( 'e2e: finding body kept', false !== strpos( $html_e2e, '7 visitor sessions are scored hot' ), $html_e2e );
+amy_assert( 'e2e: no raw ** left', false === strpos( $html_e2e, '**' ), $html_e2e );
+
+// Isolated converter with the exact pasted labels (user's manual check).
+$isolated = Amy_Telegram::markdown_to_telegram_html(
+	"**Finding**\n7 visitor sessions are scored hot (high-intent).\n**Evidence**\n234 lead sessions total; hot=7, warm=5, cold=222; with_email=3; hot_with_email=2; hot_without_email=5; seen_7d=43.\n**Confidence: high**\n**Limitations**\nHot scoring is rule-based; having an email does not prove consent for marketing — use Approve → Send in Email Marketing."
+);
+amy_assert( 'isolated Finding bold', false !== strpos( $isolated, '<b>Finding</b>' ), $isolated );
+amy_assert( 'isolated Evidence bold', false !== strpos( $isolated, '<b>Evidence</b>' ), $isolated );
+
+// Parse-error detection: Bot API often returns HTTP 200 + error_code 400.
+$parse_http200 = array(
+	'ok'     => false,
+	'status' => 200,
+	'data'   => array(
+		'ok'          => false,
+		'error_code'  => 400,
+		'description' => "Bad Request: can't parse entities: Unsupported start tag \"blockquote\"",
+	),
+	'error'  => "Bad Request: can't parse entities: Unsupported start tag \"blockquote\"",
+);
+amy_assert(
+	'parse error detects error_code 400 on HTTP 200',
+	Amy_Telegram::is_telegram_parse_error( $parse_http200 ),
+	'expected true'
+);
+amy_assert(
+	'parse error false when ok',
+	! Amy_Telegram::is_telegram_parse_error(
+		array(
+			'ok'     => true,
+			'status' => 200,
+			'data'   => array( 'ok' => true ),
+			'error'  => null,
+		)
+	),
+	'expected false'
+);
+
+$with_bq = '<b>Next step</b><blockquote>Do the thing</blockquote>';
+$stripped = Amy_Telegram::strip_telegram_blockquotes( $with_bq );
+amy_assert( 'strip blockquote keeps bold', false !== strpos( $stripped, '<b>Next step</b>' ), $stripped );
+amy_assert( 'strip blockquote removes tags', false === strpos( $stripped, 'blockquote' ), $stripped );
+
 if ( $failures > 0 ) {
 	echo "\n{$failures} failure(s)\n";
 	exit( 1 );

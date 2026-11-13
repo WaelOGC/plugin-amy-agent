@@ -28,7 +28,7 @@ from app.services.email_audience_summary import (
 )
 from app.services.recommendation_format import (
     Recommendation,
-    format_recommendations,
+    append_recommendations_block,
     recommendation_from_mapping,
     recommendation_to_dict,
 )
@@ -156,6 +156,8 @@ _ANALYTICS_INTENT = re.compile(
     r"\b("
     r"analytics|/analytics|"
     r"visitor|visitors|traffic|lead|leads|"
+    r"client|clients|prospect|prospects|"
+    r"potential\s+clients?|potential\s+customers?|"
     r"hot\s+lead|warm\s+lead|cold\s+lead|"
     r"with[_\s-]?email|emails?\s+captured|email\s+capture|"
     r"submit\s+idea|last[_\s-]?seen|sessions?"
@@ -521,11 +523,16 @@ def _append_recommendations_to_reply(
     text: str,
     recommendations: Sequence[Recommendation],
 ) -> str:
-    """Deterministically append the structured block when any recommendations exist."""
+    """Deterministically append the structured block when any recommendations exist.
+
+    Uses the same ``**Recommendations**`` header as
+    :func:`append_recommendations_block` so Telegram always receives Markdown
+    bold markers the plugin converter turns into ``<b>`` — never a model-paraphrased
+    plain Finding/Evidence trailer.
+    """
     if not recommendations:
         return text
-    block = format_recommendations(list(recommendations))
-    return f"{text.rstrip()}\n\n{block}"
+    return append_recommendations_block(text, list(recommendations))
 
 
 def _assistant_tool_call_message(turn: CompletionTurn) -> ChatMessage:
@@ -575,7 +582,7 @@ async def run_admin_tool_loop(
     Structured ``recommendations`` from tool results (and optional
     ``seed_recommendations`` from intent auto-invoke) are accumulated across
     rounds, deduped by ``(finding, evidence)``, and appended verbatim to the
-    final model text via :func:`format_recommendations` — never left to the
+    final model text via :func:`append_recommendations_block` — never left to the
     model to reproduce.
     """
     tools_used: list[str] = []

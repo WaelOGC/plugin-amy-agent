@@ -111,6 +111,10 @@ A plain restart of an older install without a rebuild will miss PDF/image proces
 
 ## Changelog
 
+### 0.2.27
+
+Telegram recommendations formatting (AA-19): analytics intent now matches “potential clients” / clients / prospects so seed recommendations append for that live question; tool-loop append uses the same `**Recommendations**` header as chat context; Next step is bold lines (not `>` blockquote) to avoid Telegram HTML parse rejections. Pair with plugin **0.2.67** (parse-error fallback checks `error_code` 400 on HTTP 200, retries without blockquote).
+
 ### 0.2.26
 
 Admin chat visual style: system prompt requires a consistent structured-data reply shape (short opener, bold `**Section**` titles, one-line emoji status pills, 📍 item rows, each number stated once). Deterministic recommendations block reformatted with bold Finding/Evidence/Confidence/Limitations and a `> **Next step**` blockquote — judgment only, not a second number dump. Pair with plugin **0.2.66** Telegram Markdown→HTML converter (headings/bullets/blockquotes).
