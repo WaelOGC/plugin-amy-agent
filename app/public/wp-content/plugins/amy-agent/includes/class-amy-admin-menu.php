@@ -310,10 +310,12 @@ class Amy_Admin_Menu {
 				null
 			);
 
+			Amy_Admin_UI::enqueue_assets();
+
 			wp_enqueue_style(
 				'amy-agent-admin-overview',
 				AMY_AGENT_URL . 'admin/css/admin-overview.css',
-				array( 'amy-agent-admin-overview-fonts', 'dashicons' ),
+				array( 'amy-agent-admin-overview-fonts', 'amy-agent-admin-ui', 'dashicons' ),
 				AMY_AGENT_VERSION
 			);
 			return;
@@ -871,293 +873,237 @@ class Amy_Admin_Menu {
 	}
 
 	/**
-	 * Overview dashboard with links to each Amy section.
+	 * Overview dashboard — feature cards with status toggles and Settings links.
 	 */
 	public function render_overview() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
-		$metrics     = $this->fetch_overview_metrics();
-		$coming_soon = __( '(coming soon)', 'amy-agent' );
-		$unavailable = __( '(unavailable)', 'amy-agent' );
-
-		$top_stats = array(
-			array(
-				'label' => __( 'Tasks in Progress', 'amy-agent' ),
-				'value' => $metrics['tasks_in_progress'],
-				'note'  => null,
-			),
-			// No due-soon aggregate exists yet — urgent open tasks is the honest best available.
-			array(
-				'label' => __( 'Urgent Tasks', 'amy-agent' ),
-				'value' => $metrics['urgent_tasks'],
-				'note'  => null,
-			),
-			array(
-				'label' => __( 'Chats This Week', 'amy-agent' ),
-				'value' => $metrics['chats_this_week'],
-				'note'  => null,
-			),
-			// No numeric SEO score API — show pending-approval issue count instead of inventing an average.
-			array(
-				'label' => __( 'Open SEO Issues', 'amy-agent' ),
-				'value' => $metrics['seo_open'],
-				'note'  => null,
-			),
+		$enabled_flags = array(
+			$this->settings->is_enabled(),
+			$this->settings->is_closing_wishes_enabled(),
+			$this->settings->is_public_chat_uploads_enabled(),
+			$this->settings->is_public_chat_upload_notify_enabled(),
+			$this->settings->is_telegram_enabled(),
 		);
+		$features_on   = count( array_filter( $enabled_flags ) );
+		$features_total = count( $enabled_flags );
+		$is_ready      = $this->settings->is_ready();
+		$is_configured = $this->settings->is_service_configured();
+		$status_label  = $is_ready
+			? __( 'Ready', 'amy-agent' )
+			: ( $is_configured ? __( 'Not ready', 'amy-agent' ) : __( 'Not configured', 'amy-agent' ) );
+		$status_class  = $is_ready ? 'ok' : 'warn';
+
+		$general_url    = $this->settings->settings_deep_link( 'general' );
+		$connection_url = $this->settings->settings_deep_link( 'connection' );
+		$telegram_url   = $this->settings->settings_deep_link( 'telegram' );
+		$from_url       = $this->settings->settings_deep_link( 'general', 'general-from' );
 
 		$cards = array(
 			array(
-				'slug'        => self::TASK_SERVICE_PAGE_SLUG,
-				'title'       => __( 'Task Service', 'amy-agent' ),
-				'description' => __( 'Assign, track, and escalate work across the team and Amy.', 'amy-agent' ),
-				'icon'        => 'yes-alt',
-				'hero'        => true,
-				'metrics'     => array(
-					array(
-						'label' => __( 'Open', 'amy-agent' ),
-						'value' => $metrics['open_tasks'],
-					),
-					array(
-						'label' => __( 'Urgent', 'amy-agent' ),
-						'value' => $metrics['urgent_tasks'],
-					),
+				'title'    => __( 'Site presence', 'amy-agent' ),
+				'subtitle' => __( 'Floating chat widget and Submit Idea', 'amy-agent' ),
+				'icon'     => 'visibility',
+				'href'     => $this->settings->settings_deep_link( 'general', 'enable-amy' ),
+				'toggle'   => array(
+					'on'   => $this->settings->is_enabled(),
+					'aria' => __( 'Enable Amy is on', 'amy-agent' ),
+					'aria_off' => __( 'Enable Amy is off', 'amy-agent' ),
 				),
+				'help'     => __( 'Show the floating chat widget and Amy Submit Idea when the service URL + shared secret are also set.', 'amy-agent' ),
 			),
 			array(
-				'slug'        => self::ANALYTICS_PAGE_SLUG,
-				'title'       => __( 'Analytics', 'amy-agent' ),
-				'description' => __( 'Review site usage and performance insights.', 'amy-agent' ),
-				'icon'        => 'chart-bar',
-				'metrics'     => array(
-					array(
-						'label' => __( 'Visitors', 'amy-agent' ),
-						'value' => $metrics['visitors'],
-					),
-					// No page-view summary endpoint — Hot lead count is a real field from list_leads.
-					array(
-						'label' => __( 'Hot leads', 'amy-agent' ),
-						'value' => $metrics['hot_leads'],
-					),
-				),
+				'title'    => __( 'Connection', 'amy-agent' ),
+				'subtitle' => __( 'Python service URL, secret, and AI provider', 'amy-agent' ),
+				'icon'     => 'admin-site-alt3',
+				'href'     => $connection_url,
+				'help'     => __( 'Amy Python service URL, shared secret, and the AI provider used for chat and tools.', 'amy-agent' ),
 			),
 			array(
-				'slug'        => self::SEO_TASKS_PAGE_SLUG,
-				'title'       => __( 'SEO Tasks', 'amy-agent' ),
-				'description' => __( 'Find and fix SEO issues across your content.', 'amy-agent' ),
-				'icon'        => 'search',
-				'metrics'     => array(
-					array(
-						'label' => __( 'Open issues', 'amy-agent' ),
-						'value' => $metrics['seo_open'],
-					),
-					array(
-						'label' => __( 'Fixed', 'amy-agent' ),
-						'value' => $metrics['seo_fixed'],
-					),
+				'title'    => __( 'Telegram', 'amy-agent' ),
+				'subtitle' => __( 'Admin Bot for chat and task alerts', 'amy-agent' ),
+				'icon'     => 'format-status',
+				'href'     => $telegram_url,
+				'toggle'   => array(
+					'on'       => $this->settings->is_telegram_enabled(),
+					'aria'     => __( 'Telegram Admin Bot is on', 'amy-agent' ),
+					'aria_off' => __( 'Telegram Admin Bot is off', 'amy-agent' ),
 				),
+				'help'     => __( 'When off, the webhook acknowledges updates but does not reply.', 'amy-agent' ),
 			),
 			array(
-				'slug'        => self::EMAIL_MARKETING_PAGE_SLUG,
-				'title'       => __( 'Email Marketing', 'amy-agent' ),
-				'description' => __( 'Audience from Analytics visitor emails — draft and approve, no auto-send.', 'amy-agent' ),
-				'icon'        => 'email',
-				'metrics'     => array(
-					array(
-						'label' => __( 'Audience', 'amy-agent' ),
-						'value' => $metrics['email_audience'],
-					),
-					array(
-						'label' => __( 'Drafts', 'amy-agent' ),
-						'value' => null,
-						// Drafts live in browser localStorage only — no server draft count.
-						'note'  => __( '(browser only)', 'amy-agent' ),
-					),
+				'title'    => __( 'Closing wishes', 'amy-agent' ),
+				'subtitle' => __( 'Friendly goodbye lines in public chat', 'amy-agent' ),
+				'icon'     => 'heart',
+				'href'     => $general_url,
+				'toggle'   => array(
+					'on'       => $this->settings->is_closing_wishes_enabled(),
+					'aria'     => __( 'Closing wishes are on', 'amy-agent' ),
+					'aria_off' => __( 'Closing wishes are off', 'amy-agent' ),
 				),
+				'help'     => __( 'When on, public Amy may add a short goodbye wish once per conversation.', 'amy-agent' ),
 			),
 			array(
-				'slug'        => 'amy-chat',
-				'title'       => __( 'Chat', 'amy-agent' ),
-				'description' => __( 'Talk with Amy the Leader from the dashboard.', 'amy-agent' ),
-				'icon'        => 'format-chat',
-				'metrics'     => array(
-					array(
-						'label' => __( 'Active now', 'amy-agent' ),
-						'value' => $metrics['chats_active'],
-					),
-					array(
-						'label' => __( 'This week', 'amy-agent' ),
-						'value' => $metrics['chats_this_week'],
-					),
+				'title'    => __( 'File uploads', 'amy-agent' ),
+				'subtitle' => __( 'Visitor image and PDF attachments', 'amy-agent' ),
+				'icon'     => 'paperclip',
+				'href'     => $general_url,
+				'toggle'   => array(
+					'on'       => $this->settings->is_public_chat_uploads_enabled(),
+					'aria'     => __( 'Public chat uploads are on', 'amy-agent' ),
+					'aria_off' => __( 'Public chat uploads are off', 'amy-agent' ),
 				),
+				'help'     => __( 'When on, visitors can attach images or PDFs (up to 5 MB) in the floating Amy widget.', 'amy-agent' ),
 			),
 			array(
-				// Admin Roles & Social is not built — keep honest stub (no fake page).
-				'slug'        => '',
-				'href'        => '#',
-				'title'       => __( 'Admin Roles & Social', 'amy-agent' ),
-				'description' => __( 'Team permissions and connected social platforms.', 'amy-agent' ),
-				'icon'        => 'groups',
-				'coming_soon' => true,
-				'metrics'     => array(
-					array(
-						'label' => __( 'Team members', 'amy-agent' ),
-						'value' => null,
-						'note'  => $coming_soon,
-					),
-					array(
-						'label' => __( 'Platforms', 'amy-agent' ),
-						'value' => null,
-						'note'  => $coming_soon,
-					),
+				'title'    => __( 'Upload notifications', 'amy-agent' ),
+				'subtitle' => __( 'Email and Telegram alerts for uploads', 'amy-agent' ),
+				'icon'     => 'email-alt',
+				'href'     => $general_url,
+				'toggle'   => array(
+					'on'       => $this->settings->is_public_chat_upload_notify_enabled(),
+					'aria'     => __( 'Upload notifications are on', 'amy-agent' ),
+					'aria_off' => __( 'Upload notifications are off', 'amy-agent' ),
 				),
+				'help'     => __( 'When on, each public chat upload can email the site admin and ping linked Telegram admins.', 'amy-agent' ),
 			),
 			array(
-				'slug'        => Amy_Settings::PAGE_SLUG,
-				'title'       => __( 'Settings', 'amy-agent' ),
-				'description' => __( 'Connect the Python service, shared secret, and AI provider.', 'amy-agent' ),
-				'icon'        => 'admin-generic',
-				'metrics'     => array(
-					array(
-						'label' => __( 'Service URL', 'amy-agent' ),
-						'value' => $metrics['service_configured']
-							? __( 'Configured', 'amy-agent' )
-							: __( 'Not set', 'amy-agent' ),
-					),
-					array(
-						'label' => __( 'Health', 'amy-agent' ),
-						'value' => $metrics['service_health'],
-						'note'  => empty( $metrics['service_configured'] )
-							? __( '(set URL + secret)', 'amy-agent' )
-							: null,
-					),
-				),
+				'title'    => __( 'Email Marketing', 'amy-agent' ),
+				'subtitle' => __( 'From identity and campaign drafts', 'amy-agent' ),
+				'icon'     => 'email',
+				'href'     => $from_url,
+				'link_label' => __( 'Settings →', 'amy-agent' ),
+				'help'     => __( 'Marketing From email/name live under Settings → General. Draft and send from Email Marketing.', 'amy-agent' ),
+				'extra_href' => admin_url( 'admin.php?page=' . self::EMAIL_MARKETING_PAGE_SLUG ),
+				'extra_label' => __( 'Open Email Marketing →', 'amy-agent' ),
 			),
 			array(
-				'slug'        => self::BRAND_PAGE_SLUG,
-				'title'       => __( 'Brand & Avatar', 'amy-agent' ),
-				'description' => __( 'Manage Amy’s look, name, and avatar.', 'amy-agent' ),
-				'icon'        => 'admin-users',
-				'metrics'     => array(
-					array(
-						'label' => __( 'Avatar', 'amy-agent' ),
-						'value' => $metrics['brand_avatar'],
-					),
-				),
+				'title'    => __( 'Task Service', 'amy-agent' ),
+				'subtitle' => __( 'Assign, track, and escalate work', 'amy-agent' ),
+				'icon'     => 'yes-alt',
+				'href'     => admin_url( 'admin.php?page=' . self::TASK_SERVICE_PAGE_SLUG ),
+				'link_label' => __( 'Open →', 'amy-agent' ),
+			),
+			array(
+				'title'    => __( 'Chat', 'amy-agent' ),
+				'subtitle' => __( 'Talk with Amy the Leader', 'amy-agent' ),
+				'icon'     => 'format-chat',
+				'href'     => admin_url( 'admin.php?page=amy-chat' ),
+				'link_label' => __( 'Open →', 'amy-agent' ),
+			),
+			array(
+				'title'    => __( 'Analytics', 'amy-agent' ),
+				'subtitle' => __( 'Site usage and lead insights', 'amy-agent' ),
+				'icon'     => 'chart-bar',
+				'href'     => admin_url( 'admin.php?page=' . self::ANALYTICS_PAGE_SLUG ),
+				'link_label' => __( 'Open →', 'amy-agent' ),
+			),
+			array(
+				'title'    => __( 'SEO Tasks', 'amy-agent' ),
+				'subtitle' => __( 'Find and fix SEO issues', 'amy-agent' ),
+				'icon'     => 'search',
+				'href'     => admin_url( 'admin.php?page=' . self::SEO_TASKS_PAGE_SLUG ),
+				'link_label' => __( 'Open →', 'amy-agent' ),
+			),
+			array(
+				'title'    => __( 'Brand & Avatar', 'amy-agent' ),
+				'subtitle' => __( 'Amy’s look and display name', 'amy-agent' ),
+				'icon'     => 'admin-users',
+				'href'     => admin_url( 'admin.php?page=' . self::BRAND_PAGE_SLUG ),
+				'link_label' => __( 'Open →', 'amy-agent' ),
 			),
 		);
 		?>
-		<div class="wrap amy-agent-overview">
+		<div class="wrap amy-agent-overview amy-admin-ui">
 			<header class="amy-agent-overview__header">
 				<span class="amy-agent-overview__eyebrow"><?php echo esc_html__( 'AMY · DIGITAL EMPLOYEE', 'amy-agent' ); ?></span>
 				<h1 class="amy-agent-overview__title"><?php echo esc_html__( 'Overview', 'amy-agent' ); ?></h1>
 				<p class="amy-agent-overview__intro">
-					<?php echo esc_html__( 'Your command center — status of every Amy tool at a glance.', 'amy-agent' ); ?>
+					<?php echo esc_html__( 'Your command center — feature switches and shortcuts into every Amy area.', 'amy-agent' ); ?>
 				</p>
 				<span class="amy-agent-overview__underline" aria-hidden="true"></span>
-				<div class="amy-agent-overview__orbit" aria-hidden="true">
-					<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" focusable="false">
-						<circle cx="60" cy="60" r="10" fill="currentColor" opacity="0.9"/>
-						<ellipse cx="60" cy="60" rx="48" ry="18" stroke="currentColor" stroke-width="1.5" transform="rotate(0 60 60)"/>
-						<ellipse cx="60" cy="60" rx="48" ry="18" stroke="currentColor" stroke-width="1.5" transform="rotate(60 60 60)"/>
-						<ellipse cx="60" cy="60" rx="48" ry="18" stroke="currentColor" stroke-width="1.5" transform="rotate(120 60 60)"/>
-						<circle cx="108" cy="60" r="3" fill="currentColor"/>
-						<circle cx="36" cy="18.5" r="2.5" fill="currentColor"/>
-						<circle cx="36" cy="101.5" r="2.5" fill="currentColor"/>
-					</svg>
-				</div>
 			</header>
 
-			<?php if ( ! empty( $metrics['connection_hint'] ) ) : ?>
-				<p class="amy-agent-overview__connection-hint" role="status">
-					<?php echo esc_html( $metrics['connection_hint'] ); ?>
-				</p>
-			<?php endif; ?>
-
-			<div class="amy-agent-overview__stats">
-				<?php foreach ( $top_stats as $stat ) : ?>
-					<?php
-					$display = $this->format_overview_metric_value( $stat['value'] ?? null );
-					$note    = isset( $stat['note'] ) ? $stat['note'] : null;
-					if ( null === ( $stat['value'] ?? null ) && null === $note ) {
-						$note = $unavailable;
-					}
-					?>
-					<div class="amy-agent-overview__stat">
-						<p class="amy-agent-overview__stat-label"><?php echo esc_html( $stat['label'] ); ?></p>
-						<p class="amy-agent-overview__stat-value">
-							<?php echo esc_html( $display ); ?>
-							<?php if ( null !== $note && '' !== $note ) : ?>
-								<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $note ); ?></span>
-							<?php endif; ?>
-						</p>
-					</div>
-				<?php endforeach; ?>
+			<div class="amy-admin-stats" role="group" aria-label="<?php echo esc_attr__( 'Amy status', 'amy-agent' ); ?>">
+				<div class="amy-admin-stat">
+					<p class="amy-admin-stat__label"><?php echo esc_html__( 'Features active', 'amy-agent' ); ?></p>
+					<p class="amy-admin-stat__value">
+						<?php
+						echo esc_html(
+							sprintf(
+								/* translators: 1: enabled count, 2: total toggles */
+								__( '%1$d / %2$d', 'amy-agent' ),
+								(int) $features_on,
+								(int) $features_total
+							)
+						);
+						?>
+					</p>
+				</div>
+				<div class="amy-admin-stat">
+					<p class="amy-admin-stat__label"><?php echo esc_html__( 'Connection', 'amy-agent' ); ?></p>
+					<p class="amy-admin-stat__value amy-admin-stat__value--<?php echo esc_attr( $status_class ); ?>">
+						<?php echo esc_html( $status_label ); ?>
+					</p>
+				</div>
+				<div class="amy-admin-stat">
+					<p class="amy-admin-stat__label"><?php echo esc_html__( 'Plugin version', 'amy-agent' ); ?></p>
+					<p class="amy-admin-stat__value"><?php echo esc_html( AMY_AGENT_VERSION ); ?></p>
+				</div>
 			</div>
 
-			<div class="amy-agent-overview__grid">
-				<?php foreach ( $cards as $card ) : ?>
+			<div class="amy-admin-card-grid">
+				<?php foreach ( $cards as $index => $card ) : ?>
 					<?php
-					$is_hero = ! empty( $card['hero'] );
-					$card_classes = 'amy-agent-overview__card';
-					if ( $is_hero ) {
-						$card_classes .= ' amy-agent-overview__card--hero';
-					}
-					if ( ! empty( $card['coming_soon'] ) ) {
-						$card_classes .= ' amy-agent-overview__card--coming-soon';
-					}
-
-					if ( ! empty( $card['href'] ) ) {
-						$card_url = $card['href'];
-					} else {
-						$card_url = admin_url( 'admin.php?page=' . $card['slug'] );
-					}
+					$link_label = ! empty( $card['link_label'] ) ? $card['link_label'] : __( 'Settings →', 'amy-agent' );
+					$has_toggle = ! empty( $card['toggle'] );
+					$toggle_on  = $has_toggle && ! empty( $card['toggle']['on'] );
+					$toggle_aria = $has_toggle
+						? ( $toggle_on
+							? (string) ( $card['toggle']['aria'] ?? '' )
+							: (string) ( $card['toggle']['aria_off'] ?? '' ) )
+						: '';
 					?>
-					<article class="<?php echo esc_attr( $card_classes ); ?>">
-						<div class="amy-agent-overview__card-top">
-							<span class="amy-agent-overview__card-icon" aria-hidden="true">
+					<article class="amy-admin-card<?php echo $has_toggle && $toggle_on ? ' amy-admin-card--accent' : ''; ?>">
+						<div class="amy-admin-card__top">
+							<span class="amy-admin-card__icon" aria-hidden="true">
 								<span class="dashicons dashicons-<?php echo esc_attr( $card['icon'] ); ?>"></span>
 							</span>
-							<div class="amy-agent-overview__card-heading">
-								<h2 class="amy-agent-overview__card-title"><?php echo esc_html( $card['title'] ); ?></h2>
-								<p class="amy-agent-overview__card-desc"><?php echo esc_html( $card['description'] ); ?></p>
+							<div class="amy-admin-card__heading">
+								<div class="amy-admin-card__title-row">
+									<h2 class="amy-admin-card__title"><?php echo esc_html( $card['title'] ); ?></h2>
+									<?php if ( ! empty( $card['help'] ) ) : ?>
+										<?php
+										Amy_Admin_UI::render_help(
+											'overview-' . $index,
+											(string) $card['help'],
+											sprintf(
+												/* translators: %s: card title */
+												__( 'About %s', 'amy-agent' ),
+												(string) $card['title']
+											)
+										);
+										?>
+									<?php endif; ?>
+								</div>
+								<p class="amy-admin-card__subtitle"><?php echo esc_html( $card['subtitle'] ); ?></p>
 							</div>
 						</div>
-
-						<?php if ( ! empty( $card['metrics'] ) ) : ?>
-							<div class="amy-agent-overview__card-metrics">
-								<?php foreach ( $card['metrics'] as $metric ) : ?>
-									<?php
-									$metric_value = array_key_exists( 'value', $metric ) ? $metric['value'] : null;
-									$metric_note  = isset( $metric['note'] ) ? $metric['note'] : null;
-									if ( null === $metric_value && null === $metric_note ) {
-										$metric_note = $unavailable;
-									}
-									?>
-									<div class="amy-agent-overview__card-metric">
-										<p class="amy-agent-overview__card-metric-label"><?php echo esc_html( $metric['label'] ); ?></p>
-										<p class="amy-agent-overview__card-metric-value">
-											<?php echo esc_html( $this->format_overview_metric_value( $metric_value ) ); ?>
-											<?php if ( null !== $metric_note && '' !== $metric_note ) : ?>
-												<span class="amy-agent-overview__coming-soon"><?php echo esc_html( $metric_note ); ?></span>
-											<?php endif; ?>
-										</p>
-									</div>
-								<?php endforeach; ?>
-							</div>
-						<?php endif; ?>
-
-						<?php if ( ! empty( $card['coming_soon'] ) ) : ?>
-							<span class="amy-agent-overview__card-link amy-agent-overview__card-link--disabled">
-								<?php echo esc_html( $coming_soon ); ?>
-							</span>
-						<?php else : ?>
-							<a
-								class="amy-agent-overview__card-link"
-								href="<?php echo esc_url( $card_url ); ?>"
-							>
-								<?php echo esc_html__( 'See more →', 'amy-agent' ); ?>
+						<div class="amy-admin-card__footer">
+							<?php if ( $has_toggle ) : ?>
+								<?php Amy_Admin_UI::render_switch_readonly( $toggle_on, $toggle_aria ); ?>
+							<?php else : ?>
+								<span></span>
+							<?php endif; ?>
+							<a class="amy-admin-card__link" href="<?php echo esc_url( $card['href'] ); ?>">
+								<?php echo esc_html( $link_label ); ?>
+							</a>
+						</div>
+						<?php if ( ! empty( $card['extra_href'] ) && ! empty( $card['extra_label'] ) ) : ?>
+							<a class="amy-admin-card__link amy-agent-overview__extra-link" href="<?php echo esc_url( $card['extra_href'] ); ?>">
+								<?php echo esc_html( $card['extra_label'] ); ?>
 							</a>
 						<?php endif; ?>
 					</article>

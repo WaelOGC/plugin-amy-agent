@@ -5,9 +5,9 @@
 .amy-agent-settings {
 	--amy-bg: #0A0A0A;
 	--amy-panel: #141414;
-	--amy-border: #F7941D;
-	--amy-grad-start: #FF7A18;
-	--amy-grad-end: #FFC542;
+	--amy-border: #F7931E;
+	--amy-grad-start: #F7931E;
+	--amy-grad-end: #FFB238;
 	--amy-text: #FFFFFF;
 	--amy-text-muted: #C9C9C9;
 	--amy-text-on-accent: #1A1200;
@@ -273,11 +273,16 @@
 .amy-agent-settings__field input[type='email'],
 .amy-agent-settings__field input[type='url'],
 .amy-agent-settings__field input[type='password'],
-.amy-agent-settings__field select {
+.amy-agent-settings__field select,
+.amy-agent-settings .amy-admin-field input[type='text'],
+.amy-agent-settings .amy-admin-field input[type='email'],
+.amy-agent-settings .amy-admin-field input[type='url'],
+.amy-agent-settings .amy-admin-field input[type='password'],
+.amy-agent-settings .amy-admin-field select {
 	width: 100%;
 	max-width: 32rem;
 	padding: 0.7rem 0.85rem;
-	border: 1px solid rgba(247, 148, 29, 0.35);
+	border: 1px solid rgba(247, 147, 30, 0.35);
 	border-radius: 10px;
 	background: #0f0f0f;
 	color: var(--amy-text);
@@ -287,25 +292,31 @@
 }
 
 .amy-agent-settings__field input:focus,
-.amy-agent-settings__field select:focus {
+.amy-agent-settings__field select:focus,
+.amy-agent-settings .amy-admin-field input:focus,
+.amy-agent-settings .amy-admin-field select:focus {
 	border-color: var(--amy-border);
 	outline: none;
-	box-shadow: 0 0 0 1px rgba(255, 122, 24, 0.35);
+	box-shadow: 0 0 0 1px rgba(247, 147, 30, 0.35);
 }
 
-.amy-agent-settings__field input.is-invalid {
+.amy-agent-settings__field input.is-invalid,
+.amy-agent-settings .amy-admin-field input.is-invalid {
 	border-color: var(--amy-urgent);
 	box-shadow: 0 0 0 1px rgba(227, 93, 106, 0.35);
 }
 
-.amy-agent-settings__field select {
+.amy-agent-settings__field select,
+.amy-agent-settings .amy-admin-field select {
 	cursor: pointer;
 }
 
-.amy-agent-settings__field select option {
+.amy-agent-settings__field select option,
+.amy-agent-settings .amy-admin-field select option {
 	background: #141414;
 	color: var(--amy-text);
 }
+
 
 .amy-agent-settings__hint,
 .amy-agent-settings__saved {
