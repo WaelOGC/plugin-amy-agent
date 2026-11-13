@@ -917,7 +917,8 @@ class Amy_Telegram {
 			return;
 		}
 
-		$this->send_message( $chat_id, $reply, false );
+		// Slash replies may include Markdown from the service (recommendations).
+		$this->send_message( $chat_id, $reply, true );
 	}
 
 	/**
@@ -1333,6 +1334,43 @@ class Amy_Telegram {
 	 * @param bool   $allow_html Whether to use HTML parse mode.
 	 * @return array{ok:bool,error:string|null}
 	 */
+	/**
+	 * Whether a Bot API response is a parse_mode / entities rejection.
+	 *
+	 * Telegram often returns HTTP 200 with JSON ``ok:false`` and
+	 * ``error_code:400`` (description mentions parse entities). Checking only
+	 * the HTTP status misses those and skips the HTML→safe fallback.
+	 *
+	 * @param array{ok:bool,status:int,data:array|null,error:string|null} $result API result.
+	 * @return bool
+	 */
+	public static function is_telegram_parse_error( array $result ) {
+		if ( ! empty( $result['ok'] ) ) {
+			return false;
+		}
+		$error_code = 0;
+		if ( isset( $result['data'] ) && is_array( $result['data'] ) && isset( $result['data']['error_code'] ) ) {
+			$error_code = (int) $result['data']['error_code'];
+		}
+		if ( 400 === (int) $result['status'] || 400 === $error_code ) {
+			return true;
+		}
+		$err = isset( $result['error'] ) ? strtolower( (string) $result['error'] ) : '';
+		return ( false !== strpos( $err, 'parse' ) ) || ( false !== strpos( $err, 'entities' ) );
+	}
+
+	/**
+	 * Drop blockquote wrappers but keep inner HTML (bold etc.) for a safer retry.
+	 *
+	 * @param string $html HTML from markdown_to_telegram_html().
+	 * @return string
+	 */
+	public static function strip_telegram_blockquotes( $html ) {
+		$html = (string) $html;
+		$html = str_replace( array( '<blockquote>', '</blockquote>' ), '', $html );
+		return $html;
+	}
+
 	private function send_message( $chat_id, $text, $allow_html ) {
 		$chunks = self::split_message_chunks( $text );
 		$last   = array( 'ok' => true, 'error' => null );
@@ -1349,7 +1387,24 @@ class Amy_Telegram {
 						'disable_web_page_preview' => true,
 					)
 				);
-				if ( ! $result['ok'] && 400 === (int) $result['status'] ) {
+				// Retry without blockquotes (keep <b>/<i>/…) before plain text.
+				if ( self::is_telegram_parse_error( $result ) && false !== strpos( $html, '<blockquote>' ) ) {
+					$safe   = self::strip_telegram_blockquotes( $html );
+					$result = $this->telegram_api_request(
+						'sendMessage',
+						array(
+							'chat_id'                  => $chat_id,
+							'text'                     => $safe,
+							'parse_mode'               => 'HTML',
+							'disable_web_page_preview' => true,
+						)
+					);
+				}
+				if ( self::is_telegram_parse_error( $result ) ) {
+					// Last resort: still convert Markdown→HTML markers to visible
+					// structure by stripping tags but keeping the converted bullets.
+					// Prefer plain original chunk so raw ** is visible for debugging
+					// rather than silently dropping formatting with no send.
 					$result = $this->telegram_api_request(
 						'sendMessage',
 						array(

@@ -92,7 +92,7 @@ def test_format_recommendation_structure() -> None:
     assert "**Evidence**\n3 hot sessions in last 7d (n=40)." in text
     assert "**Confidence: medium**" in text
     assert "**Limitations**\nRule-based intent only." in text
-    assert "> **Next step**\n> Review Amy → Analytics hot sample." in text
+    assert "**Next step**\nReview Amy → Analytics hot sample." in text
 
 
 def test_format_recommendation_omits_action_when_none() -> None:

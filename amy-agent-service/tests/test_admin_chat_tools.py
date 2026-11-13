@@ -138,6 +138,11 @@ def test_allowlisted_tool_specs() -> None:
             "who can we email for marketing?",
             ["email_audience_summary"],
         ),
+        (
+            "How are the potential clients doing today?",
+            ["analytics_summary"],
+        ),
+        ("any new prospects?", ["analytics_summary"]),
     ],
 )
 def test_detect_admin_tool_intent(text: str, expected: list[str]) -> None:
@@ -346,11 +351,12 @@ _SAMPLE_REC = {
 }
 
 _SAMPLE_REC_BLOCK = (
+    "**Recommendations**\n"
     "**Finding**\n1 hot lead session is active.\n"
     "**Evidence**\nBased on 3 lead sessions in Amy Analytics.\n"
     "**Confidence: low**\n"
     "**Limitations**\nLead status is a heuristic, not a purchase guarantee.\n"
-    "> **Next step**\n> Review the hot sample and follow up."
+    "**Next step**\nReview the hot sample and follow up."
 )
 
 

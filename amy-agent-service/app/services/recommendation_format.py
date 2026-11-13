@@ -119,9 +119,12 @@ def recommendation_from_mapping(data: Mapping[str, Any]) -> Recommendation:
 def format_recommendation(rec: Recommendation) -> str:
     """Render one recommendation for Telegram / admin chat text.
 
-    Uses Markdown the Telegram HTML converter turns into bold section titles
-    and a highlighted Next-step blockquote. Judgment-focused: confidence,
-    limitations, and action — not a second dump of the same counts.
+    Uses Markdown the Telegram HTML converter turns into bold section titles.
+    Next-step is bold lines (not a ``>`` blockquote): blockquotes have caused
+    Telegram HTML ``parse_mode`` rejections, and the plugin's plain-text
+    fallback historically keyed off HTTP 400 only (Bot API often returns HTTP
+    200 + ``error_code`` 400), which dropped the formatted block entirely or
+    left a model-paraphrased plain trailer visible instead.
     """
     lines = [
         f"**Finding**\n{rec.finding}",
@@ -130,7 +133,7 @@ def format_recommendation(rec: Recommendation) -> str:
         f"**Limitations**\n{rec.limitations}",
     ]
     if rec.recommended_action:
-        lines.append(f"> **Next step**\n> {rec.recommended_action}")
+        lines.append(f"**Next step**\n{rec.recommended_action}")
     return "\n".join(lines)
 
 
