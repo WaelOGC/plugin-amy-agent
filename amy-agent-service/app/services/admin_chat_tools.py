@@ -11,7 +11,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from app.db import analytics_db
 from app.providers.base import BaseProvider
@@ -25,6 +25,12 @@ from app.services.analytics_summary import (
 from app.services.email_audience_summary import (
     email_audience_summary_for_chat,
     format_email_audience_chat_context,
+)
+from app.services.recommendation_format import (
+    Recommendation,
+    format_recommendations,
+    recommendation_from_mapping,
+    recommendation_to_dict,
 )
 from app.services.seo_task_summary import (
     format_seo_chat_context,
@@ -460,15 +466,20 @@ def tool_result_message(call: ToolCallRequest, result: dict[str, Any]) -> ChatMe
     )
 
 
-def intent_context_messages(tool_names: Sequence[str]) -> tuple[list[ChatMessage], list[str]]:
-    """Auto-invoke tools from intent and return system context messages + names used."""
+def intent_context_messages(
+    tool_names: Sequence[str],
+) -> tuple[list[ChatMessage], list[str], list[dict[str, Any]]]:
+    """Auto-invoke tools from intent; return context messages, names, recommendation dicts."""
     messages: list[ChatMessage] = []
     used: list[str] = []
+    recommendations: list[Recommendation] = []
+    seen: set[tuple[str, str]] = set()
     for name in tool_names:
         if name not in ADMIN_TOOL_NAMES:
             continue
         result = execute_admin_tool(name, {})
         used.append(name)
+        _collect_recommendations(result.get("recommendations"), recommendations, seen)
         body = result.get("chat_context") or result.get("summary") or json.dumps(result)
         messages.append(
             ChatMessage(
@@ -480,7 +491,41 @@ def intent_context_messages(tool_names: Sequence[str]) -> tuple[list[ChatMessage
                 ),
             )
         )
-    return messages, used
+    # Plain dicts so callers can seed the tool loop without importing Recommendation.
+    return messages, used, [recommendation_to_dict(r) for r in recommendations]
+
+
+def _collect_recommendations(
+    raw_items: Any,
+    accumulated: list[Recommendation],
+    seen: set[tuple[str, str]],
+) -> None:
+    """Parse recommendation dicts into ``accumulated``, deduping by (finding, evidence)."""
+    if not isinstance(raw_items, list):
+        return
+    for item in raw_items:
+        if not isinstance(item, Mapping):
+            continue
+        try:
+            rec = recommendation_from_mapping(item)
+        except (TypeError, ValueError):
+            continue
+        key = (rec.finding, rec.evidence)
+        if key in seen:
+            continue
+        seen.add(key)
+        accumulated.append(rec)
+
+
+def _append_recommendations_to_reply(
+    text: str,
+    recommendations: Sequence[Recommendation],
+) -> str:
+    """Deterministically append the structured block when any recommendations exist."""
+    if not recommendations:
+        return text
+    block = format_recommendations(list(recommendations))
+    return f"{text.rstrip()}\n\n{block}"
 
 
 def _assistant_tool_call_message(turn: CompletionTurn) -> ChatMessage:
@@ -519,19 +564,30 @@ async def run_admin_tool_loop(
     api_key: str,
     model: str | None,
     max_rounds: int = MAX_TOOL_ROUNDS,
+    seed_recommendations: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[str, list[str]]:
     """Provider tool-calling loop for admin mode.
 
     Returns ``(assistant_text, tools_used)``. When the provider lacks tool support,
     falls back to a single ``complete()`` text turn (intent context should already
     be injected by the caller).
+
+    Structured ``recommendations`` from tool results (and optional
+    ``seed_recommendations`` from intent auto-invoke) are accumulated across
+    rounds, deduped by ``(finding, evidence)``, and appended verbatim to the
+    final model text via :func:`format_recommendations` — never left to the
+    model to reproduce.
     """
     tools_used: list[str] = []
     working = list(messages)
+    collected: list[Recommendation] = []
+    seen_recs: set[tuple[str, str]] = set()
+    if seed_recommendations:
+        _collect_recommendations(list(seed_recommendations), collected, seen_recs)
 
     if not getattr(provider, "supports_tools", False):
         text = await provider.complete(working, api_key=api_key, model=model)
-        return text, tools_used
+        return _append_recommendations_to_reply(text, collected), tools_used
 
     for _ in range(max(1, max_rounds)):
         turn = await provider.complete_turn(
@@ -544,7 +600,7 @@ async def run_admin_tool_loop(
             text = (turn.text or "").strip()
             if not text:
                 raise ValueError("empty_reply")
-            return text, tools_used
+            return _append_recommendations_to_reply(text, collected), tools_used
 
         # Normalize IDs before recording the assistant tool_calls message so
         # tool_result tool_call_id values always match (OpenAI/Anthropic require it).
@@ -558,6 +614,7 @@ async def run_admin_tool_loop(
             result = execute_admin_tool(call.name, call.arguments)
             if call.name in ADMIN_TOOL_NAMES and call.name not in tools_used:
                 tools_used.append(call.name)
+            _collect_recommendations(result.get("recommendations"), collected, seen_recs)
             working.append(tool_result_message(call, result))
 
     # Exhausted rounds — ask for a final text-only answer without tools.
@@ -570,4 +627,4 @@ async def run_admin_tool_loop(
     text = (final.text or "").strip()
     if not text:
         raise ValueError("empty_reply")
-    return text, tools_used
+    return _append_recommendations_to_reply(text, collected), tools_used

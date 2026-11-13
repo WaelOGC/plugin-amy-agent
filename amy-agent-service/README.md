@@ -111,6 +111,10 @@ A plain restart of an older install without a rebuild will miss PDF/image proces
 
 ## Changelog
 
+### 0.2.25
+
+Admin chat: append evidence-based recommendation blocks (`📊`/`📈`/`🎯`/`⚠️`/`✅`) verbatim after the model reply. `run_admin_tool_loop` accumulates `recommendations` from tool results (and intent auto-invoke seeds), dedupes by finding+evidence, and formats them in code — providers no longer paraphrase the structure away. Admin system prompt asks the model not to restate conclusions/confidence/actions. Plugin/widget unchanged (service only).
+
 ### 0.2.24
 
 Gemini tool-calling: preserve `thoughtSignature` on function-call parts through parse → `ToolCallRequest` / `ToolCallPart` → `_gemini_contents` replay. Fixes HTTP 400 `Function call is missing a thought_signature` on follow-up admin-chat turns with `gemini-3.6-flash` (and other Gemini 3 models). Other providers unchanged. Plugin/widget unchanged (service only).

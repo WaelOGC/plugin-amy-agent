@@ -453,7 +453,7 @@ def test_chat_rejects_empty_key_cleanly(client: TestClient) -> None:
 
 
 def test_general_mode_system_prompt_unchanged() -> None:
-    messages, tools_used = _messages_with_system(
+    messages, tools_used, _seed = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="general",
     )
@@ -465,7 +465,7 @@ def test_general_mode_system_prompt_unchanged() -> None:
 
 def test_general_mode_appends_pricing_catalogue_when_present() -> None:
     catalogue = "Custom WordPress Development\nStarter Website — €549, one-off"
-    messages, tools_used = _messages_with_system(
+    messages, tools_used, _seed = _messages_with_system(
         [ChatMessage(role="user", content="How much is a starter site?")],
         mode="general",
         pricing_catalogue=catalogue,
@@ -483,7 +483,7 @@ def test_general_mode_without_catalogue_keeps_base_prompt() -> None:
     assert _public_system_content(None) == AMY_SYSTEM_PROMPT
     assert _public_system_content("") == AMY_SYSTEM_PROMPT
     assert _public_system_content("   ") == AMY_SYSTEM_PROMPT
-    messages, _ = _messages_with_system(
+    messages, _, _seed = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="general",
         pricing_catalogue="",
@@ -510,7 +510,7 @@ def test_pricing_catalogue_over_long_input_is_capped() -> None:
 
 def test_admin_mode_never_receives_pricing_catalogue() -> None:
     catalogue = "Custom WordPress Development\nStarter Website — €549, one-off"
-    messages, tools_used = _messages_with_system(
+    messages, tools_used, _seed = _messages_with_system(
         [ChatMessage(role="user", content="What are our WP prices?")],
         mode="admin",
         pricing_catalogue=catalogue,
@@ -524,7 +524,7 @@ def test_admin_mode_never_receives_pricing_catalogue() -> None:
 
 
 def test_support_mode_uses_public_prompt_not_admin() -> None:
-    messages, tools_used = _messages_with_system(
+    messages, tools_used, _seed = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="support",
         wp_user_name="Should Be Ignored",
@@ -536,7 +536,7 @@ def test_support_mode_uses_public_prompt_not_admin() -> None:
 
 
 def test_admin_mode_uses_admin_prompt_without_always_on_snapshots() -> None:
-    messages, tools_used = _messages_with_system(
+    messages, tools_used, _seed = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="admin",
     )
@@ -559,7 +559,7 @@ def test_admin_mode_uses_admin_prompt_without_always_on_snapshots() -> None:
 
 
 def test_admin_mode_appends_identity_when_name_or_email_present() -> None:
-    messages, tools_used = _messages_with_system(
+    messages, tools_used, _seed = _messages_with_system(
         [ChatMessage(role="user", content="hello")],
         mode="admin",
         wp_user_name="Wael",
@@ -588,7 +588,7 @@ def test_admin_mode_intent_auto_invokes_multi_tools() -> None:
             return_value=_LIVE_TASK_SNAP,
         ),
     ):
-        messages, tools_used = _messages_with_system(
+        messages, tools_used, _seed = _messages_with_system(
             [
                 ChatMessage(
                     role="user",
@@ -619,7 +619,7 @@ def test_admin_mode_can_force_legacy_snapshots() -> None:
             return_value=_EMPTY_TASK_SNAP,
         ),
     ):
-        messages, tools_used = _messages_with_system(
+        messages, tools_used, _seed = _messages_with_system(
             [ChatMessage(role="user", content="hello")],
             mode="admin",
             include_analytics_snapshot=True,
@@ -639,7 +639,7 @@ def test_admin_mode_can_skip_forced_seo_task_snapshots() -> None:
         "app.routes.chat.analytics_summary_for_chat",
         return_value=_EMPTY_ANALYTICS_SNAP,
     ):
-        messages, _tools = _messages_with_system(
+        messages, _tools, _seed = _messages_with_system(
             [ChatMessage(role="user", content="hello")],
             mode="admin",
             include_analytics_snapshot=True,
@@ -968,3 +968,5 @@ def test_admin_prompt_mentions_tools_and_richer_analytics_fields() -> None:
     assert "orchestrator" in lower or "allowlisted" in lower
     assert "you have no live access" not in lower
     assert "seo tasks, task service board stats, and live web search are not wired" not in lower
+    assert "do not restate conclusions" in lower
+    assert "structured recommendations summary" in lower

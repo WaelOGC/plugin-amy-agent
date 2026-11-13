@@ -194,7 +194,7 @@ def _messages_with_system(
     auto_invoke_tools: bool = True,
     pricing_catalogue: str | None = None,
     closing_wish_hint: str | None = None,
-) -> tuple[list[ChatMessage], list[str]]:
+) -> tuple[list[ChatMessage], list[str], list[dict]]:
     """Prepend Amy's persona prompt unless a system message is already first.
 
     Admin mode (P3): hybrid orchestrator —
@@ -208,16 +208,19 @@ def _messages_with_system(
     ``pricing_catalogue`` is non-empty, and an optional closing-wish hint.
     Admin mode never receives either.
 
-    Returns ``(messages, tools_auto_invoked)``.
+    Returns ``(messages, tools_auto_invoked, seed_recommendations)``.
+    ``seed_recommendations`` are structured recommendation dicts from intent
+    auto-invoke (admin only); the tool loop appends them verbatim to the reply.
     """
     if messages and messages[0].role == "system":
-        return messages, []
+        return messages, [], []
 
     if mode == "admin":
         system_msgs: list[ChatMessage] = [
             ChatMessage(role="system", content=AMY_ADMIN_SYSTEM_PROMPT)
         ]
         tools_used: list[str] = []
+        seed_recommendations: list[dict] = []
 
         if include_analytics_snapshot:
             system_msgs.append(_admin_analytics_context_message())
@@ -237,14 +240,16 @@ def _messages_with_system(
                 skip.update({"seo_summary", "task_stats"})
             intent_names = [n for n in intent_names if n not in skip]
             if intent_names:
-                ctx_msgs, used = intent_context_messages(intent_names)
+                ctx_msgs, used, seed_recommendations = intent_context_messages(
+                    intent_names
+                )
                 system_msgs.extend(ctx_msgs)
                 tools_used.extend(used)
 
         identity = _admin_identity_message(wp_user_name, wp_user_email)
         if identity is not None:
             system_msgs.append(identity)
-        return [*system_msgs, *messages], tools_used
+        return [*system_msgs, *messages], tools_used, seed_recommendations
 
     return [
         ChatMessage(
@@ -255,7 +260,7 @@ def _messages_with_system(
             ),
         ),
         *messages,
-    ], []
+    ], [], []
 
 
 def _content_for_provider(msg: ChatMessage) -> str:
@@ -550,7 +555,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
             if last_prepared.role == "user":
                 new_user_message = last_prepared
 
-    prepared, auto_tools = _messages_with_system(
+    prepared, auto_tools, seed_recommendations = _messages_with_system(
         history_for_completion,
         mode=body.mode,
         wp_user_name=body.wp_user_name,
@@ -568,6 +573,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
                 messages,
                 api_key=api_key,
                 model=body.ai.model,
+                seed_recommendations=seed_recommendations,
             )
             for name in loop_tools:
                 if name not in tools_used:

@@ -175,7 +175,7 @@ def test_admin_mode_never_gets_closing_wish_hint() -> None:
     assert resolved is None
     assert mark is False
 
-    messages, _ = _messages_with_system(
+    messages, _, _seed = _messages_with_system(
         [ChatMessage(role="user", content="Thanks, bye!")],
         mode="admin",
         closing_wish_hint=hint_block,
