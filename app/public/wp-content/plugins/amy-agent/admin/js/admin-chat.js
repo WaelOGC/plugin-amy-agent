@@ -104,6 +104,52 @@
 		}
 
 		function renderMarkdown(raw) {
+			var source = String(raw == null ? '' : raw);
+			var htmlChunks = [];
+			var cursor = 0;
+			var htmlRe = /@@AMY_TG_HTML@@\r?\n?([\s\S]*?)@@\/AMY_TG_HTML@@/g;
+			var match;
+			while ((match = htmlRe.exec(source)) !== null) {
+				if (match.index > cursor) {
+					htmlChunks.push(renderMarkdownSegment(source.slice(cursor, match.index)));
+				}
+				// Service already escaped body text; allow only <b> labels through.
+				htmlChunks.push(
+					String(match[1] || '')
+						.replace(/<\/?b>/gi, function (tag) {
+							return tag.toLowerCase() === '<b>'
+								? '<strong>'
+								: '</strong>';
+						})
+						.replace(/\n/g, '<br>')
+				);
+				cursor = match.index + match[0].length;
+			}
+			if (cursor < source.length || htmlChunks.length === 0) {
+				htmlChunks.push(renderMarkdownSegment(source.slice(cursor)));
+			}
+			return htmlChunks.join('');
+		}
+
+		function boldRecommendationLabels(line) {
+			var labels = {
+				Recommendations: true,
+				Finding: true,
+				Evidence: true,
+				Limitations: true,
+				'Next step': true,
+				'Suggested action': true
+			};
+			if (labels[line]) {
+				return '<strong>' + line + '</strong>';
+			}
+			if (/^Confidence:\s+\S/.test(line)) {
+				return '<strong>' + line + '</strong>';
+			}
+			return line;
+		}
+
+		function renderMarkdownSegment(raw) {
 			var escaped = escapeHtml(raw || '');
 			var lines = escaped.split('\n');
 			var htmlParts = [];
@@ -122,7 +168,7 @@
 					/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
 					'<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
 				);
-				return text;
+				return boldRecommendationLabels(text);
 			}
 
 			lines.forEach(function (line) {

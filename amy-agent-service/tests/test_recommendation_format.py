@@ -88,11 +88,12 @@ def test_format_recommendation_structure() -> None:
         recommended_action="Review Amy → Analytics hot sample.",
     )
     text = format_recommendation(rec)
-    assert "**Finding**\nHot leads need follow-up." in text
-    assert "**Evidence**\n3 hot sessions in last 7d (n=40)." in text
-    assert "**Confidence: medium**" in text
-    assert "**Limitations**\nRule-based intent only." in text
-    assert "**Next step**\nReview Amy → Analytics hot sample." in text
+    assert "<b>Finding</b>\nHot leads need follow-up." in text
+    assert "<b>Evidence</b>\n3 hot sessions in last 7d (n=40)." in text
+    assert "<b>Confidence: medium</b>" in text
+    assert "<b>Limitations</b>\nRule-based intent only." in text
+    assert "<b>Next step</b>\nReview Amy → Analytics hot sample." in text
+    assert "**" not in text
 
 
 def test_format_recommendation_omits_action_when_none() -> None:
@@ -187,12 +188,14 @@ def test_analytics_recommendation_when_hot(analytics_tmp) -> None:
     assert rec["limitations"]
 
     ctx = format_analytics_chat_context(snap)
-    assert "**Finding**" in ctx
-    assert "**Recommendations**" in ctx
+    assert "<b>Finding</b>" in ctx
+    assert "<b>Recommendations</b>" in ctx
+    assert "@@AMY_TG_HTML@@" in ctx
 
     # Factual slash reply stays count-based (no recommendation block).
     slash = format_analytics_slash_reply(snap)
     assert "Sessions:" in slash
+    assert "<b>Finding</b>" not in slash
     assert "**Finding**" not in slash
 
 
@@ -202,7 +205,7 @@ def test_analytics_no_recommendation_without_hot(analytics_tmp) -> None:
     analytics_db.set_lead_status("only-cold", "cold")
     snap = build_analytics_summary()
     assert snap["recommendations"] == []
-    assert "**Finding**" not in format_analytics_chat_context(snap)
+    assert "<b>Finding</b>" not in format_analytics_chat_context(snap)
     # Direct builder stays empty.
     assert (
         build_analytics_recommendations(
@@ -223,6 +226,7 @@ def test_analytics_factual_empty_unchanged(analytics_tmp) -> None:
     assert snap["recommendations"] == []
     ctx = format_analytics_chat_context(snap)
     assert "EMPTY" in ctx
+    assert "<b>Finding</b>" not in ctx
     assert "**Finding**" not in ctx
     slash = format_analytics_slash_reply(snap)
     assert "no visitor sessions recorded yet" in slash.lower()
@@ -248,7 +252,7 @@ def test_seo_recommendation_when_open(seo_tmp) -> None:
     assert rec["limitations"]
     assert rec["recommended_action"]
     ctx = format_seo_chat_context(snap)
-    assert "**Finding**" in ctx
+    assert "<b>Finding</b>" in ctx
 
 
 def test_seo_no_recommendation_when_no_open(seo_tmp) -> None:
@@ -263,7 +267,7 @@ def test_seo_no_recommendation_when_no_open(seo_tmp) -> None:
     snap = build_seo_review_summary()
     assert snap["open_count"] == 0
     assert snap["recommendations"] == []
-    assert "**Finding**" not in format_seo_chat_context(snap)
+    assert "<b>Finding</b>" not in format_seo_chat_context(snap)
     assert (
         build_seo_recommendations(
             total=1,
@@ -348,7 +352,7 @@ def test_admin_tool_surfaces_formatted_recommendations(analytics_tmp, seo_tmp) -
     result = execute_admin_tool("analytics_summary", {})
     assert result["ok"] is True
     assert result["recommendations"]
-    assert "**Finding**" in result["chat_context"]
+    assert "<b>Finding</b>" in result["chat_context"]
 
     seo_tasks_db.create_check(
         wp_post_id=9,
@@ -359,4 +363,4 @@ def test_admin_tool_surfaces_formatted_recommendations(analytics_tmp, seo_tmp) -
     )
     seo = execute_admin_tool("seo_summary", {})
     assert seo["recommendations"]
-    assert "**Finding**" in seo["chat_context"]
+    assert "<b>Finding</b>" in seo["chat_context"]

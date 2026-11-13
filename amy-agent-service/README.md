@@ -111,6 +111,10 @@ A plain restart of an older install without a rebuild will miss PDF/image proces
 
 ## Changelog
 
+### 0.2.28
+
+Telegram recommendations (AA-20): stop depending on Markdown `**` for the Recommendations trailer. `format_recommendation` / `append_recommendations_block` emit Telegram HTML `<b>` labels (body text HTML-escaped) inside `@@AMY_TG_HTML@@` sentinels; strip a trailing model-echoed plain Finding/Evidence block before append. Pair with plugin **0.2.68** (injects sentinel HTML without double-escaping; also boldifies bare label lines when the model echoes without markers). E2E asserts the final outbound HTML contains `<b>Finding</b>` etc. for the literal live paste.
+
 ### 0.2.27
 
 Telegram recommendations formatting (AA-19): analytics intent now matches “potential clients” / clients / prospects so seed recommendations append for that live question; tool-loop append uses the same `**Recommendations**` header as chat context; Next step is bold lines (not `>` blockquote) to avoid Telegram HTML parse rejections. Pair with plugin **0.2.67** (parse-error fallback checks `error_code` 400 on HTTP 200, retries without blockquote).

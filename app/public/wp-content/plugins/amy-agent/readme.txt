@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.67
+Stable tag: 0.2.68
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,12 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 6. For Task Service outbound: set `WORDPRESS_BASE_URL` on the Python service; enable Telegram under Amy → Settings → Telegram; assignees link chat id from Amy → My Profile. Create the Admin Bot via BotFather (Settings → Telegram has the deeplink + steps).
 
 == Changelog ==
+
+= 0.2.68 =
+* Telegram: stop relying on Markdown `**` for the Recommendations trailer. Promote bare Finding/Evidence/Confidence/Limitations/Next step label lines to `<b>`, and inject service `@@AMY_TG_HTML@@` blocks without double-escaping.
+* Dashboard Chat: render the same HTML recommendation sentinels / bare labels as bold.
+* Requires service 0.2.28+ (recommendations emit Telegram HTML `<b>` inside sentinels; strips model-echoed plain trailers before append).
+* E2E: literal post-0.2.67 live paste (no asterisks) must produce `<b>Finding</b>` etc. in the final outbound HTML.
 
 = 0.2.67 =
 * Telegram: treat Bot API `error_code` 400 (often on HTTP 200) as a parse failure so HTML→safe retries actually run; strip `<blockquote>` and retry HTML before plain fallback.

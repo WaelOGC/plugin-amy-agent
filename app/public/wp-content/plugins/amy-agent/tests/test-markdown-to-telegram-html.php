@@ -147,19 +147,21 @@ amy_assert(
 	$escaped
 );
 
-// --- Real AA-19 fixture: full assembly path (not converter-only) ---
-$real_rec = <<<'MD'
-**Recommendations**
-**Finding**
+// --- AA-20: service HTML sentinel block (no Markdown **) ---
+$service_html_rec = <<<'HTML'
+@@AMY_TG_HTML@@
+<b>Recommendations</b>
+<b>Finding</b>
 7 visitor sessions are scored hot (high-intent).
-**Evidence**
+<b>Evidence</b>
 234 lead sessions total; hot=7, warm=5, cold=222; with_email=3; hot_with_email=2; hot_without_email=5; seen_7d=43.
-**Confidence: high**
-**Limitations**
+<b>Confidence: high</b>
+<b>Limitations</b>
 Hot scoring is rule-based; having an email does not prove consent for marketing — use Approve → Send in Email Marketing.
-**Next step**
+<b>Next step</b>
 Prioritize the hot leads that already left an email, then review the remaining hot sessions in Analytics.
-MD;
+@@/AMY_TG_HTML@@
+HTML;
 
 $model_body = <<<'MD'
 **Activity Overview**
@@ -172,7 +174,7 @@ Here is today's picture of potential clients.
 • Visitor abc12345: (email on file)
 MD;
 
-$outbound = $model_body . "\n\n" . $real_rec;
+$outbound = $model_body . "\n\n" . $service_html_rec;
 $html_e2e = Amy_Telegram::markdown_to_telegram_html( $outbound );
 
 amy_assert( 'e2e: Activity Overview bold', false !== strpos( $html_e2e, '<b>Activity Overview</b>' ), $html_e2e );
@@ -183,14 +185,54 @@ amy_assert( 'e2e: Confidence bold', false !== strpos( $html_e2e, '<b>Confidence:
 amy_assert( 'e2e: Limitations bold', false !== strpos( $html_e2e, '<b>Limitations</b>' ), $html_e2e );
 amy_assert( 'e2e: Next step bold', false !== strpos( $html_e2e, '<b>Next step</b>' ), $html_e2e );
 amy_assert( 'e2e: finding body kept', false !== strpos( $html_e2e, '7 visitor sessions are scored hot' ), $html_e2e );
+amy_assert( 'e2e: Approve arrow kept', false !== strpos( $html_e2e, 'Approve → Send' ), $html_e2e );
+amy_assert( 'e2e: sentinel stripped', false === strpos( $html_e2e, 'AMY_TG_HTML' ), $html_e2e );
 amy_assert( 'e2e: no raw ** left', false === strpos( $html_e2e, '**' ), $html_e2e );
+// Must not double-escape service <b> into visible &lt;b&gt;.
+amy_assert( 'e2e: no escaped b tags', false === strpos( $html_e2e, '&lt;b&gt;' ), $html_e2e );
 
-// Isolated converter with the exact pasted labels (user's manual check).
-$isolated = Amy_Telegram::markdown_to_telegram_html(
-	"**Finding**\n7 visitor sessions are scored hot (high-intent).\n**Evidence**\n234 lead sessions total; hot=7, warm=5, cold=222; with_email=3; hot_with_email=2; hot_without_email=5; seen_7d=43.\n**Confidence: high**\n**Limitations**\nHot scoring is rule-based; having an email does not prove consent for marketing — use Approve → Send in Email Marketing."
+// --- AA-20 regression: LITERAL live paste — bare labels, NO asterisks ---
+$live_plain = <<<'TXT'
+**Lead Status Breakdown**
+🔥 7 hot · 🌤️ 5 warm · ❄️ 222 cold
+
+**Hot Leads Sample**
+• Visitor sample
+
+Recommendations
+Finding
+7 visitor sessions are scored hot (high-intent).
+Evidence
+234 lead sessions total; hot=7, warm=5, cold=222; with_email=3; hot_with_email=2; hot_without_email=5; seen_7d=43.
+Confidence: high
+Limitations
+Hot scoring is rule-based; having an email does not prove consent for marketing — use Approve → Send in Email Marketing.
+Next step
+Prioritize the hot leads that already left an email, then review the remaining hot sessions in Analytics.
+TXT;
+
+$html_live = Amy_Telegram::markdown_to_telegram_html( $live_plain );
+amy_assert( 'live: Lead Status bold', false !== strpos( $html_live, '<b>Lead Status Breakdown</b>' ), $html_live );
+amy_assert( 'live: Recommendations bold', false !== strpos( $html_live, '<b>Recommendations</b>' ), $html_live );
+amy_assert( 'live: Finding bold', false !== strpos( $html_live, '<b>Finding</b>' ), $html_live );
+amy_assert( 'live: Evidence bold', false !== strpos( $html_live, '<b>Evidence</b>' ), $html_live );
+amy_assert( 'live: Confidence bold', false !== strpos( $html_live, '<b>Confidence: high</b>' ), $html_live );
+amy_assert( 'live: Limitations bold', false !== strpos( $html_live, '<b>Limitations</b>' ), $html_live );
+amy_assert( 'live: Next step bold', false !== strpos( $html_live, '<b>Next step</b>' ), $html_live );
+amy_assert( 'live: no bare Finding line', 1 !== preg_match( '/^Finding$/m', $html_live ), $html_live );
+amy_assert( 'live: no bare Next step line', 1 !== preg_match( '/^Next step$/m', $html_live ), $html_live );
+
+// bold_recommendation_labels is idempotent on already-bold lines.
+$already = Amy_Telegram::bold_recommendation_labels( "<b>Finding</b>\nbody" );
+amy_assert( 'idempotent Finding', '<b>Finding</b>' === explode( "\n", $already )[0], $already );
+
+// Dangerous body chars are escaped when they arrive as Markdown (not sentinel HTML).
+$dangerous = Amy_Telegram::markdown_to_telegram_html(
+	"Finding\nSaw <script>x</script> & more\nEvidence\nn=1\nConfidence: low\nLimitations\nn/a"
 );
-amy_assert( 'isolated Finding bold', false !== strpos( $isolated, '<b>Finding</b>' ), $isolated );
-amy_assert( 'isolated Evidence bold', false !== strpos( $isolated, '<b>Evidence</b>' ), $isolated );
+amy_assert( 'escapes script', false !== strpos( $dangerous, '&lt;script&gt;' ), $dangerous );
+amy_assert( 'escapes amp', false !== strpos( $dangerous, '&amp;' ), $dangerous );
+amy_assert( 'still bolds Finding', false !== strpos( $dangerous, '<b>Finding</b>' ), $dangerous );
 
 // Parse-error detection: Bot API often returns HTTP 200 + error_code 400.
 $parse_http200 = array(

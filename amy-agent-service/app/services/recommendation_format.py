@@ -5,10 +5,16 @@ structure (Finding / Evidence / Confidence / Limitations / Suggested action)
 so suggestions never read as guaranteed outcomes.
 
 See plugin ``docs/10-revenue-intelligence-concepts.md`` item 4.
+
+Telegram bold is emitted as HTML ``<b>`` (not Markdown ``**``) inside
+``@@AMY_TG_HTML@@`` sentinels so the WordPress plugin can inject the block
+without ``htmlspecialchars`` double-escaping. Body field text is escaped.
 """
 
 from __future__ import annotations
 
+import html
+import re
 from dataclasses import asdict, dataclass
 from typing import Any, Literal, Mapping
 
@@ -19,6 +25,32 @@ _CONFIDENCE_LABEL = {
     "medium": "medium",
     "low": "low",
 }
+
+# Plugin extracts these markers before htmlspecialchars and restores the
+# inner HTML as already-safe Telegram parse_mode HTML.
+AMY_TG_HTML_START = "@@AMY_TG_HTML@@"
+AMY_TG_HTML_END = "@@/AMY_TG_HTML@@"
+
+# Model often restates Finding/Evidence/… as plain labels (no **). Strip that
+# trailer before we append the canonical HTML block so Telegram does not show
+# a plain duplicate above the bold system block.
+_ECHOED_REC_TRAILER = re.compile(
+    r"\n+"
+    r"(?:"
+    r"(?:\*\*)?Recommendations(?:\*\*)?"
+    r"|"
+    r"<b>Recommendations</b>"
+    r")?\s*\n+"
+    r"(?:"
+    r"(?:\*\*)?Finding(?:\*\*)?"
+    r"|"
+    r"<b>Finding</b>"
+    r")\s*\n"
+    r"(?=[\s\S]*?(?:(?:\*\*)?Evidence(?:\*\*)?|<b>Evidence</b>))"
+    r"(?=[\s\S]*?(?:Confidence|<b>Confidence))"
+    r"[\s\S]*\Z",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -116,24 +148,34 @@ def recommendation_from_mapping(data: Mapping[str, Any]) -> Recommendation:
     )
 
 
-def format_recommendation(rec: Recommendation) -> str:
-    """Render one recommendation for Telegram / admin chat text.
+def _escape_telegram_html(text: str) -> str:
+    """Escape user/data text for Telegram HTML parse_mode (not attributes)."""
+    return html.escape(text, quote=False)
 
-    Uses Markdown the Telegram HTML converter turns into bold section titles.
-    Next-step is bold lines (not a ``>`` blockquote): blockquotes have caused
-    Telegram HTML ``parse_mode`` rejections, and the plugin's plain-text
-    fallback historically keyed off HTTP 400 only (Bot API often returns HTTP
-    200 + ``error_code`` 400), which dropped the formatted block entirely or
-    left a model-paraphrased plain trailer visible instead.
+
+def wrap_amy_tg_html(inner_html: str) -> str:
+    """Wrap pre-escaped Telegram HTML so the plugin skips double-escaping."""
+    body = (inner_html or "").strip("\n")
+    return f"{AMY_TG_HTML_START}\n{body}\n{AMY_TG_HTML_END}"
+
+
+def format_recommendation(rec: Recommendation) -> str:
+    """Render one recommendation as Telegram HTML (bold labels, escaped body).
+
+    Does **not** use Markdown ``**``. Labels are literal ``<b>…</b>``; finding /
+    evidence / limitations / action text is HTML-escaped so characters like
+    ``<``, ``&``, and ``Approve → Send`` cannot break ``parse_mode``.
     """
     lines = [
-        f"**Finding**\n{rec.finding}",
-        f"**Evidence**\n{rec.evidence}",
-        f"**Confidence: {rec.confidence}**",
-        f"**Limitations**\n{rec.limitations}",
+        f"<b>Finding</b>\n{_escape_telegram_html(rec.finding)}",
+        f"<b>Evidence</b>\n{_escape_telegram_html(rec.evidence)}",
+        f"<b>Confidence: {_escape_telegram_html(rec.confidence)}</b>",
+        f"<b>Limitations</b>\n{_escape_telegram_html(rec.limitations)}",
     ]
     if rec.recommended_action:
-        lines.append(f"**Next step**\n{rec.recommended_action}")
+        lines.append(
+            f"<b>Next step</b>\n{_escape_telegram_html(rec.recommended_action)}"
+        )
     return "\n".join(lines)
 
 
@@ -143,15 +185,31 @@ def format_recommendations(recs: list[Recommendation] | tuple[Recommendation, ..
     return "\n\n".join(blocks)
 
 
+def strip_echoed_recommendations_trailer(body: str) -> str:
+    """Drop a trailing model-paraphrased Finding/Evidence/… block if present."""
+    text = body or ""
+    match = _ECHOED_REC_TRAILER.search(text)
+    if not match:
+        return text
+    return text[: match.start()].rstrip()
+
+
 def append_recommendations_block(
     body: str,
     recs: list[Recommendation] | tuple[Recommendation, ...] | None,
 ) -> str:
-    """Append a formatted recommendations section when any exist."""
+    """Append a Telegram-HTML recommendations section when any exist.
+
+    The block is wrapped in :data:`AMY_TG_HTML_START` / :data:`AMY_TG_HTML_END`
+    so the WordPress Telegram path can inject ``<b>`` without relying on
+    Markdown ``**`` conversion (which fails when the model echoes plain labels).
+    """
     if not recs:
         return body
     block = format_recommendations(list(recs))
-    base = (body or "").rstrip()
+    inner = f"<b>Recommendations</b>\n{block}"
+    wrapped = wrap_amy_tg_html(inner)
+    base = strip_echoed_recommendations_trailer(body or "").rstrip()
     if not base:
-        return "**Recommendations**\n" + block
-    return f"{base}\n\n**Recommendations**\n{block}"
+        return wrapped
+    return f"{base}\n\n{wrapped}"
