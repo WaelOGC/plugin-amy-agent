@@ -102,7 +102,7 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 
 ## Deploy note (0.2.22+)
 
-When deploying **amy-agent-service 0.2.22**, rebuild the service image / reinstall dependencies so new pip packages are present:
+When deploying **amy-agent-service 0.2.22+**, rebuild the service image / reinstall dependencies so new pip packages are present:
 
 - `Pillow>=10.0.0`
 - `pymupdf>=1.24.0`
@@ -110,6 +110,10 @@ When deploying **amy-agent-service 0.2.22**, rebuild the service image / reinsta
 A plain restart of an older install without a rebuild will miss PDF/image processing deps.
 
 ## Changelog
+
+### 0.2.23
+
+Evidence-based recommendation format for admin-facing summaries: shared `Recommendation` helper (`finding` / `evidence` / `confidence` / `limitations` / `recommended_action`) with an explicit confidence rule; conclusion paths in lead scoring, analytics, SEO review, and traffic depth summaries now return structured recommendations; admin chat / Telegram tool context renders them consistently. Plain factual counts are unchanged. Plugin/widget version unchanged (service only).
 
 ### 0.2.22
 

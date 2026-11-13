@@ -10,11 +10,23 @@ import time
 from typing import Any
 
 from app.db import analytics_db
+from app.services.recommendation_format import (
+    Recommendation,
+    append_recommendations_block,
+    assess_confidence,
+    recommendation_from_mapping,
+    recommendation_to_dict,
+)
 
 logger = logging.getLogger(__name__)
 
 _DAY_SECONDS = 24 * 60 * 60
 _DEFAULT_TOP_PATHS = 10
+# Clear trend vs 7d daily average (2× up or ½× down) before calling out a shift.
+_TREND_HIGH_RATIO = 2.0
+_TREND_LOW_RATIO = 0.5
+# Path dominance: one path ≥ 50% of 7d pageviews.
+_DOMINANCE_SHARE = 0.5
 
 
 def _window_counts(*, now: float, days: int | None) -> dict[str, int]:
@@ -61,6 +73,7 @@ def build_traffic_summary(
             },
             "top_paths_7d": [],
             "top_paths_all": [],
+            "recommendations": [],
             "empty": True,
         }
 
@@ -72,6 +85,11 @@ def build_traffic_summary(
         f"24h={last_24h['pageviews']}/{last_24h['unique_sessions']}; "
         f"7d={last_7d['pageviews']}/{last_7d['unique_sessions']}; "
         f"30d={last_30d['pageviews']}/{last_30d['unique_sessions']}."
+    )
+    recommendations = build_traffic_recommendations(
+        last_24h=last_24h,
+        last_7d=last_7d,
+        top_paths_7d=top_paths,
     )
     return {
         "ok": True,
@@ -85,7 +103,109 @@ def build_traffic_summary(
         "top_paths_all": top_paths_all,
         "empty": empty,
         "summary": summary,
+        "recommendations": [recommendation_to_dict(r) for r in recommendations],
     }
+
+
+def build_traffic_recommendations(
+    *,
+    last_24h: dict[str, int],
+    last_7d: dict[str, int],
+    top_paths_7d: list[dict[str, Any]],
+) -> list[Recommendation]:
+    """Trend / dominance callouts only — not raw window counts.
+
+    - Trend: 24h pageviews vs 7d daily average when the ratio is clearly high
+      (≥2×) or low (≤0.5×) and the 7d sample is large enough for confidence.
+    - Dominance: a single path has ≥50% of 7d pageviews.
+    Returns empty when neither judgment applies.
+    """
+    recs: list[Recommendation] = []
+    pv_24h = int(last_24h.get("pageviews") or 0)
+    pv_7d = int(last_7d.get("pageviews") or 0)
+    sess_7d = int(last_7d.get("unique_sessions") or 0)
+    daily_avg_7d = (pv_7d / 7.0) if pv_7d > 0 else 0.0
+
+    if daily_avg_7d > 0 and pv_7d >= 10:
+        ratio = pv_24h / daily_avg_7d
+        confidence = assess_confidence(data_points=pv_7d, span_days=7.0)
+        if ratio >= _TREND_HIGH_RATIO:
+            recs.append(
+                Recommendation(
+                    finding=(
+                        "Page-view traffic in the last 24h is clearly above the "
+                        "recent daily average."
+                    ),
+                    evidence=(
+                        f"last_24h pageviews={pv_24h}; last_7d pageviews={pv_7d} "
+                        f"(daily avg ≈ {daily_avg_7d:.1f}); ratio≈{ratio:.2f}×; "
+                        f"unique_sessions_7d={sess_7d}."
+                    ),
+                    confidence=confidence,
+                    limitations=(
+                        "Amy Analytics page_view beacons only — not GA; short "
+                        "spikes can be bots, campaigns, or a single busy day."
+                    ),
+                    recommended_action=(
+                        "Check top paths for the last 7d in Amy → Analytics and "
+                        "note whether the spike matches a known campaign or page."
+                    ),
+                )
+            )
+        elif ratio <= _TREND_LOW_RATIO:
+            recs.append(
+                Recommendation(
+                    finding=(
+                        "Page-view traffic in the last 24h is clearly below the "
+                        "recent daily average."
+                    ),
+                    evidence=(
+                        f"last_24h pageviews={pv_24h}; last_7d pageviews={pv_7d} "
+                        f"(daily avg ≈ {daily_avg_7d:.1f}); ratio≈{ratio:.2f}×; "
+                        f"unique_sessions_7d={sess_7d}."
+                    ),
+                    confidence=confidence,
+                    limitations=(
+                        "Amy Analytics page_view beacons only — not GA; a quiet "
+                        "day is not proof of a lasting drop or tracking failure."
+                    ),
+                    recommended_action=(
+                        "Compare with the 7d/30d windows in Amy → Analytics; "
+                        "verify the tracking beacon if the quiet stretch continues."
+                    ),
+                )
+            )
+
+    if top_paths_7d and pv_7d > 0:
+        top = top_paths_7d[0]
+        top_pv = int(top.get("pageviews") or 0)
+        share = top_pv / pv_7d if pv_7d else 0.0
+        if top_pv > 0 and share >= _DOMINANCE_SHARE:
+            path = str(top.get("path") or "(unknown)")
+            confidence = assess_confidence(data_points=pv_7d, span_days=7.0)
+            recs.append(
+                Recommendation(
+                    finding=(
+                        f"One path dominates recent page views: {path}."
+                    ),
+                    evidence=(
+                        f"last_7d pageviews={pv_7d}; top path {path} has "
+                        f"pageviews={top_pv} ({share:.0%} of 7d); "
+                        f"sessions={int(top.get('unique_sessions') or 0)}."
+                    ),
+                    confidence=confidence,
+                    limitations=(
+                        "Path share is correlational — does not prove content "
+                        "quality, conversion value, or that other pages underperform."
+                    ),
+                    recommended_action=(
+                        "Review that path's content and lead capture points; "
+                        "consider whether quieter pages need clearer CTAs."
+                    ),
+                )
+            )
+
+    return recs
 
 
 def traffic_summary_for_chat() -> dict[str, Any]:
@@ -152,4 +272,21 @@ def format_traffic_chat_context(snapshot: dict[str, Any]) -> str:
             "Do NOT invent other numbers beyond this snapshot.",
         ]
     )
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    return append_recommendations_block(body, _recommendations_from_snapshot(snapshot))
+
+
+def _recommendations_from_snapshot(snapshot: dict[str, Any]) -> list[Recommendation]:
+    raw = snapshot.get("recommendations") or []
+    out: list[Recommendation] = []
+    for item in raw:
+        if isinstance(item, Recommendation):
+            out.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        try:
+            out.append(recommendation_from_mapping(item))
+        except (TypeError, ValueError):
+            continue
+    return out

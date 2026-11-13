@@ -254,6 +254,7 @@ def _run_analytics_summary(_args: dict[str, Any]) -> dict[str, Any]:
         "snapshot": snap,
         "chat_context": format_analytics_chat_context(snap),
         "summary": snap.get("summary"),
+        "recommendations": snap.get("recommendations") or [],
         "error": snap.get("error"),
     }
 
@@ -359,6 +360,7 @@ def _run_seo_summary(_args: dict[str, Any]) -> dict[str, Any]:
         "snapshot": snap,
         "chat_context": format_seo_chat_context(snap),
         "summary": snap.get("summary"),
+        "recommendations": snap.get("recommendations") or [],
         "error": snap.get("error"),
     }
 
@@ -383,6 +385,7 @@ def _run_analytics_traffic(_args: dict[str, Any]) -> dict[str, Any]:
         "snapshot": snap,
         "chat_context": format_traffic_chat_context(snap),
         "summary": snap.get("summary"),
+        "recommendations": snap.get("recommendations") or [],
         "error": snap.get("error"),
     }
 
@@ -437,6 +440,7 @@ def tool_result_message(call: ToolCallRequest, result: dict[str, Any]) -> ChatMe
         "tool": result.get("tool") or call.name,
         "chat_context": result.get("chat_context"),
         "summary": result.get("summary"),
+        "recommendations": result.get("recommendations"),
         "error": result.get("error"),
         "count": result.get("count"),
         "total": result.get("total"),
