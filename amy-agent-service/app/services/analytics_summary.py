@@ -14,6 +14,13 @@ import time
 from typing import Any
 
 from app.db import analytics_db
+from app.services.recommendation_format import (
+    Recommendation,
+    append_recommendations_block,
+    assess_confidence,
+    recommendation_from_mapping,
+    recommendation_to_dict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +153,7 @@ def build_analytics_summary(
                 "most_recent_at": None,
                 "most_recent": None,
             },
+            "recommendations": [],
             "empty": True,
         }
 
@@ -177,6 +185,13 @@ def build_analytics_summary(
         f"{most_recent_bit})."
     )
 
+    recommendations = build_analytics_recommendations(
+        total=total,
+        counts=counts,
+        with_email=with_email,
+        last_seen=last_seen,
+        leads=leads,
+    )
     result: dict[str, Any] = {
         "ok": True,
         "total": total,
@@ -189,6 +204,7 @@ def build_analytics_summary(
         "last_seen": last_seen,
         "empty": total == 0,
         "summary": summary,
+        "recommendations": [recommendation_to_dict(r) for r in recommendations],
     }
     if include_sample:
         # Prefer hot-first sample for admin Q&A; fall back to overall top leads.
@@ -225,6 +241,83 @@ def build_analytics_summary(
         result["hot_sample"] = hot_sample
         result["hot_sample_count"] = len(hot_sample)
     return result
+
+
+def build_analytics_recommendations(
+    *,
+    total: int,
+    counts: dict[str, int],
+    with_email: int,
+    last_seen: dict[str, Any],
+    leads: list[dict[str, Any]],
+) -> list[Recommendation]:
+    """Conclusions only — not raw count sentences.
+
+    Emits a hot-lead attention recommendation when any sessions are scored hot
+    (the same judgment ``lead_scoring`` already applies per session). Plain
+    totals with no hot emphasis return an empty list.
+    """
+    hot = int(counts.get("hot") or 0)
+    if hot <= 0:
+        return []
+
+    hot_with_email = 0
+    for lead in leads:
+        if str(lead.get("lead_status") or "") != "hot":
+            continue
+        if lead.get("lead_email"):
+            hot_with_email += 1
+    hot_without_email = hot - hot_with_email
+
+    seen_7d = int(last_seen.get("last_7d") or 0)
+    span_days = 7.0 if seen_7d > 0 else 0.0
+    confidence = assess_confidence(data_points=total, span_days=span_days)
+
+    if hot_without_email > 0 and hot_with_email == 0:
+        action = (
+            "Open Amy → Analytics, review the hot sample, and watch for contact "
+            "capture on those sessions."
+        )
+        limitations = (
+            "Hot is rule-based intent only — no email on file means outreach "
+            "may not be possible; correlation with conversion is unproven."
+        )
+    elif hot_without_email > 0:
+        action = (
+            "Prioritize the hot leads that already left an email, then review "
+            "the remaining hot sessions in Analytics."
+        )
+        limitations = (
+            "Hot scoring is rule-based; having an email does not prove consent "
+            "for marketing — use Approve → Send in Email Marketing."
+        )
+    else:
+        action = (
+            "Review hot leads with email in Amy → Analytics (or Email Marketing "
+            "audience) and follow up via Approve → Send if appropriate."
+        )
+        limitations = (
+            "Hot scoring is rule-based intent, not attributed revenue or "
+            "guaranteed conversion."
+        )
+
+    return [
+        Recommendation(
+            finding=(
+                f"{hot} visitor session{'s are' if hot != 1 else ' is'} scored "
+                f"hot (high-intent)."
+            ),
+            evidence=(
+                f"{total} lead sessions total; hot={hot}, warm={int(counts.get('warm') or 0)}, "
+                f"cold={int(counts.get('cold') or 0)}; with_email={with_email}; "
+                f"hot_with_email={hot_with_email}; hot_without_email={hot_without_email}; "
+                f"seen_7d={seen_7d}."
+            ),
+            confidence=confidence,
+            limitations=limitations,
+            recommended_action=action,
+        )
+    ]
 
 
 def analytics_summary_for_chat() -> dict[str, Any]:
@@ -334,7 +427,25 @@ def format_analytics_chat_context(snapshot: dict[str, Any]) -> str:
             "Do NOT invent other numbers beyond this snapshot.",
         ]
     )
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    recs = _recommendations_from_snapshot(snapshot)
+    return append_recommendations_block(body, recs)
+
+
+def _recommendations_from_snapshot(snapshot: dict[str, Any]) -> list[Recommendation]:
+    raw = snapshot.get("recommendations") or []
+    out: list[Recommendation] = []
+    for item in raw:
+        if isinstance(item, Recommendation):
+            out.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        try:
+            out.append(recommendation_from_mapping(item))
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def format_analytics_slash_reply(snapshot: dict[str, Any]) -> str:

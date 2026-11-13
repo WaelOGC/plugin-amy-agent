@@ -13,6 +13,13 @@ import logging
 from typing import Any
 
 from app.db import seo_tasks_db, tasks_db
+from app.services.recommendation_format import (
+    Recommendation,
+    append_recommendations_block,
+    assess_confidence,
+    recommendation_from_mapping,
+    recommendation_to_dict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +49,7 @@ def build_seo_review_summary() -> dict[str, Any]:
             "open_count": 0,
             "fixed_count": 0,
             "rejected_count": 0,
+            "recommendations": [],
             "empty": True,
         }
 
@@ -64,6 +72,13 @@ def build_seo_review_summary() -> dict[str, Any]:
         f"verdicts={by_verdict or {'none': 0}}; "
         f"statuses={by_status or {'none': 0}})."
     )
+    recommendations = build_seo_recommendations(
+        total=total,
+        open_count=open_count,
+        fixed_count=fixed_count,
+        rejected_count=rejected_count,
+        verdicts=by_verdict,
+    )
     return {
         "ok": True,
         "total": total,
@@ -74,7 +89,61 @@ def build_seo_review_summary() -> dict[str, Any]:
         "rejected_count": rejected_count,
         "empty": total == 0,
         "summary": summary,
+        "recommendations": [recommendation_to_dict(r) for r in recommendations],
     }
+
+
+def build_seo_recommendations(
+    *,
+    total: int,
+    open_count: int,
+    fixed_count: int,
+    rejected_count: int,
+    verdicts: dict[str, int],
+) -> list[Recommendation]:
+    """Conclusions only — pending-approval backlog / red-verdict callouts.
+
+    Plain zero-open summaries return no recommendations.
+    """
+    if open_count <= 0:
+        return []
+
+    red = int(verdicts.get("red") or 0)
+    # SEO checks rarely carry a time span in the summary path — use count only
+    # (span_days=0 prevents an automatic high confidence).
+    confidence = assess_confidence(data_points=total, span_days=0.0)
+    finding = (
+        f"{open_count} SEO check{'s are' if open_count != 1 else ' is'} "
+        f"open (pending_approval)."
+    )
+    evidence = (
+        f"{total} stored checks; open/pending_approval={open_count}, "
+        f"fixed/approved={fixed_count}, rejected={rejected_count}; "
+        f"verdicts={verdicts or {'none': 0}}."
+    )
+    limitations = (
+        "Stored check counts only — does not prove ranking impact, search "
+        "traffic change, or that approving will improve SEO."
+    )
+    if red > 0:
+        action = (
+            f"Review pending approvals in Amy → SEO Tasks "
+            f"(including {red} red verdict{'s' if red != 1 else ''}) before writing to WordPress."
+        )
+    else:
+        action = (
+            "Review pending approvals in Amy → SEO Tasks; approve or reject "
+            "before any WordPress write."
+        )
+    return [
+        Recommendation(
+            finding=finding,
+            evidence=evidence,
+            confidence=confidence,
+            limitations=limitations,
+            recommended_action=action,
+        )
+    ]
 
 
 def build_task_service_summary() -> dict[str, Any]:
@@ -184,7 +253,24 @@ def format_seo_chat_context(snapshot: dict[str, Any]) -> str:
         "from this chat.",
         "Do NOT invent other numbers beyond this snapshot.",
     ]
-    return "\n".join(lines)
+    body = "\n".join(lines)
+    return append_recommendations_block(body, _recommendations_from_snapshot(snapshot))
+
+
+def _recommendations_from_snapshot(snapshot: dict[str, Any]) -> list[Recommendation]:
+    raw = snapshot.get("recommendations") or []
+    out: list[Recommendation] = []
+    for item in raw:
+        if isinstance(item, Recommendation):
+            out.append(item)
+            continue
+        if not isinstance(item, dict):
+            continue
+        try:
+            out.append(recommendation_from_mapping(item))
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def format_task_service_chat_context(snapshot: dict[str, Any]) -> str:
