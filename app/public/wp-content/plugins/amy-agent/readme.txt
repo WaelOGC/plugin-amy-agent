@@ -4,7 +4,7 @@ Tags: ai, chat, assistant, ogc-newfinity
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 0.2.63
+Stable tag: 0.2.64
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -24,6 +24,9 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 6. For Task Service outbound: set `WORDPRESS_BASE_URL` on the Python service; enable Telegram under Amy → Settings → Telegram; assignees link chat id from Amy → My Profile. Create the Admin Bot via BotFather (Settings → Telegram has the deeplink + steps).
 
 == Changelog ==
+
+= 0.2.64 =
+* Public chat uploads: show a friendly rate-limit message when the server returns 429 / error `rate_limited` (i18n key `uploadRateLimited`), instead of the generic upload-failed string.
 
 = 0.2.63 =
 * Fix public chat attachments: sanitize_messages keeps empty-content messages that have files, and forwards AttachmentRef fields (url, filename, content_type, id, kind, size) to the service /v1/chat.

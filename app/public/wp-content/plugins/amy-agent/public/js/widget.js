@@ -688,10 +688,10 @@
 					return res
 						.json()
 						.then(function (data) {
-							return { ok: res.ok, data: data };
+							return { ok: res.ok, status: res.status, data: data };
 						})
 						.catch(function () {
-							return { ok: false, data: null };
+							return { ok: false, status: res.status, data: null };
 						});
 				})
 				.then(function (result) {
@@ -706,7 +706,16 @@
 						pendingFiles[idx].attachment = result.data;
 					} else {
 						pendingFiles[idx].status = 'error';
-						appendBubble(i18n.uploadFailed || 'Upload failed.', 'status');
+						var rateLimited =
+							result.status === 429 ||
+							(result.data && result.data.error === 'rate_limited');
+						appendBubble(
+							rateLimited
+								? i18n.uploadRateLimited ||
+										"You've reached the upload limit for now, please try again in a bit."
+								: i18n.uploadFailed || 'Upload failed.',
+							'status'
+						);
 					}
 					renderPendingChips();
 				})
