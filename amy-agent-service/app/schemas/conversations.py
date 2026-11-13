@@ -16,6 +16,8 @@ class ConversationSummary(BaseModel):
     created_at: float
     updated_at: float
     visitor_id: str | None = None
+    # Start of the last message (any role) for the public history preview line.
+    last_message_preview: str | None = None
 
 
 class ConversationDetail(ConversationSummary):

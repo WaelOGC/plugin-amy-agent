@@ -257,7 +257,9 @@ def list_visitor_public_conversations(
     """Public-widget history for one visitor — never returns admin conversations.
 
     Filters: matching ``visitor_id``, ``wp_user_id = 0``, ``mode != 'admin'``,
-    not deleted/archived. Newest ``updated_at`` first, capped at ``limit`` (max 20).
+    not deleted/archived, and **at least one visitor (user) message**.
+    Newest ``updated_at`` first, capped at ``limit`` (max 20).
+    Each row includes ``last_message_preview`` (start of the latest message).
     """
     vid = (visitor_id or "").strip()
     if not vid:
@@ -267,18 +269,41 @@ def list_visitor_public_conversations(
     try:
         rows = conn.execute(
             """
-            SELECT * FROM conversations
-            WHERE visitor_id = ?
-              AND wp_user_id = 0
-              AND mode != 'admin'
-              AND status != 'deleted'
-              AND status != 'archived'
-            ORDER BY updated_at DESC
+            SELECT c.* FROM conversations c
+            WHERE c.visitor_id = ?
+              AND c.wp_user_id = 0
+              AND c.mode != 'admin'
+              AND c.status != 'deleted'
+              AND c.status != 'archived'
+              AND EXISTS (
+                SELECT 1 FROM conversation_messages m
+                WHERE m.conversation_id = c.id AND m.role = 'user'
+              )
+            ORDER BY c.updated_at DESC
             LIMIT ?
             """,
             (vid, cap),
         ).fetchall()
-        return [_conversation_row_to_dict(row) for row in rows]
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            item = _conversation_row_to_dict(row)
+            last = conn.execute(
+                """
+                SELECT content FROM conversation_messages
+                WHERE conversation_id = ?
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (item["id"],),
+            ).fetchone()
+            preview = ""
+            if last is not None and last["content"]:
+                preview = " ".join(str(last["content"]).split())
+                if len(preview) > 90:
+                    preview = preview[:87] + "…"
+            item["last_message_preview"] = preview or None
+            out.append(item)
+        return out
     finally:
         conn.close()
 

@@ -26,7 +26,8 @@ Amy Agent is the customer-facing AI layer for OGC NewFinity. The WordPress plugi
 == Changelog ==
 
 = 0.2.61 =
-* Public chat: secure visitor file uploads (images/PDF), Settings toggles, admin email + Telegram notify relay; widget i18n for attach UI. Service 0.2.20+.
+* Public chat polish: history date+time + preview, lazy conversation create, subtitle modes, custom scrollbars, auto-growing textarea.
+* Secure visitor file uploads (JPEG/PNG/WebP/PDF), Settings toggles, admin email + Telegram notify. Requires service 0.2.21+.
 
 = 0.2.60 =
 * Public widget: message times + date separators; New chat; History list; desktop expand mode (backdrop, focus trap, Esc, localStorage).

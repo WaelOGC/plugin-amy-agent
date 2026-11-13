@@ -136,7 +136,18 @@ def _gemini_contents(
             contents.append({"role": "model", "parts": parts})
             continue
         role = "user" if msg.role == "user" else "model"
-        contents.append({"role": role, "parts": [{"text": msg.content}]})
+        parts: list[dict[str, Any]] = []
+        if (msg.content or "").strip() or not getattr(msg, "inline_media", None):
+            parts.append({"text": msg.content or ""})
+        for media in getattr(msg, "inline_media", None) or []:
+            mime = (getattr(media, "mime_type", None) or "").strip() or "image/jpeg"
+            data = (getattr(media, "data", None) or "").strip()
+            if not data:
+                continue
+            parts.append({"inline_data": {"mime_type": mime, "data": data}})
+        if not parts:
+            parts.append({"text": msg.content or ""})
+        contents.append({"role": role, "parts": parts})
 
     return system_parts, contents
 
@@ -145,6 +156,7 @@ class GeminiProvider(BaseProvider):
     provider_id = "gemini"
     default_model = "gemini-3.6-flash"
     supports_tools = True
+    supports_vision = True
 
     async def complete(
         self,

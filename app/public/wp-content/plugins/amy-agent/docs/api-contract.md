@@ -172,9 +172,32 @@ Public-widget history for one anonymous visitor. Requires `X-Amy-Secret`.
 | `visitor_id` | Required. Exact ownership match. |
 | `limit` | Optional. Default `20`, max `20`. |
 
-**Response `200`:** `{ "conversations": [ ConversationSummary, … ] }` — newest `updated_at` first. Only rows with matching `visitor_id`, `wp_user_id = 0`, and `mode != "admin"` (never admin chats). Wrong/unknown `visitor_id` → empty list.
+**Response `200`:** `{ "conversations": [ ConversationSummary, … ] }` — newest `updated_at` first. Only rows with matching `visitor_id`, `wp_user_id = 0`, and `mode != "admin"` (never admin chats), **and at least one `role=user` message** (empty shells are omitted). Each summary may include `last_message_preview` (start of the latest message). Wrong/unknown `visitor_id` → empty list.
 
-Conversation detail (`GET /v1/conversations/{id}`) messages may include `created_at` (unix seconds) for the public widget timestamps.
+Conversation detail (`GET /v1/conversations/{id}`) messages may include `created_at` (unix seconds) for the public widget timestamps. Public-chat attachments use secure file ids (see below); expired files surface as `expired: true` / “File expired”.
+
+### `POST /v1/public-chat/upload`
+
+Secure **public widget** uploads only (not Submit Idea, not admin chat). Requires `X-Amy-Secret`. Multipart form:
+
+| Field | Notes |
+| --- | --- |
+| `file` | Required. JPEG / PNG / WebP / PDF only (magic bytes). Max 5 MB. PDF max 10 pages; encrypted PDFs rejected. |
+| `visitor_id` | Required. |
+| `conversation_id` | Optional until the first message creates the conversation. |
+| `notify` | Optional bool (default true). When true, service relays to WP `POST /amy-agent/v1/chat-upload-notify`. |
+| `allow_uploads` | Optional bool. When false → `403 uploads_disabled`. |
+| `message_excerpt` | Optional short visitor text for the notify email/Telegram. |
+
+Images are decoded and re-encoded (metadata stripped; longest side capped at 2000px). PDFs are never stored or served — pages are rendered to JPEG. Files live under `uploads/public-chat/` with random names (not WordPress uploads, not statically mounted). Rate limit: 10 logical files / visitor / hour; total active storage cap configurable (default 1 GB).
+
+**Response `200`:** `AttachmentRef` with `id`, proxy `url` (`/wp-json/amy-agent/v1/chat/files/{id}`), `kind`, `size`, `description`, and for PDFs `pages[]` / `page_count`.
+
+### `GET /v1/public-chat/files/{file_id}`
+
+Authenticated serve of a **processed** image. Requires `X-Amy-Secret` plus matching `visitor_id` **or** `is_full_admin=true`. Response includes `X-Content-Type-Options: nosniff` and a fixed image content type. Missing/deleted → `404 file_expired`.
+
+WordPress proxies: `POST /wp-json/amy-agent/v1/chat/upload`, `GET /wp-json/amy-agent/v1/chat/files/{id}` (nonce `wp_rest`). Settings gates: **Allow file uploads in public chat** and **Notify me about uploads** (both default ON).
 
 **Provider failure `502`:**
 

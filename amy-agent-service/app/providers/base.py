@@ -13,6 +13,7 @@ class BaseProvider(ABC):
     provider_id: str
     default_model: str
     supports_tools: bool = False
+    supports_vision: bool = False
 
     @abstractmethod
     async def complete(

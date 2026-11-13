@@ -303,6 +303,9 @@ def test_list_visitor_public_conversations_excludes_empty_and_includes_preview(
     api_ids = {r["id"] for r in api_rows}
     assert empty["id"] not in api_ids
     assert with_user["id"] in api_ids
+    api_match = next(r for r in api_rows if r["id"] == with_user["id"])
+    api_preview = (api_match.get("last_message_preview") or "").lower()
+    assert "happy" in api_preview or "pricing" in api_preview
 
     rows = conversations_db.list_visitor_public_conversations(visitor, limit=20)
     db_ids = {r["id"] for r in rows}

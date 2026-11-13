@@ -6,19 +6,26 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
 from app.auth import require_amy_secret
-from app.db import conversations_db
+from app.db import conversations_db, public_chat_uploads_db as uploads_db
 from app.prompts import AMY_ADMIN_SYSTEM_PROMPT, AMY_SYSTEM_PROMPT
 from app.providers import get_provider, is_known_provider
 from app.providers.errors import ProviderError
 from app.schemas.messages import (
+    AttachmentRef,
     ChatMessage,
     ChatMeta,
     ChatReply,
     ChatRequest,
     ChatSuccessResponse,
     ErrorBody,
+    InlineMediaPart,
     sanitize_pricing_catalogue,
 )
+from app.services.public_chat_upload import (
+    attachment_ref_for_row,
+    load_inline_media_for_uploads,
+)
+from app.routes.public_chat_uploads import PROXY_FILE_BASE
 from app.services.admin_chat_tools import (
     detect_admin_tool_intent,
     intent_context_messages,
@@ -255,8 +262,173 @@ def _content_for_provider(msg: ChatMessage) -> str:
     """Provider-bound text only — does not mutate stored message content."""
     if not msg.attachments:
         return msg.content
-    names = ", ".join(a.filename for a in msg.attachments)
-    return f"{msg.content}\n\n[Attached: {names}]"
+    # Prefer stored descriptions for public-chat secure uploads.
+    desc_bits: list[str] = []
+    names: list[str] = []
+    for a in msg.attachments:
+        if a.description:
+            desc_bits.append(a.description)
+        else:
+            names.append(a.filename)
+    parts = [msg.content]
+    if desc_bits:
+        parts.append("Attached file notes:\n- " + "\n- ".join(desc_bits))
+    elif names:
+        parts.append(f"[Attached: {', '.join(names)}]")
+    return "\n\n".join(p for p in parts if p)
+
+
+def _expand_public_upload_ids(attachments: list[AttachmentRef]) -> list[dict]:
+    """Resolve attachment ids to DB rows (including PDF page siblings)."""
+    ids: list[str] = []
+    for a in attachments:
+        if a.id:
+            ids.append(a.id)
+    rows = uploads_db.get_uploads_by_ids(ids)
+    by_id = {r["id"]: r for r in rows}
+    expanded: list[dict] = []
+    seen: set[str] = set()
+    for a in attachments:
+        if not a.id or a.id not in by_id:
+            continue
+        row = by_id[a.id]
+        desc = row.get("description") or ""
+        page_ids = [a.id]
+        if "[pages:" in desc:
+            try:
+                inner = desc.split("[pages:", 1)[1].split("]", 1)[0]
+                page_ids = [p.strip() for p in inner.split(",") if p.strip()] or [a.id]
+            except Exception:
+                page_ids = [a.id]
+        missing = [pid for pid in page_ids if pid not in by_id]
+        if missing:
+            for extra in uploads_db.get_uploads_by_ids(missing):
+                by_id[extra["id"]] = extra
+        for pid in page_ids:
+            if pid in seen:
+                continue
+            if pid not in by_id:
+                continue
+            seen.add(pid)
+            expanded.append(by_id[pid])
+    return expanded
+
+
+def _prepare_public_attachments_for_turn(
+    messages: list[ChatMessage],
+    *,
+    provider_supports_vision: bool,
+    visitor_id: str | None,
+    conversation_id: str | None,
+) -> tuple[list[ChatMessage], list[str]]:
+    """Attach inline media once; later turns use descriptions. Returns vision ids."""
+    if not messages:
+        return messages, []
+
+    out = list(messages)
+    vision_ids: list[str] = []
+    # Only the latest user turn may send fresh images.
+    last_idx = None
+    for i in range(len(out) - 1, -1, -1):
+        if out[i].role == "user":
+            last_idx = i
+            break
+    if last_idx is None:
+        return out, []
+
+    last = out[last_idx]
+    if not last.attachments:
+        return out, []
+
+    rows = _expand_public_upload_ids(list(last.attachments))
+    if not rows:
+        # Legacy filename-only attachments (admin) — keep prior behaviour.
+        return out, []
+
+    if visitor_id and conversation_id:
+        uploads_db.bind_conversation(
+            [r["id"] for r in rows],
+            conversation_id,
+            visitor_id,
+        )
+
+    # Refresh attachment refs (expired flag, descriptions, proxy URLs).
+    refreshed: list[AttachmentRef] = []
+    for a in last.attachments:
+        if a.id:
+            row = uploads_db.get_upload(a.id)
+            if row is None:
+                refreshed.append(
+                    AttachmentRef(
+                        id=a.id,
+                        url=a.url,
+                        filename=a.filename,
+                        content_type=a.content_type,
+                        kind=a.kind or "image",
+                        expired=True,
+                        description="File expired",
+                    )
+                )
+            else:
+                refreshed.append(
+                    AttachmentRef.model_validate(
+                        attachment_ref_for_row(row, proxy_base=PROXY_FILE_BASE)
+                    )
+                )
+        else:
+            refreshed.append(a)
+
+    inline_parts: list[InlineMediaPart] = []
+    content = last.content
+    if provider_supports_vision:
+        media = load_inline_media_for_uploads(rows)
+        for m in media:
+            inline_parts.append(
+                InlineMediaPart(mime_type=m["mime_type"], data=m["data"])
+            )
+            vision_ids.append(m["upload_id"])
+        if not inline_parts:
+            # Already sent previously or expired — descriptions only.
+            notes = [
+                (r.get("description") or f"Uploaded file «{r.get('original_filename')}»")
+                for r in rows
+                if r.get("deleted_at") is None
+            ]
+            if notes and "[Uploaded file" not in content:
+                content = (
+                    f"{content}\n\nAttached file notes:\n- " + "\n- ".join(notes)
+                ).strip()
+    else:
+        names = ", ".join(
+            sorted({r.get("original_filename") or "file" for r in rows})
+        )
+        note = (
+            f"The visitor uploaded: {names}. You cannot view file contents with this "
+            "provider. Confirm you received the file(s) and that the team will review "
+            "them — do not invent what is inside."
+        )
+        content = f"{content}\n\n{note}".strip()
+
+    out[last_idx] = ChatMessage(
+        role=last.role,
+        content=content,
+        attachments=refreshed,
+        created_at=last.created_at,
+        inline_media=inline_parts,
+    )
+
+    # Older user turns: strip any residual inline and prefer descriptions.
+    for i, m in enumerate(out):
+        if i == last_idx or m.role != "user" or not m.attachments:
+            continue
+        out[i] = ChatMessage(
+            role=m.role,
+            content=_content_for_provider(m),
+            attachments=list(m.attachments or []),
+            created_at=m.created_at,
+            inline_media=[],
+        )
+    return out, vision_ids
 
 
 def _messages_for_provider(messages: list[ChatMessage]) -> list[ChatMessage]:
@@ -270,6 +442,7 @@ def _messages_for_provider(messages: list[ChatMessage]) -> list[ChatMessage]:
                 tool_calls=list(m.tool_calls or []),
                 tool_call_id=m.tool_call_id,
                 name=m.name,
+                inline_media=list(m.inline_media or []),
             )
         )
     return out
@@ -360,6 +533,23 @@ async def chat(body: ChatRequest) -> JSONResponse:
 
     provider = get_provider(provider_slug)
     resolved_model = provider.resolve_model(body.ai.model)
+
+    vision_ids: list[str] = []
+    if body.mode != "admin":
+        history_for_completion, vision_ids = _prepare_public_attachments_for_turn(
+            history_for_completion,
+            provider_supports_vision=bool(
+                getattr(provider, "supports_vision", False)
+            ),
+            visitor_id=body.visitor_id,
+            conversation_id=conversation_id,
+        )
+        if new_user_message is not None and history_for_completion:
+            # Keep new_user_message attachments in sync for persistence.
+            last_prepared = history_for_completion[-1]
+            if last_prepared.role == "user":
+                new_user_message = last_prepared
+
     prepared, auto_tools = _messages_with_system(
         history_for_completion,
         mode=body.mode,
@@ -401,13 +591,20 @@ async def chat(body: ChatRequest) -> JSONResponse:
             status.HTTP_502_BAD_GATEWAY,
         )
 
+    if vision_ids:
+        uploads_db.mark_vision_sent(vision_ids)
+
     closing_wish_used = False
     if conversation_id is not None and new_user_message is not None:
         conversations_db.append_message(
             conversation_id,
             "user",
             new_user_message.content,
-            attachments=[a.model_dump() for a in new_user_message.attachments] or None,
+            attachments=[
+                a.model_dump(exclude_none=True, exclude_defaults=True)
+                for a in new_user_message.attachments
+            ]
+            or None,
         )
         conversations_db.append_message(conversation_id, "assistant", text)
         if mark_closing_wish and closing_hint:

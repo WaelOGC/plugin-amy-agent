@@ -3,3 +3,5 @@ submit-idea/**
 !submit-idea/.gitkeep
 conversations/**
 !conversations/.gitkeep
+public-chat/**
+!public-chat/.gitkeep
