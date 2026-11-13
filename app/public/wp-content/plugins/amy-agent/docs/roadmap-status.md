@@ -284,6 +284,27 @@
 - **Confidence Score / Business Health Monitor / Gap Detection** (BI features) — not started.
 - **Amy as a Product** (license keys, multi-tenant SaaS) — explicitly deferred, not a
   current priority.
+- **Revenue Intelligence concepts** (general business site assistant — **not**
+  e-commerce cart/margin/Shopify scope) — design-only in
+  `10-revenue-intelligence-concepts.md`. All five below are
+  **Not implemented — proposed** (no code, endpoints, UI, or tables yet):
+  1. **Visitor Journey Context** — Not implemented — proposed. Pre-chat
+     page path for Amy context + owner path summaries (reuse
+     `visitor_events` `page_view` / `page_path`, widget events, chat `page`).
+  2. **Missed-Opportunity Detection** — Not implemented — proposed.
+     Lead-recovery flag when chat shows pricing/service interest but no
+     contact / request (reuse lead scoring, funnel abandons, `lead_email`,
+     conversation messages).
+  3. **Conversion Experiments** — Not implemented — proposed. A/B opening
+     message or pricing presentation vs lead/contact outcomes (precedent:
+     `GET /v1/analytics/closing-wish-effect`).
+  4. **Evidence-Based Recommendation Format** — Not implemented — proposed.
+     Finding / Evidence / Confidence / Limitations / Recommended action on
+     owner-facing reports (never as guaranteed outcomes).
+  5. **Human Approval for Consequential Actions** — Not implemented —
+     proposed as a product-wide invariant. Observe/analyze/recommend only
+     until explicit owner approve (already practiced in Email Approve→Send
+     and SEO Approve; extend to any future real-world action).
 
 ---
 
