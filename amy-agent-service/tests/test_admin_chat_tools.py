@@ -335,3 +335,315 @@ def test_run_admin_tool_loop_normalizes_empty_tool_call_ids() -> None:
     assistant_id, tool_id = seen[0]
     assert assistant_id
     assert assistant_id == tool_id
+
+
+_SAMPLE_REC = {
+    "finding": "1 hot lead session is active.",
+    "evidence": "Based on 3 lead sessions in Amy Analytics.",
+    "confidence": "low",
+    "limitations": "Lead status is a heuristic, not a purchase guarantee.",
+    "recommended_action": "Review the hot sample and follow up.",
+}
+
+_SAMPLE_REC_BLOCK = (
+    "📊 Finding: 1 hot lead session is active.\n"
+    "📈 Evidence: Based on 3 lead sessions in Amy Analytics.\n"
+    "🎯 Confidence: low\n"
+    "⚠️ Limitations: Lead status is a heuristic, not a purchase guarantee.\n"
+    "✅ Suggested action: Review the hot sample and follow up."
+)
+
+
+def test_run_admin_tool_loop_appends_recommendations_block() -> None:
+    """Tool-returned recommendations are appended verbatim after model text."""
+
+    analytics_with_rec = {
+        **_LIVE_ANALYTICS,
+        "recommendations": [_SAMPLE_REC],
+    }
+
+    class _RecProvider(BaseProvider):
+        provider_id = "openai"
+        default_model = "gpt-4o-mini"
+        supports_tools = True
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+        ) -> str:
+            return "fallback"
+
+        async def complete_turn(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+            tools: Sequence[ToolSpec] | None = None,
+        ) -> CompletionTurn:
+            self.calls += 1
+            if self.calls == 1:
+                return CompletionTurn(
+                    text=None,
+                    tool_calls=[
+                        ToolCallRequest(id="1", name="analytics_summary", arguments={}),
+                    ],
+                )
+            return CompletionTurn(text="There are 3 visitor sessions, including 1 hot.")
+
+    async def _run() -> tuple[str, list[str]]:
+        with patch(
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
+            return_value=analytics_with_rec,
+        ):
+            return await run_admin_tool_loop(
+                _RecProvider(),
+                [ChatMessage(role="user", content="any hot leads?")],
+                api_key="sk-test",
+                model=None,
+            )
+
+    text, used = asyncio.run(_run())
+    assert used == ["analytics_summary"]
+    assert text.startswith("There are 3 visitor sessions, including 1 hot.")
+    assert text.endswith(_SAMPLE_REC_BLOCK)
+    assert text.count("📊 Finding:") == 1
+
+
+def test_run_admin_tool_loop_dedupes_identical_recommendations() -> None:
+    """Same finding/evidence from two tool calls appears once in the block."""
+
+    analytics_with_rec = {
+        **_LIVE_ANALYTICS,
+        "recommendations": [_SAMPLE_REC],
+    }
+    traffic_with_same_rec = {
+        **_LIVE_TRAFFIC,
+        "recommendations": [_SAMPLE_REC],
+    }
+
+    class _DupProvider(BaseProvider):
+        provider_id = "openai"
+        default_model = "gpt-4o-mini"
+        supports_tools = True
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+        ) -> str:
+            return "fallback"
+
+        async def complete_turn(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+            tools: Sequence[ToolSpec] | None = None,
+        ) -> CompletionTurn:
+            self.calls += 1
+            if self.calls == 1:
+                return CompletionTurn(
+                    text=None,
+                    tool_calls=[
+                        ToolCallRequest(id="1", name="analytics_summary", arguments={}),
+                        ToolCallRequest(id="2", name="analytics_traffic", arguments={}),
+                    ],
+                )
+            return CompletionTurn(text="3 sessions; 12 pageviews.")
+
+    async def _run() -> tuple[str, list[str]]:
+        with (
+            patch(
+                "app.services.admin_chat_tools.analytics_summary_for_chat",
+                return_value=analytics_with_rec,
+            ),
+            patch(
+                "app.services.admin_chat_tools.traffic_summary_for_chat",
+                return_value=traffic_with_same_rec,
+            ),
+        ):
+            return await run_admin_tool_loop(
+                _DupProvider(),
+                [ChatMessage(role="user", content="leads and traffic?")],
+                api_key="sk-test",
+                model=None,
+            )
+
+    text, used = asyncio.run(_run())
+    assert used == ["analytics_summary", "analytics_traffic"]
+    assert text.count("📊 Finding:") == 1
+    assert text.endswith(_SAMPLE_REC_BLOCK)
+
+
+def test_run_admin_tool_loop_skips_empty_recommendations() -> None:
+    """Empty recommendations list leaves model text unchanged."""
+
+    analytics_empty_rec = {
+        **_LIVE_ANALYTICS,
+        "recommendations": [],
+    }
+
+    class _EmptyRecProvider(BaseProvider):
+        provider_id = "openai"
+        default_model = "gpt-4o-mini"
+        supports_tools = True
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+        ) -> str:
+            return "fallback"
+
+        async def complete_turn(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+            tools: Sequence[ToolSpec] | None = None,
+        ) -> CompletionTurn:
+            self.calls += 1
+            if self.calls == 1:
+                return CompletionTurn(
+                    text=None,
+                    tool_calls=[
+                        ToolCallRequest(id="1", name="analytics_summary", arguments={}),
+                    ],
+                )
+            return CompletionTurn(text="3 visitor sessions on file.")
+
+    async def _run() -> tuple[str, list[str]]:
+        with patch(
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
+            return_value=analytics_empty_rec,
+        ):
+            return await run_admin_tool_loop(
+                _EmptyRecProvider(),
+                [ChatMessage(role="user", content="visitor count?")],
+                api_key="sk-test",
+                model=None,
+            )
+
+    text, used = asyncio.run(_run())
+    assert used == ["analytics_summary"]
+    assert text == "3 visitor sessions on file."
+    assert "📊" not in text
+
+
+def test_run_admin_tool_loop_appends_on_exhausted_rounds() -> None:
+    """Exhausted-rounds fallback also appends the structured block."""
+
+    analytics_with_rec = {
+        **_LIVE_ANALYTICS,
+        "recommendations": [_SAMPLE_REC],
+    }
+
+    class _ExhaustProvider(BaseProvider):
+        provider_id = "openai"
+        default_model = "gpt-4o-mini"
+        supports_tools = True
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+        ) -> str:
+            return "fallback"
+
+        async def complete_turn(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+            tools: Sequence[ToolSpec] | None = None,
+        ) -> CompletionTurn:
+            self.calls += 1
+            # Always request tools while tools are offered (loop rounds).
+            if tools is not None:
+                return CompletionTurn(
+                    text=None,
+                    tool_calls=[
+                        ToolCallRequest(
+                            id=f"c{self.calls}",
+                            name="analytics_summary",
+                            arguments={},
+                        ),
+                    ],
+                )
+            # Final text-only turn after MAX_TOOL_ROUNDS exhausted.
+            return CompletionTurn(text="Still 3 sessions after several looks.")
+
+    async def _run() -> tuple[str, list[str]]:
+        with patch(
+            "app.services.admin_chat_tools.analytics_summary_for_chat",
+            return_value=analytics_with_rec,
+        ):
+            return await run_admin_tool_loop(
+                _ExhaustProvider(),
+                [ChatMessage(role="user", content="hot leads?")],
+                api_key="sk-test",
+                model=None,
+                max_rounds=2,
+            )
+
+    text, used = asyncio.run(_run())
+    assert used == ["analytics_summary"]
+    assert text.startswith("Still 3 sessions after several looks.")
+    assert text.endswith(_SAMPLE_REC_BLOCK)
+    assert text.count("📊 Finding:") == 1
+
+
+def test_run_admin_tool_loop_seed_recommendations_without_tool_calls() -> None:
+    """Intent-seeded recommendations append even when the model calls no tools."""
+
+    class _NoToolProvider(BaseProvider):
+        provider_id = "openai"
+        default_model = "gpt-4o-mini"
+        supports_tools = True
+
+        async def complete(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+        ) -> str:
+            return "fallback"
+
+        async def complete_turn(
+            self,
+            messages: Sequence[ChatMessage],
+            api_key: str,
+            model: str | None = None,
+            tools: Sequence[ToolSpec] | None = None,
+        ) -> CompletionTurn:
+            return CompletionTurn(text="1 hot lead among 3 sessions.")
+
+    async def _run() -> tuple[str, list[str]]:
+        return await run_admin_tool_loop(
+            _NoToolProvider(),
+            [ChatMessage(role="user", content="hot leads?")],
+            api_key="sk-test",
+            model=None,
+            seed_recommendations=[_SAMPLE_REC],
+        )
+
+    text, used = asyncio.run(_run())
+    assert used == []
+    assert text.endswith(_SAMPLE_REC_BLOCK)
