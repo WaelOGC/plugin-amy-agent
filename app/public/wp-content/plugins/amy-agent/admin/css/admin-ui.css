@@ -1,0 +1,487 @@
+/**
+ * Amy Agent — shared admin UI primitives (cards, switches, help popovers).
+ * Reusable across Overview, Settings, and follow-up admin pages.
+ */
+
+.amy-admin-ui {
+	--amy-ui-bg: #0a0a0a;
+	--amy-ui-panel: #141414;
+	--amy-ui-panel-2: #1a1a1a;
+	--amy-ui-border: rgba(247, 147, 30, 0.35);
+	--amy-ui-border-strong: #f7931e;
+	--amy-ui-grad-start: #f7931e;
+	--amy-ui-grad-end: #ffb238;
+	--amy-ui-text: #ffffff;
+	--amy-ui-text-muted: #c9c9c9;
+	--amy-ui-text-on-accent: #1a1200;
+	--amy-ui-ok: #3ddc97;
+	--amy-ui-urgent: #e35d6a;
+	--amy-ui-font-heading: 'Space Grotesk', sans-serif;
+	--amy-ui-font-body: 'Inter', sans-serif;
+}
+
+/* —— Stat row —— */
+
+.amy-admin-stats {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.85rem;
+	margin: 0 0 1.35rem;
+}
+
+.amy-admin-stat {
+	padding: 1rem 1.1rem;
+	border: 1px solid var(--amy-ui-border);
+	border-radius: 12px;
+	background: var(--amy-ui-panel);
+}
+
+.amy-admin-stat__label {
+	margin: 0 0 0.4rem;
+	color: var(--amy-ui-text-muted);
+	font-family: var(--amy-ui-font-body);
+	font-size: 0.75rem;
+	font-weight: 500;
+	letter-spacing: 0.02em;
+	line-height: 1.3;
+}
+
+.amy-admin-stat__value {
+	margin: 0;
+	color: var(--amy-ui-text);
+	font-family: var(--amy-ui-font-heading);
+	font-size: 1.45rem;
+	font-weight: 700;
+	line-height: 1.15;
+}
+
+.amy-admin-stat__value--ok {
+	color: #9af0cb;
+}
+
+.amy-admin-stat__value--warn {
+	color: #ffd27a;
+}
+
+/* —— Feature / settings card grid —— */
+
+.amy-admin-card-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 1rem;
+}
+
+.amy-admin-card {
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+	margin: 0;
+	padding: 1.15rem 1.2rem;
+	border: 1px solid var(--amy-ui-border);
+	border-radius: 14px;
+	background: var(--amy-ui-panel);
+	color: var(--amy-ui-text);
+}
+
+.amy-admin-card--accent {
+	border-color: rgba(247, 147, 30, 0.55);
+	box-shadow: inset 3px 0 0 var(--amy-ui-grad-start);
+}
+
+.amy-admin-card__top {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.85rem;
+	min-width: 0;
+}
+
+.amy-admin-card__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 auto;
+	width: 2.35rem;
+	height: 2.35rem;
+	border-radius: 10px;
+	background: linear-gradient(135deg, rgba(247, 147, 30, 0.22), rgba(255, 178, 56, 0.12));
+	color: #ffd27a;
+}
+
+.amy-admin-card__icon .dashicons {
+	width: 1.25rem;
+	height: 1.25rem;
+	font-size: 1.25rem;
+	line-height: 1;
+}
+
+.amy-admin-card__heading {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.amy-admin-card__title-row {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	margin: 0 0 0.25rem;
+}
+
+.amy-admin-card__title {
+	margin: 0;
+	color: var(--amy-ui-text);
+	font-family: var(--amy-ui-font-heading);
+	font-size: 0.95rem;
+	font-weight: 700;
+	line-height: 1.3;
+}
+
+.amy-admin-card__subtitle {
+	margin: 0;
+	color: var(--amy-ui-text-muted);
+	font-family: var(--amy-ui-font-body);
+	font-size: 0.8125rem;
+	line-height: 1.4;
+}
+
+.amy-admin-card__footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.65rem 0.85rem;
+	margin-top: auto;
+	padding-top: 0.15rem;
+}
+
+.amy-admin-card__link {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.2rem;
+	color: #ffd27a;
+	font-family: var(--amy-ui-font-body);
+	font-size: 0.8125rem;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.amy-admin-card__link:hover,
+.amy-admin-card__link:focus-visible {
+	color: var(--amy-ui-text);
+	outline: none;
+}
+
+.amy-admin-card__body {
+	display: flex;
+	flex-direction: column;
+	gap: 0.85rem;
+}
+
+/* —— Settings group card (inside tabs) —— */
+
+.amy-admin-group {
+	margin: 0 0 1.15rem;
+	padding: 1.1rem 1.15rem;
+	border: 1px solid var(--amy-ui-border);
+	border-radius: 12px;
+	background: var(--amy-ui-panel);
+}
+
+.amy-admin-group__header {
+	display: flex;
+	align-items: center;
+	gap: 0.45rem;
+	margin: 0 0 0.95rem;
+}
+
+.amy-admin-group__title {
+	margin: 0;
+	font-family: var(--amy-ui-font-heading);
+	font-size: 0.95rem;
+	font-weight: 700;
+	color: #ffd27a;
+}
+
+.amy-admin-group__rows {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.amy-admin-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.7rem 0;
+	border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.amy-admin-row:first-child {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.amy-admin-row:last-child {
+	padding-bottom: 0;
+}
+
+.amy-admin-row__label-wrap {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	min-width: 0;
+}
+
+.amy-admin-row__label {
+	margin: 0;
+	color: var(--amy-ui-text);
+	font-family: var(--amy-ui-font-heading);
+	font-size: 0.9rem;
+	font-weight: 600;
+	line-height: 1.35;
+}
+
+.amy-admin-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin: 0 0 1rem;
+}
+
+.amy-admin-field:last-child {
+	margin-bottom: 0;
+}
+
+.amy-admin-field__label-row {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+}
+
+.amy-admin-field__label {
+	margin: 0;
+	color: var(--amy-ui-text-muted);
+	font-size: 0.75rem;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+/* —— Pill toggle switch (OGC accent gradient) —— */
+
+.amy-admin-switch {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	margin: 0;
+	cursor: pointer;
+}
+
+.amy-admin-switch__input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.amy-admin-switch__track {
+	position: relative;
+	display: block;
+	width: 2.75rem;
+	height: 1.5rem;
+	border-radius: 999px;
+	background: #2a2a2a;
+	border: 1px solid rgba(255, 255, 255, 0.12);
+	transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.amy-admin-switch__track::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 1.15rem;
+	height: 1.15rem;
+	border-radius: 50%;
+	background: #f2f2f2;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+	transition: transform 0.18s ease;
+}
+
+.amy-admin-switch__input:checked + .amy-admin-switch__track {
+	background: linear-gradient(90deg, var(--amy-ui-grad-start), var(--amy-ui-grad-end));
+	border-color: transparent;
+	box-shadow: 0 0 0 1px rgba(247, 147, 30, 0.25);
+}
+
+.amy-admin-switch__input:checked + .amy-admin-switch__track::after {
+	transform: translateX(1.2rem);
+}
+
+.amy-admin-switch__input:focus-visible + .amy-admin-switch__track {
+	outline: 2px solid #ffd27a;
+	outline-offset: 2px;
+}
+
+.amy-admin-switch.is-readonly {
+	cursor: default;
+	pointer-events: none;
+}
+
+.amy-admin-switch.is-readonly .amy-admin-switch__track {
+	opacity: 0.95;
+}
+
+/* —— (?) help popover —— */
+
+.amy-admin-help {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 auto;
+	vertical-align: middle;
+}
+
+.amy-admin-help__btn {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.25rem;
+	height: 1.25rem;
+	margin: 0;
+	padding: 0;
+	border: 1px solid rgba(247, 147, 30, 0.45);
+	border-radius: 999px;
+	background: rgba(247, 147, 30, 0.12);
+	color: #ffd27a;
+	font-family: var(--amy-ui-font-body);
+	font-size: 0.7rem;
+	font-weight: 700;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.amy-admin-help__btn:hover,
+.amy-admin-help__btn:focus-visible,
+.amy-admin-help.is-open .amy-admin-help__btn {
+	border-color: rgba(247, 147, 30, 0.85);
+	background: rgba(247, 147, 30, 0.22);
+	color: var(--amy-ui-text);
+	outline: none;
+}
+
+.amy-admin-help__popover {
+	position: absolute;
+	z-index: 30;
+	top: calc(100% + 0.4rem);
+	left: 0;
+	width: min(18.5rem, 72vw);
+	padding: 0.7rem 0.8rem;
+	border: 1px solid rgba(247, 147, 30, 0.35);
+	border-radius: 10px;
+	background: rgba(18, 18, 18, 0.98);
+	box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+	color: var(--amy-ui-text-muted);
+	font-family: var(--amy-ui-font-body);
+	font-size: 0.75rem;
+	font-weight: 400;
+	line-height: 1.45;
+	text-transform: none;
+	letter-spacing: normal;
+}
+
+.amy-admin-help__popover[hidden] {
+	display: none !important;
+}
+
+.amy-admin-help__popover p {
+	margin: 0 0 0.45rem;
+}
+
+.amy-admin-help__popover p:last-child {
+	margin-bottom: 0;
+}
+
+.amy-admin-help--end .amy-admin-help__popover {
+	left: auto;
+	right: 0;
+}
+
+/* —— Collapsed instructions disclosure —— */
+
+.amy-admin-disclosure {
+	margin: 0;
+	border: 1px solid var(--amy-ui-border);
+	border-radius: 12px;
+	background: var(--amy-ui-panel);
+}
+
+.amy-admin-disclosure + .amy-admin-disclosure,
+.amy-admin-group + .amy-admin-disclosure,
+.amy-admin-disclosure + .amy-admin-group {
+	margin-top: 1.15rem;
+}
+
+.amy-admin-disclosure__summary {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.9rem 1.1rem;
+	cursor: pointer;
+	list-style: none;
+	color: #ffd27a;
+	font-family: var(--amy-ui-font-heading);
+	font-size: 0.9rem;
+	font-weight: 700;
+	user-select: none;
+}
+
+.amy-admin-disclosure__summary::-webkit-details-marker {
+	display: none;
+}
+
+.amy-admin-disclosure__summary::before {
+	content: '';
+	width: 0.45rem;
+	height: 0.45rem;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: rotate(-45deg);
+	transition: transform 0.15s ease;
+}
+
+.amy-admin-disclosure[open] > .amy-admin-disclosure__summary::before {
+	transform: rotate(45deg);
+}
+
+.amy-admin-disclosure__body {
+	padding: 0 1.1rem 1.1rem;
+	color: var(--amy-ui-text-muted);
+	font-size: 0.8125rem;
+	line-height: 1.45;
+}
+
+@media (max-width: 1100px) {
+	.amy-admin-card-grid {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+}
+
+@media (max-width: 782px) {
+	.amy-admin-stats,
+	.amy-admin-card-grid {
+		grid-template-columns: 1fr;
+	}
+
+	.amy-admin-row {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+}

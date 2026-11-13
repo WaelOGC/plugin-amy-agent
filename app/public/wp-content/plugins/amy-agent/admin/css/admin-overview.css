@@ -5,9 +5,9 @@
 .amy-agent-overview {
 	--amy-bg: #0A0A0A;
 	--amy-panel: #141414;
-	--amy-border: #F7941D;
-	--amy-grad-start: #FF7A18;
-	--amy-grad-end: #FFC542;
+	--amy-border: #F7931E;
+	--amy-grad-start: #F7931E;
+	--amy-grad-end: #FFB238;
 	--amy-text: #FFFFFF;
 	--amy-text-muted: #C9C9C9;
 	--amy-text-on-accent: #1A1200;
@@ -152,13 +152,22 @@
 .amy-agent-overview__connection-hint {
 	margin: 0 0 1.15rem;
 	padding: 0.75rem 1rem;
-	border: 1px solid rgba(247, 148, 29, 0.35);
+	border: 1px solid rgba(247, 147, 30, 0.35);
 	border-radius: 10px;
-	background: rgba(247, 148, 29, 0.08);
+	background: rgba(247, 147, 30, 0.08);
 	color: var(--amy-text-muted);
 	font-family: var(--amy-font-body);
 	font-size: 0.8125rem;
 	line-height: 1.45;
+}
+
+.amy-agent-overview .amy-admin-card__footer {
+	margin-top: 0.15rem;
+}
+
+.amy-agent-overview__extra-link {
+	align-self: flex-end;
+	margin-top: -0.35rem;
 }
 
 .amy-agent-overview__card--coming-soon {

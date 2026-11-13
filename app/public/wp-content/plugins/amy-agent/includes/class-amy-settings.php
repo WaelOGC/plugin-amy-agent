@@ -426,17 +426,19 @@ class Amy_Settings {
 			null
 		);
 
+		Amy_Admin_UI::enqueue_assets();
+
 		wp_enqueue_style(
 			'amy-agent-admin-settings',
 			AMY_AGENT_URL . 'admin/css/admin-settings.css',
-			array( 'amy-agent-admin-settings-fonts', 'dashicons' ),
+			array( 'amy-agent-admin-settings-fonts', 'amy-agent-admin-ui', 'dashicons' ),
 			AMY_AGENT_VERSION
 		);
 
 		wp_enqueue_script(
 			'amy-agent-admin-settings',
 			AMY_AGENT_URL . 'admin/js/admin-settings.js',
-			array(),
+			array( 'amy-agent-admin-ui' ),
 			AMY_AGENT_VERSION,
 			true
 		);
@@ -1429,7 +1431,7 @@ class Amy_Settings {
 			$active_tab = 'general';
 		}
 		?>
-		<div class="wrap amy-agent-settings" id="amy-agent-settings">
+		<div class="wrap amy-agent-settings amy-admin-ui" id="amy-agent-settings">
 			<header class="amy-agent-settings__header">
 				<h1 class="amy-agent-settings__title"><?php echo esc_html__( 'Settings', 'amy-agent' ); ?></h1>
 				<p class="amy-agent-settings__intro">
@@ -1472,11 +1474,6 @@ class Amy_Settings {
 					<?php endif; ?>
 				</div>
 			</div>
-
-			<p class="amy-agent-settings__controls-note">
-				<strong><?php echo esc_html__( 'What Enable Amy controls:', 'amy-agent' ); ?></strong>
-				<?php echo esc_html__( ' the floating site chat widget and Amy Submit Idea. Analytics tracking can still run when the service URL + secret are set. Brand avatar is edited under Brand & Avatar — not here.', 'amy-agent' ); ?>
-			</p>
 
 			<div class="amy-agent-settings__tabs" role="tablist" aria-label="<?php echo esc_attr__( 'Settings tabs', 'amy-agent' ); ?>">
 				<button
@@ -1529,82 +1526,101 @@ class Amy_Settings {
 						<?php echo esc_html__( 'Rarely touched site switches and the marketing From identity used by Email Marketing sends.', 'amy-agent' ); ?>
 					</p>
 
-					<div class="amy-agent-settings__card" id="enable-amy">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Site presence', 'amy-agent' ); ?></h3>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__toggle" for="amy_agent_enabled">
-								<input
-									type="checkbox"
-									id="amy_agent_enabled"
-									name="<?php echo esc_attr( self::OPTION_ENABLED ); ?>"
-									value="1"
-									<?php checked( $this->is_enabled(), true ); ?>
-								/>
-								<span class="amy-agent-settings__toggle-copy">
-									<strong><?php echo esc_html__( 'Enable Amy', 'amy-agent' ); ?></strong>
-									<span><?php echo esc_html__( 'Show the floating chat widget and Amy Submit Idea when the service URL + shared secret are also set.', 'amy-agent' ); ?></span>
-								</span>
-							</label>
-							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Uncheck and save to hide Amy on the site again. Connection settings stay saved.', 'amy-agent' ); ?>
-							</p>
+					<div class="amy-admin-group" id="enable-amy">
+						<div class="amy-admin-group__header">
+							<h3 class="amy-admin-group__title"><?php echo esc_html__( 'Site presence', 'amy-agent' ); ?></h3>
+							<?php
+							Amy_Admin_UI::render_help(
+								'site-presence',
+								__( 'What Enable Amy controls: the floating site chat widget and Amy Submit Idea. Analytics tracking can still run when the service URL + secret are set. Brand avatar is edited under Brand & Avatar — not here.', 'amy-agent' ),
+								__( 'About site presence', 'amy-agent' )
+							);
+							?>
 						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__toggle" for="amy_agent_closing_wishes">
-								<input
-									type="checkbox"
-									id="amy_agent_closing_wishes"
-									name="<?php echo esc_attr( self::OPTION_CLOSING_WISHES ); ?>"
-									value="1"
-									<?php checked( $this->is_closing_wishes_enabled(), true ); ?>
-								/>
-								<span class="amy-agent-settings__toggle-copy">
-									<strong><?php echo esc_html__( 'Friendly closing wishes in public chat', 'amy-agent' ); ?></strong>
-									<span><?php echo esc_html__( 'When on, public Amy may add a short goodbye wish (weekend / holidays / day-evening) once per conversation. Tone changes stay on either way. Off: the widget does not send timezone and the service never adds the wish hint.', 'amy-agent' ); ?></span>
-								</span>
-							</label>
-						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__toggle" for="amy_agent_public_chat_uploads">
-								<input
-									type="checkbox"
-									id="amy_agent_public_chat_uploads"
-									name="<?php echo esc_attr( self::OPTION_PUBLIC_CHAT_UPLOADS ); ?>"
-									value="1"
-									<?php checked( $this->is_public_chat_uploads_enabled(), true ); ?>
-								/>
-								<span class="amy-agent-settings__toggle-copy">
-									<strong><?php echo esc_html__( 'Allow file uploads in public chat', 'amy-agent' ); ?></strong>
-									<span><?php echo esc_html__( 'When on, visitors can attach images or PDFs (up to 5 MB) in the floating Amy widget. Off: the attach control is hidden and uploads are rejected.', 'amy-agent' ); ?></span>
-								</span>
-							</label>
-						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__toggle" for="amy_agent_public_chat_upload_notify">
-								<input
-									type="checkbox"
-									id="amy_agent_public_chat_upload_notify"
-									name="<?php echo esc_attr( self::OPTION_PUBLIC_CHAT_UPLOAD_NOTIFY ); ?>"
-									value="1"
-									<?php checked( $this->is_public_chat_upload_notify_enabled(), true ); ?>
-								/>
-								<span class="amy-agent-settings__toggle-copy">
-									<strong><?php echo esc_html__( 'Notify me about uploads', 'amy-agent' ); ?></strong>
-									<span><?php echo esc_html__( 'When on, each public chat upload can email the site admin and ping linked Telegram admins (if Telegram is enabled).', 'amy-agent' ); ?></span>
-								</span>
-							</label>
+						<div class="amy-admin-group__rows">
+							<div class="amy-admin-row">
+								<div class="amy-admin-row__label-wrap">
+									<p class="amy-admin-row__label"><?php echo esc_html__( 'Enable Amy', 'amy-agent' ); ?></p>
+									<?php
+									Amy_Admin_UI::render_help(
+										'enable-amy',
+										__( 'Show the floating chat widget and Amy Submit Idea when the service URL + shared secret are also set. Uncheck and save to hide Amy on the site again. Connection settings stay saved.', 'amy-agent' ),
+										__( 'About Enable Amy', 'amy-agent' )
+									);
+									?>
+								</div>
+								<?php Amy_Admin_UI::render_switch( 'amy_agent_enabled', self::OPTION_ENABLED, $this->is_enabled(), __( 'Enable Amy', 'amy-agent' ) ); ?>
+							</div>
+							<div class="amy-admin-row">
+								<div class="amy-admin-row__label-wrap">
+									<p class="amy-admin-row__label"><?php echo esc_html__( 'Friendly closing wishes', 'amy-agent' ); ?></p>
+									<?php
+									Amy_Admin_UI::render_help(
+										'closing-wishes',
+										__( 'When on, public Amy may add a short goodbye wish (weekend / holidays / day-evening) once per conversation. Tone changes stay on either way. Off: the widget does not send timezone and the service never adds the wish hint.', 'amy-agent' ),
+										__( 'About closing wishes', 'amy-agent' )
+									);
+									?>
+								</div>
+								<?php Amy_Admin_UI::render_switch( 'amy_agent_closing_wishes', self::OPTION_CLOSING_WISHES, $this->is_closing_wishes_enabled(), __( 'Friendly closing wishes in public chat', 'amy-agent' ) ); ?>
+							</div>
+							<div class="amy-admin-row">
+								<div class="amy-admin-row__label-wrap">
+									<p class="amy-admin-row__label"><?php echo esc_html__( 'Allow file uploads', 'amy-agent' ); ?></p>
+									<?php
+									Amy_Admin_UI::render_help(
+										'public-uploads',
+										__( 'When on, visitors can attach images or PDFs (up to 5 MB) in the floating Amy widget. Off: the attach control is hidden and uploads are rejected.', 'amy-agent' ),
+										__( 'About file uploads', 'amy-agent' )
+									);
+									?>
+								</div>
+								<?php Amy_Admin_UI::render_switch( 'amy_agent_public_chat_uploads', self::OPTION_PUBLIC_CHAT_UPLOADS, $this->is_public_chat_uploads_enabled(), __( 'Allow file uploads in public chat', 'amy-agent' ) ); ?>
+							</div>
+							<div class="amy-admin-row">
+								<div class="amy-admin-row__label-wrap">
+									<p class="amy-admin-row__label"><?php echo esc_html__( 'Notify me about uploads', 'amy-agent' ); ?></p>
+									<?php
+									Amy_Admin_UI::render_help(
+										'upload-notify',
+										__( 'When on, each public chat upload can email the site admin and ping linked Telegram admins (if Telegram is enabled).', 'amy-agent' ),
+										__( 'About upload notifications', 'amy-agent' )
+									);
+									?>
+								</div>
+								<?php Amy_Admin_UI::render_switch( 'amy_agent_public_chat_upload_notify', self::OPTION_PUBLIC_CHAT_UPLOAD_NOTIFY, $this->is_public_chat_upload_notify_enabled(), __( 'Notify me about uploads', 'amy-agent' ) ); ?>
+							</div>
 						</div>
 					</div>
 
-					<div class="amy-agent-settings__card" id="general-from">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Email Marketing From', 'amy-agent' ); ?></h3>
-						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html__( 'Each WordPress site configures its own Marketing From. Buyers: use a mailbox on your domain and authorize that address in FluentSMTP (SPF/DKIM). Sends go through wp_mail → FluentSMTP — never personal Gmail, AgentMail (@agentmail.to), or free webmail.', 'amy-agent' ); ?>
-						</p>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_marketing_from_email">
-								<?php echo esc_html__( 'Marketing From email', 'amy-agent' ); ?>
-							</label>
+					<div class="amy-admin-group" id="general-from">
+						<div class="amy-admin-group__header">
+							<h3 class="amy-admin-group__title"><?php echo esc_html__( 'Email Marketing From', 'amy-agent' ); ?></h3>
+							<?php
+							Amy_Admin_UI::render_help(
+								'marketing-from',
+								__( 'Each WordPress site configures its own Marketing From. Buyers: use a mailbox on your domain and authorize that address in FluentSMTP (SPF/DKIM). Sends go through wp_mail → FluentSMTP — never personal Gmail, AgentMail (@agentmail.to), or free webmail.', 'amy-agent' ),
+								__( 'About Marketing From', 'amy-agent' )
+							);
+							?>
+						</div>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_marketing_from_email">
+									<?php echo esc_html__( 'Marketing From email', 'amy-agent' ); ?>
+								</label>
+								<?php
+								Amy_Admin_UI::render_help(
+									'marketing-from-email',
+									sprintf(
+										/* translators: %s: plugin default From email */
+										__( 'Leave empty to use the plugin default (%s) for this OGC NewFinity install. Other sites should set their own domain mailbox here and authorize it in FluentSMTP (SPF/DKIM).', 'amy-agent' ),
+										self::DEFAULT_MARKETING_FROM_EMAIL
+									),
+									__( 'About Marketing From email', 'amy-agent' )
+								);
+								?>
+							</div>
 							<input
 								type="email"
 								id="amy_agent_marketing_from_email"
@@ -1614,22 +1630,24 @@ class Amy_Settings {
 								autocomplete="off"
 							/>
 							<p class="amy-agent-settings__field-error" id="amy-settings-from-error" hidden></p>
-							<p class="amy-agent-settings__hint">
+						</div>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_marketing_from_name">
+									<?php echo esc_html__( 'Marketing From name', 'amy-agent' ); ?>
+								</label>
 								<?php
-								echo esc_html(
+								Amy_Admin_UI::render_help(
+									'marketing-from-name',
 									sprintf(
-										/* translators: %s: plugin default From email */
-										__( 'Leave empty to use the plugin default (%s) for this OGC NewFinity install. Other sites should set their own domain mailbox here and authorize it in FluentSMTP (SPF/DKIM).', 'amy-agent' ),
-										self::DEFAULT_MARKETING_FROM_EMAIL
-									)
+										/* translators: %s: example display name */
+										__( 'Display name recipients see (example: %s).', 'amy-agent' ),
+										self::DEFAULT_MARKETING_FROM_NAME
+									),
+									__( 'About Marketing From name', 'amy-agent' )
 								);
 								?>
-							</p>
-						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_marketing_from_name">
-								<?php echo esc_html__( 'Marketing From name', 'amy-agent' ); ?>
-							</label>
+							</div>
 							<input
 								type="text"
 								id="amy_agent_marketing_from_name"
@@ -1638,27 +1656,18 @@ class Amy_Settings {
 								placeholder="<?php echo esc_attr( self::DEFAULT_MARKETING_FROM_NAME ); ?>"
 								autocomplete="organization"
 							/>
-							<p class="amy-agent-settings__hint">
-								<?php
-								echo esc_html(
-									sprintf(
-										/* translators: %s: example display name */
-										__( 'Display name recipients see (example: %s).', 'amy-agent' ),
-										self::DEFAULT_MARKETING_FROM_NAME
-									)
-								);
-								?>
-							</p>
 						</div>
 					</div>
 
-					<div class="amy-agent-settings__card amy-agent-settings__card--help amy-agent-settings__card--fluentsmtp" id="general-from-playbook">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html( self::get_fluentsmtp_playbook_title() ); ?></h3>
-						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html( self::get_fluentsmtp_playbook_intro() ); ?>
-						</p>
-						<?php self::render_fluentsmtp_buyer_playbook( self::DEFAULT_MARKETING_FROM_EMAIL ); ?>
-					</div>
+					<details class="amy-admin-disclosure" id="general-from-playbook">
+						<summary class="amy-admin-disclosure__summary">
+							<?php echo esc_html__( 'Show instructions — set your Marketing From', 'amy-agent' ); ?>
+						</summary>
+						<div class="amy-admin-disclosure__body">
+							<p><?php echo esc_html( self::get_fluentsmtp_playbook_intro() ); ?></p>
+							<?php self::render_fluentsmtp_buyer_playbook( self::DEFAULT_MARKETING_FROM_EMAIL ); ?>
+						</div>
+					</details>
 
 					<?php
 					$default_owner = $this->get_task_default_owner_wp_user_id();
@@ -1670,15 +1679,30 @@ class Amy_Settings {
 						)
 					);
 					?>
-					<div class="amy-agent-settings__card">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Task Service owner', 'amy-agent' ); ?></h3>
-						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html__( 'On timeout, Amy notifies the task creator first. If that creator has no Telegram link or is gone, escalate to this site default owner (then their designated backup).', 'amy-agent' ); ?>
-						</p>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_task_default_owner">
-								<?php echo esc_html__( 'Site default owner', 'amy-agent' ); ?>
-							</label>
+					<div class="amy-admin-group">
+						<div class="amy-admin-group__header">
+							<h3 class="amy-admin-group__title"><?php echo esc_html__( 'Task Service owner', 'amy-agent' ); ?></h3>
+							<?php
+							Amy_Admin_UI::render_help(
+								'task-owner',
+								__( 'On timeout, Amy notifies the task creator first. If that creator has no Telegram link or is gone, escalate to this site default owner (then their designated backup).', 'amy-agent' ),
+								__( 'About Task Service owner', 'amy-agent' )
+							);
+							?>
+						</div>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_task_default_owner">
+									<?php echo esc_html__( 'Site default owner', 'amy-agent' ); ?>
+								</label>
+								<?php
+								Amy_Admin_UI::render_help(
+									'task-owner-select',
+									__( 'Typically Abdulla / the business owner. Each person can also designate a personal backup under Amy → My Profile.', 'amy-agent' ),
+									__( 'About site default owner', 'amy-agent' )
+								);
+								?>
+							</div>
 							<select
 								id="amy_agent_task_default_owner"
 								name="<?php echo esc_attr( self::OPTION_TASK_DEFAULT_OWNER ); ?>"
@@ -1690,9 +1714,6 @@ class Amy_Settings {
 									</option>
 								<?php endforeach; ?>
 							</select>
-							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Typically Abdulla / the business owner. Each person can also designate a personal backup under Amy → My Profile.', 'amy-agent' ); ?>
-							</p>
 						</div>
 					</div>
 				</div>
@@ -1709,12 +1730,23 @@ class Amy_Settings {
 						<?php echo esc_html__( 'Amy Python service URL, shared secret, and the AI provider used for chat and tools. Keys stay in the WordPress database and are never printed back into the page.', 'amy-agent' ); ?>
 					</p>
 
-					<div class="amy-agent-settings__card" id="connection">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Python service', 'amy-agent' ); ?></h3>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_service_url">
-								<?php echo esc_html__( 'Python service URL', 'amy-agent' ); ?>
-							</label>
+					<div class="amy-admin-group" id="connection">
+						<div class="amy-admin-group__header">
+							<h3 class="amy-admin-group__title"><?php echo esc_html__( 'Python service', 'amy-agent' ); ?></h3>
+						</div>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_service_url">
+									<?php echo esc_html__( 'Python service URL', 'amy-agent' ); ?>
+								</label>
+								<?php
+								Amy_Admin_UI::render_help(
+									'service-url',
+									__( 'Base URL of your Amy Python service host (no trailing slash). On Local, try 127.0.0.1 or host.docker.internal.', 'amy-agent' ),
+									__( 'About Python service URL', 'amy-agent' )
+								);
+								?>
+							</div>
 							<input
 								type="url"
 								id="amy_agent_service_url"
@@ -1723,14 +1755,26 @@ class Amy_Settings {
 								placeholder="http://127.0.0.1:8765"
 								autocomplete="off"
 							/>
-							<p class="amy-agent-settings__hint">
-								<?php echo esc_html__( 'Base URL of your Amy Python service host (no trailing slash). On Local, try 127.0.0.1 or host.docker.internal.', 'amy-agent' ); ?>
-							</p>
 						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_shared_secret">
-								<?php echo esc_html__( 'Shared secret', 'amy-agent' ); ?>
-							</label>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_shared_secret">
+									<?php echo esc_html__( 'Shared secret', 'amy-agent' ); ?>
+								</label>
+								<?php
+								Amy_Admin_UI::render_help(
+									'shared-secret',
+									$has_secret
+										? sprintf(
+											/* translators: %s: masked secret ending */
+											__( 'Shared secret is stored in the database (%s). Leave blank when saving to keep it. Must match AMY_SHARED_SECRET on your Amy Python service host (.env).', 'amy-agent' ),
+											$this->mask_secret( $this->get_shared_secret() )
+										)
+										: __( 'Must match AMY_SHARED_SECRET on your Amy Python service host (.env).', 'amy-agent' ),
+									__( 'About shared secret', 'amy-agent' )
+								);
+								?>
+							</div>
 							<input
 								type="password"
 								id="amy_agent_shared_secret"
@@ -1745,15 +1789,11 @@ class Amy_Settings {
 									echo esc_html(
 										sprintf(
 											/* translators: %s: masked secret ending */
-											__( 'Shared secret is stored in the database (%s). Leave blank when saving to keep it.', 'amy-agent' ),
+											__( 'Saved (%s)', 'amy-agent' ),
 											$this->mask_secret( $this->get_shared_secret() )
 										)
 									);
 									?>
-								</p>
-							<?php else : ?>
-								<p class="amy-agent-settings__hint">
-									<?php echo esc_html__( 'Must match AMY_SHARED_SECRET on your Amy Python service host (.env).', 'amy-agent' ); ?>
 								</p>
 							<?php endif; ?>
 						</div>
@@ -1762,19 +1802,27 @@ class Amy_Settings {
 							<button type="button" class="amy-agent-settings__btn amy-agent-settings__btn--ghost" id="amy-settings-health-check">
 								<?php echo esc_html__( 'Check connection', 'amy-agent' ); ?>
 							</button>
+							<?php
+							Amy_Admin_UI::render_help(
+								'health-check',
+								__( 'Calls WordPress /wp-json/amy-agent/v1/health, which probes the Python service /v1/health with the saved secret.', 'amy-agent' ),
+								__( 'About connection check', 'amy-agent' )
+							);
+							?>
 							<p class="amy-agent-settings__health-status" id="amy-settings-health-status" hidden role="status"></p>
 						</div>
-						<p class="amy-agent-settings__hint">
-							<?php echo esc_html__( 'Calls WordPress /wp-json/amy-agent/v1/health, which probes the Python service /v1/health with the saved secret.', 'amy-agent' ); ?>
-						</p>
 					</div>
 
-					<div class="amy-agent-settings__card" id="ai-key">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'AI provider', 'amy-agent' ); ?></h3>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_ai_provider">
-								<?php echo esc_html__( 'Provider', 'amy-agent' ); ?>
-							</label>
+					<div class="amy-admin-group" id="ai-key">
+						<div class="amy-admin-group__header">
+							<h3 class="amy-admin-group__title"><?php echo esc_html__( 'AI provider', 'amy-agent' ); ?></h3>
+						</div>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_ai_provider">
+									<?php echo esc_html__( 'Provider', 'amy-agent' ); ?>
+								</label>
+							</div>
 							<select id="amy_agent_ai_provider" name="<?php echo esc_attr( self::OPTION_AI_PROVIDER ); ?>">
 								<?php foreach ( self::providers() as $slug => $label ) : ?>
 									<option value="<?php echo esc_attr( $slug ); ?>" <?php selected( $this->get_ai_provider(), $slug ); ?>>
@@ -1783,10 +1831,25 @@ class Amy_Settings {
 								<?php endforeach; ?>
 							</select>
 						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_ai_api_key">
-								<?php echo esc_html__( 'API key', 'amy-agent' ); ?>
-							</label>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_ai_api_key">
+									<?php echo esc_html__( 'API key', 'amy-agent' ); ?>
+								</label>
+								<?php
+								Amy_Admin_UI::render_help(
+									'ai-api-key',
+									$has_key
+										? sprintf(
+											/* translators: %s: masked API key ending */
+											__( 'API key is stored in the database (%s). Leave blank when saving to keep it. The field stays empty after save on purpose so the key is never shown in the page HTML.', 'amy-agent' ),
+											$this->mask_secret( $this->get_ai_api_key() )
+										)
+										: __( 'Stored via the Options API. The field stays empty after save on purpose so the key is never shown in the page HTML.', 'amy-agent' ),
+									__( 'About API key', 'amy-agent' )
+								);
+								?>
+							</div>
 							<input
 								type="password"
 								id="amy_agent_ai_api_key"
@@ -1801,22 +1864,20 @@ class Amy_Settings {
 									echo esc_html(
 										sprintf(
 											/* translators: %s: masked API key ending */
-											__( 'API key is stored in the database (%s). Leave blank when saving to keep it.', 'amy-agent' ),
+											__( 'Saved (%s)', 'amy-agent' ),
 											$this->mask_secret( $this->get_ai_api_key() )
 										)
 									);
 									?>
 								</p>
-							<?php else : ?>
-								<p class="amy-agent-settings__hint">
-									<?php echo esc_html__( 'Stored via the Options API. The field stays empty after save on purpose so the key is never shown in the page HTML.', 'amy-agent' ); ?>
-								</p>
 							<?php endif; ?>
 						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_ai_model">
-								<?php echo esc_html__( 'Model (optional)', 'amy-agent' ); ?>
-							</label>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_ai_model">
+									<?php echo esc_html__( 'Model (optional)', 'amy-agent' ); ?>
+								</label>
+							</div>
 							<input
 								type="text"
 								id="amy_agent_ai_model"
@@ -1847,64 +1908,83 @@ class Amy_Settings {
 						</div>
 					<?php endif; ?>
 
-					<div class="amy-agent-settings__card amy-agent-settings__card--botfather">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html( self::get_botfather_help_title() ); ?></h3>
-						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html( self::get_botfather_help_intro() ); ?>
-						</p>
-						<p class="amy-agent-settings__botfather-cta">
-							<a
-								class="amy-agent-settings__btn amy-agent-settings__btn--accent amy-agent-settings__external-link"
-								href="https://t.me/BotFather"
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								<?php echo esc_html__( 'Open BotFather', 'amy-agent' ); ?>
-								<span class="dashicons dashicons-external" aria-hidden="true"></span>
-								<span class="screen-reader-text"><?php echo esc_html__( '(opens in a new tab)', 'amy-agent' ); ?></span>
-							</a>
-						</p>
-						<ol class="amy-agent-settings__steps">
-							<?php foreach ( self::get_botfather_help_steps() as $botfather_step ) : ?>
-								<li><?php echo esc_html( $botfather_step ); ?></li>
-							<?php endforeach; ?>
-						</ol>
-						<p class="amy-agent-settings__hint">
-							<?php echo esc_html__( 'Official guide:', 'amy-agent' ); ?>
-							<a
-								class="amy-agent-settings__external-link"
-								href="https://core.telegram.org/bots/tutorial"
-								target="_blank"
-								rel="noopener noreferrer"
-							>
-								<?php echo esc_html__( 'Telegram Bots tutorial (BotFather + token)', 'amy-agent' ); ?>
-								<span class="dashicons dashicons-external" aria-hidden="true"></span>
-								<span class="screen-reader-text"><?php echo esc_html__( '(opens in a new tab)', 'amy-agent' ); ?></span>
-							</a>
-						</p>
-					</div>
-
-					<div class="amy-agent-settings__card" id="telegram">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Bot connection', 'amy-agent' ); ?></h3>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__toggle" for="amy_agent_telegram_enabled">
-								<input
-									type="checkbox"
-									id="amy_agent_telegram_enabled"
-									name="<?php echo esc_attr( self::OPTION_TELEGRAM_ENABLED ); ?>"
-									value="1"
-									<?php checked( $this->is_telegram_enabled(), true ); ?>
-								/>
-								<span class="amy-agent-settings__toggle-copy">
-									<strong><?php echo esc_html__( 'Enable Telegram Admin Bot', 'amy-agent' ); ?></strong>
-									<span><?php echo esc_html__( 'When off, the webhook acknowledges updates but does not reply.', 'amy-agent' ); ?></span>
-								</span>
-							</label>
+					<details class="amy-admin-disclosure amy-agent-settings__card--botfather">
+						<summary class="amy-admin-disclosure__summary">
+							<?php echo esc_html( self::get_botfather_help_title() ); ?>
+						</summary>
+						<div class="amy-admin-disclosure__body">
+							<p><?php echo esc_html( self::get_botfather_help_intro() ); ?></p>
+							<p class="amy-agent-settings__botfather-cta">
+								<a
+									class="amy-agent-settings__btn amy-agent-settings__btn--accent amy-agent-settings__external-link"
+									href="https://t.me/BotFather"
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									<?php echo esc_html__( 'Open BotFather', 'amy-agent' ); ?>
+									<span class="dashicons dashicons-external" aria-hidden="true"></span>
+									<span class="screen-reader-text"><?php echo esc_html__( '(opens in a new tab)', 'amy-agent' ); ?></span>
+								</a>
+							</p>
+							<ol class="amy-agent-settings__steps">
+								<?php foreach ( self::get_botfather_help_steps() as $botfather_step ) : ?>
+									<li><?php echo esc_html( $botfather_step ); ?></li>
+								<?php endforeach; ?>
+							</ol>
+							<p class="amy-agent-settings__hint">
+								<?php echo esc_html__( 'Official guide:', 'amy-agent' ); ?>
+								<a
+									class="amy-agent-settings__external-link"
+									href="https://core.telegram.org/bots/tutorial"
+									target="_blank"
+									rel="noopener noreferrer"
+								>
+									<?php echo esc_html__( 'Telegram Bots tutorial (BotFather + token)', 'amy-agent' ); ?>
+									<span class="dashicons dashicons-external" aria-hidden="true"></span>
+									<span class="screen-reader-text"><?php echo esc_html__( '(opens in a new tab)', 'amy-agent' ); ?></span>
+								</a>
+							</p>
 						</div>
-						<div class="amy-agent-settings__field">
-							<label class="amy-agent-settings__field-label" for="amy_agent_telegram_bot_token">
-								<?php echo esc_html__( 'Bot token', 'amy-agent' ); ?>
-							</label>
+					</details>
+
+					<div class="amy-admin-group" id="telegram">
+						<div class="amy-admin-group__header">
+							<h3 class="amy-admin-group__title"><?php echo esc_html__( 'Bot connection', 'amy-agent' ); ?></h3>
+						</div>
+						<div class="amy-admin-group__rows">
+							<div class="amy-admin-row">
+								<div class="amy-admin-row__label-wrap">
+									<p class="amy-admin-row__label"><?php echo esc_html__( 'Enable Telegram Admin Bot', 'amy-agent' ); ?></p>
+									<?php
+									Amy_Admin_UI::render_help(
+										'telegram-enabled',
+										__( 'When off, the webhook acknowledges updates but does not reply.', 'amy-agent' ),
+										__( 'About Telegram Admin Bot', 'amy-agent' )
+									);
+									?>
+								</div>
+								<?php Amy_Admin_UI::render_switch( 'amy_agent_telegram_enabled', self::OPTION_TELEGRAM_ENABLED, $this->is_telegram_enabled(), __( 'Enable Telegram Admin Bot', 'amy-agent' ) ); ?>
+							</div>
+						</div>
+						<div class="amy-admin-field">
+							<div class="amy-admin-field__label-row">
+								<label class="amy-admin-field__label" for="amy_agent_telegram_bot_token">
+									<?php echo esc_html__( 'Bot token', 'amy-agent' ); ?>
+								</label>
+								<?php
+								Amy_Admin_UI::render_help(
+									'telegram-token',
+									$has_tg_token
+										? sprintf(
+											/* translators: %s: masked token ending */
+											__( 'Token is stored in the database (%s). Leave blank when saving to keep it. Never share this token.', 'amy-agent' ),
+											$this->mask_secret( $this->get_telegram_token() )
+										)
+										: __( 'Paste the token from BotFather (see instructions above). Never share this token.', 'amy-agent' ),
+									__( 'About bot token', 'amy-agent' )
+								);
+								?>
+							</div>
 							<input
 								type="password"
 								id="amy_agent_telegram_bot_token"
@@ -1920,15 +2000,11 @@ class Amy_Settings {
 									echo esc_html(
 										sprintf(
 											/* translators: %s: masked token ending */
-											__( 'Token is stored in the database (%s). Leave blank when saving to keep it.', 'amy-agent' ),
+											__( 'Saved (%s)', 'amy-agent' ),
 											$this->mask_secret( $this->get_telegram_token() )
 										)
 									);
 									?>
-								</p>
-							<?php else : ?>
-								<p class="amy-agent-settings__hint">
-									<?php echo esc_html__( 'Paste the token from BotFather (steps above). Never share this token.', 'amy-agent' ); ?>
 								</p>
 							<?php endif; ?>
 						</div>
@@ -1970,8 +2046,10 @@ class Amy_Settings {
 					</div>
 
 					<?php $whitelist_tips = self::get_whitelist_column_tooltips(); ?>
-					<div class="amy-agent-settings__card">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html__( 'Allowed admins (whitelist)', 'amy-agent' ); ?></h3>
+					<div class="amy-admin-group">
+						<div class="amy-admin-group__header">
+							<h3 class="amy-admin-group__title"><?php echo esc_html__( 'Allowed admins (whitelist)', 'amy-agent' ); ?></h3>
+						</div>
 						<div class="amy-agent-settings__table-wrap">
 							<table class="amy-agent-settings__table" id="amy-telegram-admins-table">
 								<thead>
@@ -2086,13 +2164,15 @@ class Amy_Settings {
 						</template>
 					</div>
 
-					<div class="amy-agent-settings__card amy-agent-settings__card--help">
-						<h3 class="amy-agent-settings__card-title"><?php echo esc_html( self::get_telegram_id_help_title() ); ?></h3>
-						<p class="amy-agent-settings__hint amy-agent-settings__hint--card">
-							<?php echo esc_html( self::get_telegram_id_help_intro() ); ?>
-						</p>
-						<?php self::render_telegram_id_help_steps(); ?>
-					</div>
+					<details class="amy-admin-disclosure">
+						<summary class="amy-admin-disclosure__summary">
+							<?php echo esc_html( self::get_telegram_id_help_title() ); ?>
+						</summary>
+						<div class="amy-admin-disclosure__body">
+							<p><?php echo esc_html( self::get_telegram_id_help_intro() ); ?></p>
+							<?php self::render_telegram_id_help_steps(); ?>
+						</div>
+					</details>
 				</div>
 
 				<div class="amy-agent-settings__actions">
