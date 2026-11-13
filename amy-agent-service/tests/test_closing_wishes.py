@@ -18,6 +18,7 @@ from app.routes.chat import (  # noqa: E402
 )
 from app.schemas.messages import ChatMessage  # noqa: E402
 from app.services.closing_wishes import (  # noqa: E402
+    CLOSING_WISH_ALREADY_HEADER,
     CLOSING_WISH_PROMPT_HEADER,
     format_closing_wish_hint,
     pick_closing_wish,
@@ -115,7 +116,7 @@ def test_hint_absent_when_setting_off_no_timezone_sent() -> None:
     assert mark is False
 
 
-def test_hint_present_then_absent_after_used_once() -> None:
+def test_hint_present_then_already_sent_status_after_used_once() -> None:
     first, mark_first = _resolve_closing_wish_hint(
         mode="general",
         visitor_timezone="Europe/Amsterdam",
@@ -132,8 +133,21 @@ def test_hint_present_then_absent_after_used_once() -> None:
         conversation={"closing_wish_sent": True},
         latest_user_text="Thanks again, bye!",
     )
-    assert second is None
+    assert second is not None
+    assert CLOSING_WISH_ALREADY_HEADER in second
+    assert CLOSING_WISH_PROMPT_HEADER not in second
+    assert "already given" in second.lower()
     assert mark_second is False
+
+
+def test_no_wish_text_rule_when_hint_absent() -> None:
+    """Public prompt forbids inventing a wish without the hint block."""
+    assert "Closing wish hint" in AMY_SYSTEM_PROMPT or "closing wish" in AMY_SYSTEM_PROMPT.lower()
+    assert "only say a closing wish" in AMY_SYSTEM_PROMPT.lower()
+    assert "when that block is absent" in AMY_SYSTEM_PROMPT.lower()
+    content = _public_system_content(closing_wish_hint=None)
+    assert CLOSING_WISH_PROMPT_HEADER not in content
+    assert content == AMY_SYSTEM_PROMPT
 
 
 def test_hint_available_mid_conversation_but_not_marked() -> None:
@@ -186,6 +200,6 @@ def test_public_system_content_appends_closing_wish_hint() -> None:
 
 def test_friendly_tone_section_in_system_prompt() -> None:
     assert "Answer first" in AMY_SYSTEM_PROMPT
-    assert "at most 1–2 per reply" in AMY_SYSTEM_PROMPT or "at most 1-2" in AMY_SYSTEM_PROMPT
+    assert "exactly one fitting emoji" in AMY_SYSTEM_PROMPT
     assert "No Markdown headings" in AMY_SYSTEM_PROMPT
     assert "never offer a discount" in AMY_SYSTEM_PROMPT.lower() or "never offer discounts" in AMY_SYSTEM_PROMPT.lower()

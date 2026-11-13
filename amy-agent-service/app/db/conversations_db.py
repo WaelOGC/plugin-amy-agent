@@ -249,6 +249,40 @@ def list_conversations(
         conn.close()
 
 
+def list_visitor_public_conversations(
+    visitor_id: str,
+    *,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Public-widget history for one visitor — never returns admin conversations.
+
+    Filters: matching ``visitor_id``, ``wp_user_id = 0``, ``mode != 'admin'``,
+    not deleted/archived. Newest ``updated_at`` first, capped at ``limit`` (max 20).
+    """
+    vid = (visitor_id or "").strip()
+    if not vid:
+        return []
+    cap = max(1, min(int(limit), 20))
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            """
+            SELECT * FROM conversations
+            WHERE visitor_id = ?
+              AND wp_user_id = 0
+              AND mode != 'admin'
+              AND status != 'deleted'
+              AND status != 'archived'
+            ORDER BY updated_at DESC
+            LIMIT ?
+            """,
+            (vid, cap),
+        ).fetchall()
+        return [_conversation_row_to_dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
 def append_message(
     conversation_id: str,
     role: str,

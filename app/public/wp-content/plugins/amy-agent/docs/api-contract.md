@@ -163,6 +163,19 @@ Routes messages to the selected provider adapter and returns the assistant reply
 
 `meta.closing_wish` is `true` when the service attached a closing-wish hint on an ending turn and marked the conversation (once). The public widget then fires `amyTrack('chat_closing_wish')`.
 
+### `GET /v1/conversations/by-visitor`
+
+Public-widget history for one anonymous visitor. Requires `X-Amy-Secret`.
+
+| Query | Notes |
+| --- | --- |
+| `visitor_id` | Required. Exact ownership match. |
+| `limit` | Optional. Default `20`, max `20`. |
+
+**Response `200`:** `{ "conversations": [ ConversationSummary, … ] }` — newest `updated_at` first. Only rows with matching `visitor_id`, `wp_user_id = 0`, and `mode != "admin"` (never admin chats). Wrong/unknown `visitor_id` → empty list.
+
+Conversation detail (`GET /v1/conversations/{id}`) messages may include `created_at` (unix seconds) for the public widget timestamps.
+
 **Provider failure `502`:**
 
 ```json
@@ -344,6 +357,9 @@ Namespace: `amy-agent/v1`
 | `GET` | `/wp-json/amy-agent/v1/health` | `manage_options` | Settings presence + Python `/v1/health` reachability |
 | `GET` | `/wp-json/amy-agent/v1/admin-chat/analytics-summary` | `manage_options` | Fresh Analytics summary for Dashboard Chat `/Analytics` (proxies Python `GET /v1/analytics/summary?include_emails=true`) |
 | `POST` | `/wp-json/amy-agent/v1/chat` | Valid `X-WP-Nonce` (`wp_rest`) | Public widget chat; proxies to Python |
+| `POST` | `/wp-json/amy-agent/v1/chat/conversation` | Valid `X-WP-Nonce` (`wp_rest`) | Create visitor-owned public conversation (`visitor_id`); proxies to `POST /v1/conversations` |
+| `GET` | `/wp-json/amy-agent/v1/chat/conversation/{id}` | Valid `X-WP-Nonce` (`wp_rest`) | Load one visitor conversation (messages include `created_at`); ownership by `visitor_id` |
+| `GET` | `/wp-json/amy-agent/v1/chat/conversations` | Valid `X-WP-Nonce` (`wp_rest`) | List this visitor's public chats (newest first, max 20); proxies to `GET /v1/conversations/by-visitor` |
 | `POST` | `/wp-json/amy-agent/v1/track` | Public (unauthenticated); REST nonce still sent so logged-in visitors are not blocked by cookie CSRF | Tracking beacon; proxies to Python `/v1/analytics/event` |
 
 ### Public tracking notes
@@ -358,10 +374,11 @@ Namespace: `amy-agent/v1`
 - Returns `503` when Amy is not ready (`amy_agent_enabled` + service URL + secret).
 - Rate limit: **20 requests per IP per 60 seconds** (WordPress transient). Exceeded → `429`.
 - On each public `general` chat proxy, when **Friendly closing wishes in public chat** is ON (default), PHP may forward `visitor_timezone` / `visitor_language` from the widget. When OFF, those fields are omitted and the service never adds a closing-wish hint. Tone changes still apply.
-- Closing wishes use a deterministic calendar in the service (`closing_wishes.py`): weekend / Happy holidays (24–26 Dec) / Happy New Year (30 Dec–2 Jan) / day-evening. Hint is once per conversation (`conversations.closing_wish_sent`). Admin chat never receives it.
+- Closing wishes use a deterministic calendar in the service (`closing_wishes.py`): weekend / Happy holidays (24–26 Dec) / Happy New Year (30 Dec–2 Jan) / day-evening. Hint is once per conversation (`conversations.closing_wish_sent`). When the flag is already set, the service appends a short “wish already given” system line (not a new hint). Public prompt: only say a wish when the Closing wish hint block is present; otherwise a simple goodbye with no wish. Admin chat never receives it.
 - Browser never receives AI API keys; PHP injects `ai` when calling Python.
 - Widget only enqueues when `ogc_amy_agent_is_active` / Amy is ready.
 - On each public `general` chat proxy, PHP may attach `pricing_catalogue` from `Amy_Theme_Bridge::get_pricing_catalogue()` (theme helper `ogc_get_pricing_data()`, 1-hour transient cache, cleared on theme switch and theme/plugin update). Cap ~6,000 characters. Admin chat and Submit Idea never send this field.
+- Public conversations are owned by browser `visitor_id` (`localStorage` key `amyAgentVisitorId`). `GET /v1/conversations/by-visitor?visitor_id=…&limit=20` (and WP `GET /chat/conversations`) returns only that visitor's non-admin rows (`wp_user_id = 0`, `mode != admin`), newest first, capped at 20. Wrong `visitor_id` → empty list. Conversation detail messages include `created_at` (unix seconds) for widget timestamps.
 
 ---
 

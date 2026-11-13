@@ -136,6 +136,16 @@ class Amy_Rest {
 
 		register_rest_route(
 			self::NAMESPACE,
+			'/chat/conversations',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_public_chat_list' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
 			'/chat/conversation/(?P<id>[a-f0-9]+)',
 			array(
 				'methods'             => 'GET',
@@ -940,6 +950,49 @@ class Amy_Rest {
 		}
 
 		$result = $this->api_client->get_conversation( $id, 0, false, $visitor_id );
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+		$body = is_array( $result['body'] ) ? $result['body'] : array(
+			'error'   => 'upstream_error',
+			'message' => __( 'Amy is unavailable right now.', 'amy-agent' ),
+		);
+		return new WP_REST_Response( $body, $status );
+	}
+
+	/**
+	 * GET /chat/conversations — list this visitor's earlier public chats.
+	 *
+	 * Proxies to Python `/v1/conversations/by-visitor`. Returns only conversations
+	 * owned by the given visitor_id (public mode, newest first, max 20).
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_public_chat_list( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$visitor_id = $this->sanitize_visitor_id( $request->get_param( 'visitor_id' ) );
+		if ( '' === $visitor_id ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A valid visitor id is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$result = $this->api_client->list_visitor_conversations( $visitor_id, 20 );
 		$status = (int) $result['status_code'];
 		if ( $status < 100 ) {
 			$status = 502;

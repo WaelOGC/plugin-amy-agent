@@ -19,6 +19,9 @@ CLOSING_WISH_PROMPT_HEADER = (
 )
 CLOSING_WISH_PROMPT_FOOTER = "----- End closing wish hint -----"
 
+CLOSING_WISH_ALREADY_HEADER = "----- Closing wish status -----"
+CLOSING_WISH_ALREADY_FOOTER = "----- End closing wish status -----"
+
 
 @dataclass(frozen=True)
 class ClosingWish:
@@ -123,10 +126,23 @@ def format_closing_wish_hint(wish: ClosingWish) -> str:
         "- Use it only when the conversation is clearly ending "
         "(the visitor thanks you or says goodbye). Never mid-conversation.\n"
         "- Once per conversation, one short sentence, positive only.\n"
+        "- Only say this wish because this hint block is present. "
+        "Do not invent a different wish.\n"
         "- If the visitor greets you with an occasion themselves, "
         "return the same greeting warmly.\n"
         "- Never mention the visitor's country, city, timezone, "
         "or that you know the local date.\n"
         "- Skip the wish entirely if the visitor is upset.\n"
         f"{CLOSING_WISH_PROMPT_FOOTER}"
+    )
+
+
+def format_closing_wish_already_sent() -> str:
+    """System line when a closing wish was already used in this conversation."""
+    return (
+        f"{CLOSING_WISH_ALREADY_HEADER}\n"
+        "A closing wish was already given earlier in this conversation. "
+        "Do not invent another wish. On goodbye, end with a simple friendly "
+        "goodbye only — no day/weekend/holiday wish.\n"
+        f"{CLOSING_WISH_ALREADY_FOOTER}"
     )

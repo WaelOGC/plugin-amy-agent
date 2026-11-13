@@ -85,6 +85,8 @@ class ChatMessage(BaseModel):
     role: MessageRole
     content: str = ""
     attachments: list[AttachmentRef] = Field(default_factory=list)
+    # Unix timestamp (seconds) when persisted; optional on outbound chat turns.
+    created_at: float | None = None
     # Assistant turn that requested tools (P3 tool loop).
     tool_calls: list[ToolCallPart] = Field(default_factory=list)
     # Tool-result turn (role=tool).
