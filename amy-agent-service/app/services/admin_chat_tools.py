@@ -485,7 +485,13 @@ def intent_context_messages(tool_names: Sequence[str]) -> tuple[list[ChatMessage
 
 def _assistant_tool_call_message(turn: CompletionTurn) -> ChatMessage:
     parts = [
-        ToolCallPart(id=c.id, name=c.name, arguments=c.arguments) for c in turn.tool_calls
+        ToolCallPart(
+            id=c.id,
+            name=c.name,
+            arguments=c.arguments,
+            thought_signature=c.thought_signature,
+        )
+        for c in turn.tool_calls
     ]
     return ChatMessage(
         role="assistant",
@@ -498,7 +504,12 @@ def _normalize_tool_call(raw: ToolCallRequest) -> ToolCallRequest:
     """Ensure every tool call has a stable id for provider round-trips."""
     call_id = (raw.id or "").strip() or f"call_{uuid.uuid4().hex[:12]}"
     args = raw.arguments if isinstance(raw.arguments, dict) else {}
-    return ToolCallRequest(id=call_id, name=raw.name, arguments=args)
+    return ToolCallRequest(
+        id=call_id,
+        name=raw.name,
+        arguments=args,
+        thought_signature=raw.thought_signature,
+    )
 
 
 async def run_admin_tool_loop(

@@ -111,6 +111,10 @@ A plain restart of an older install without a rebuild will miss PDF/image proces
 
 ## Changelog
 
+### 0.2.24
+
+Gemini tool-calling: preserve `thoughtSignature` on function-call parts through parse → `ToolCallRequest` / `ToolCallPart` → `_gemini_contents` replay. Fixes HTTP 400 `Function call is missing a thought_signature` on follow-up admin-chat turns with `gemini-3.6-flash` (and other Gemini 3 models). Other providers unchanged. Plugin/widget unchanged (service only).
+
 ### 0.2.23
 
 Evidence-based recommendation format for admin-facing summaries: shared `Recommendation` helper (`finding` / `evidence` / `confidence` / `limitations` / `recommended_action`) with an explicit confidence rule; conclusion paths in lead scoring, analytics, SEO review, and traffic depth summaries now return structured recommendations; admin chat / Telegram tool context renders them consistently. Plain factual counts are unchanged. Plugin/widget version unchanged (service only).
