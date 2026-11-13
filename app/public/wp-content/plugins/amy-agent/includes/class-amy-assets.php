@@ -130,6 +130,7 @@ class Amy_Assets {
 					'fileExpired'       => __( 'File expired', 'amy-agent' ),
 					'removeFile'        => __( 'Remove attachment', 'amy-agent' ),
 					'uploadFailed'      => __( 'Could not upload that file.', 'amy-agent' ),
+					'uploadRateLimited' => __( "You've reached the upload limit for now, please try again in a bit.", 'amy-agent' ),
 					'tooManyFiles'      => __( 'You can only attach a few files at a time.', 'amy-agent' ),
 					'send'            => __( 'Send', 'amy-agent' ),
 					'open'            => __( 'Open Amy chat', 'amy-agent' ),
