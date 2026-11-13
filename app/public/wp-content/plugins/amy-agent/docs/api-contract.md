@@ -189,7 +189,7 @@ Secure **public widget** uploads only (not Submit Idea, not admin chat). Require
 | `allow_uploads` | Optional bool. When false → `403 uploads_disabled`. |
 | `message_excerpt` | Optional short visitor text for the notify email/Telegram. |
 
-Images are decoded and re-encoded (metadata stripped; longest side capped at 2000px). PDFs are never stored or served — pages are rendered to JPEG. Files live under `uploads/public-chat/` with random names (not WordPress uploads, not statically mounted). Rate limit: 10 logical files / visitor / hour; total active storage cap configurable (default 1 GB).
+Images are decoded and re-encoded (metadata stripped; longest side capped at 2000px). PDFs are never stored or served — pages are scaled **before** rendering to JPEG (longest side ≤ 2000 px, ≤ 4M pixels; absurd declared page sizes rejected). Files live under `uploads/public-chat/` with random names (not WordPress uploads, not statically mounted). Rate limits: 10 logical files / visitor / hour, 10 / client IP / hour, 200 / hour globally (WP also enforces IP+global via transients and forwards `X-Amy-Client-Ip` with the shared secret). Bodies are read in bounded chunks; oversize → `413 file_too_large`. Total active storage cap configurable (default 1 GB). **Deploy 0.2.22+ with a rebuild** so `Pillow` and `pymupdf` are installed.
 
 **Response `200`:** `AttachmentRef` with `id`, proxy `url` (`/wp-json/amy-agent/v1/chat/files/{id}`), `kind`, `size`, `description`, and for PDFs `pages[]` / `page_count`.
 

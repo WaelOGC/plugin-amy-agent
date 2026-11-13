@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     wordpress_base_url: str = ""
     # Public-chat secure uploads: max files per visitor per rolling hour.
     public_chat_upload_max_per_hour: int = 10
+    # Max files per client IP per rolling hour (plugin forwards X-Amy-Client-Ip).
+    public_chat_upload_max_per_ip_hour: int = 10
+    # Max logical public-chat uploads globally per rolling hour.
+    public_chat_upload_max_global_hour: int = 200
     # Total active public-chat upload storage cap (bytes). Default 1 GB.
     public_chat_upload_storage_cap_bytes: int = 1_073_741_824
 

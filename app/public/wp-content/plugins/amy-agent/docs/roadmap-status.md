@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-13 (amy-agent v0.2.61 / amy-agent-service v0.2.21 — public chat uploads + widget polish).
+> Last verified against code: 2026-11-13 (amy-agent v0.2.62 / amy-agent-service v0.2.22 — upload security + attach UI).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -116,6 +116,11 @@
   file retention, Gemini vision once then stored description, admin email +
   Telegram notify. Settings: Allow file uploads / Notify me about uploads
   (both default ON). Admin chat and Submit Idea upload limits unchanged.
+- **Upload security + attach UI (plugin 0.2.62 / service 0.2.22):** PDF render
+  scales before pixmap (memory DoS fix); per-IP + global upload rate limits;
+  bounded reads / early size checks; one-line textarea; attach + upload-info
+  popovers; history titles from generated title / first user message. Deploy
+  note: rebuild service for Pillow + PyMuPDF.
 
 ### 3. Infrastructure
 - Python service deployed on **Dokploy**, separate from the WP host, always-on

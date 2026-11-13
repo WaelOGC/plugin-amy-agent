@@ -73,6 +73,27 @@
 					'><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>'
 				);
 			}
+			if (name === 'image') {
+				return (
+					'<svg ' +
+					common +
+					'><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>'
+				);
+			}
+			if (name === 'document') {
+				return (
+					'<svg ' +
+					common +
+					'><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'
+				);
+			}
+			if (name === 'help') {
+				return (
+					'<svg ' +
+					common +
+					'><circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.5-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+				);
+			}
 			return '×';
 		}
 
@@ -183,15 +204,61 @@
 			'<div class="amy-agent-messages" data-amy-messages></div>' +
 			'<form class="amy-agent-form" data-amy-form>' +
 			'<div class="amy-agent-form__chips" data-amy-chips hidden></div>' +
+			(uploadsEnabled
+				? '<p class="amy-agent-form__sensitive" data-amy-sensitive-notice hidden>' +
+				  escapeHtml(i18n.sensitiveNotice || '') +
+				  '</p>'
+				: '') +
 			'<div class="amy-agent-form__row">' +
 			(uploadsEnabled
-				? '<button type="button" class="amy-agent-icon-btn amy-agent-form__attach" data-amy-attach aria-label="' +
+				? '<div class="amy-agent-form__attach-wrap">' +
+				  '<button type="button" class="amy-agent-icon-btn amy-agent-form__attach" data-amy-attach aria-label="' +
 				  escapeHtml(i18n.attach || 'Attach a file') +
 				  '" title="' +
 				  escapeHtml(i18n.attach || 'Attach a file') +
-				  '">' +
+				  '" aria-haspopup="menu" aria-expanded="false" aria-controls="amy-agent-attach-menu">' +
 				  iconSvg('attach') +
-				  '</button><input type="file" class="amy-agent-form__file-input" data-amy-file-input hidden accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" multiple />'
+				  '</button>' +
+				  '<button type="button" class="amy-agent-icon-btn amy-agent-form__upload-info" data-amy-upload-info aria-label="' +
+				  escapeHtml(i18n.uploadInfo || 'Upload information') +
+				  '" title="' +
+				  escapeHtml(i18n.uploadInfo || 'Upload information') +
+				  '" aria-haspopup="dialog" aria-expanded="false" aria-controls="amy-agent-upload-info">' +
+				  iconSvg('help') +
+				  '</button>' +
+				  '<div class="amy-agent-popover amy-agent-popover--attach" id="amy-agent-attach-menu" data-amy-attach-menu role="menu" hidden>' +
+				  '<button type="button" class="amy-agent-popover__item" role="menuitem" data-amy-attach-choice="image">' +
+				  '<span class="amy-agent-popover__icon">' +
+				  iconSvg('image') +
+				  '</span><span class="amy-agent-popover__text"><span class="amy-agent-popover__label">' +
+				  escapeHtml(i18n.attachUploadImage || 'Upload image') +
+				  '</span><span class="amy-agent-popover__hint">' +
+				  escapeHtml(i18n.attachUploadImageHint || 'JPEG, PNG, WebP') +
+				  '</span></span></button>' +
+				  '<button type="button" class="amy-agent-popover__item" role="menuitem" data-amy-attach-choice="document">' +
+				  '<span class="amy-agent-popover__icon">' +
+				  iconSvg('document') +
+				  '</span><span class="amy-agent-popover__text"><span class="amy-agent-popover__label">' +
+				  escapeHtml(i18n.attachUploadDoc || 'Upload document') +
+				  '</span><span class="amy-agent-popover__hint">' +
+				  escapeHtml(i18n.attachUploadDocHint || 'PDF, up to 10 pages') +
+				  '</span></span></button>' +
+				  '</div>' +
+				  '<div class="amy-agent-popover amy-agent-popover--info" id="amy-agent-upload-info" data-amy-upload-info-panel role="dialog" aria-label="' +
+				  escapeHtml(i18n.uploadInfo || 'Upload information') +
+				  '" hidden>' +
+				  '<p>' +
+				  escapeHtml(i18n.uploadInfoAccepted || '') +
+				  '</p><p>' +
+				  escapeHtml(i18n.uploadInfoLimits || '') +
+				  '</p><p>' +
+				  escapeHtml(i18n.uploadInfoSensitive || '') +
+				  '</p><p>' +
+				  escapeHtml(i18n.uploadInfoRetention || '') +
+				  '</p></div>' +
+				  '<input type="file" class="amy-agent-form__file-input" data-amy-file-image hidden accept="image/jpeg,image/png,image/webp" multiple />' +
+				  '<input type="file" class="amy-agent-form__file-input" data-amy-file-pdf hidden accept="application/pdf" />' +
+				  '</div>'
 				: '') +
 			'<textarea class="amy-agent-form__input amy-agent-form__textarea" name="message" rows="1" autocomplete="off" maxlength="2000" placeholder="' +
 			escapeHtml(i18n.placeholder) +
@@ -200,9 +267,6 @@
 			escapeHtml(i18n.send) +
 			'</button>' +
 			'</div>' +
-			(uploadsEnabled
-				? '<p class="amy-agent-form__hint">' + escapeHtml(i18n.attachHint || '') + '</p>'
-				: '') +
 			'</form>' +
 			'</div>' +
 			'</div>' +
@@ -224,8 +288,17 @@
 		var sendBtn = root.querySelector('[data-amy-send]');
 		var chipsEl = root.querySelector('[data-amy-chips]');
 		var attachBtn = root.querySelector('[data-amy-attach]');
-		var fileInput = root.querySelector('[data-amy-file-input]');
+		var uploadInfoBtn = root.querySelector('[data-amy-upload-info]');
+		var attachMenu = root.querySelector('[data-amy-attach-menu]');
+		var uploadInfoPanel = root.querySelector('[data-amy-upload-info-panel]');
+		var fileImageInput = root.querySelector('[data-amy-file-image]');
+		var filePdfInput = root.querySelector('[data-amy-file-pdf]');
+		var sensitiveNoticeEl = root.querySelector('[data-amy-sensitive-notice]');
 		var subtitleEl = root.querySelector('.amy-agent-header__subtitle');
+		var sensitiveNoticeShown = false;
+		var attachMenuOpen = false;
+		var uploadInfoOpen = false;
+		var attachMenuFocusIndex = 0;
 
 		function conversationUrl(suffix) {
 			return cfg.restUrl.replace(/\/chat$/, '/chat' + suffix);
@@ -354,22 +427,44 @@
 			return Math.ceil(linePx * maxLines + 8);
 		}
 
+		function oneLineTextareaHeightPx() {
+			var linePx = 22;
+			var pad = 0;
+			try {
+				var cs = window.getComputedStyle(input);
+				var lh = parseFloat(cs.lineHeight);
+				if (lh && !isNaN(lh)) {
+					linePx = lh;
+				}
+				var pt = parseFloat(cs.paddingTop) || 0;
+				var pb = parseFloat(cs.paddingBottom) || 0;
+				var bt = parseFloat(cs.borderTopWidth) || 0;
+				var bb = parseFloat(cs.borderBottomWidth) || 0;
+				pad = pt + pb + bt + bb;
+			} catch (e) {}
+			return Math.ceil(linePx + pad);
+		}
+
 		function syncTextareaHeight() {
 			if (!input) {
 				return;
 			}
 			var maxPx = textareaMaxHeightPx();
-			input.style.height = 'auto';
-			var next = Math.min(input.scrollHeight, maxPx);
+			var minPx = oneLineTextareaHeightPx();
+			input.style.height = '0px';
+			var scroll = input.scrollHeight;
+			var next = Math.max(minPx, Math.min(scroll, maxPx));
 			input.style.height = next + 'px';
-			input.style.overflowY = input.scrollHeight > maxPx ? 'auto' : 'hidden';
+			input.style.overflowY = scroll > maxPx ? 'auto' : 'hidden';
 		}
 
 		function resetTextareaHeight() {
 			if (!input) {
 				return;
 			}
-			input.style.height = '';
+			input.value = input.value || '';
+			input.style.height = oneLineTextareaHeightPx() + 'px';
+			input.style.overflowY = 'hidden';
 			syncTextareaHeight();
 		}
 
@@ -522,6 +617,20 @@
 				});
 		}
 
+		function showSensitiveNoticeOnce() {
+			if (sensitiveNoticeShown || !sensitiveNoticeEl) {
+				return;
+			}
+			sensitiveNoticeShown = true;
+			sensitiveNoticeEl.hidden = false;
+		}
+
+		function hideSensitiveNotice() {
+			if (sensitiveNoticeEl) {
+				sensitiveNoticeEl.hidden = true;
+			}
+		}
+
 		function queueFiles(fileList) {
 			if (!uploadsEnabled || !fileList) {
 				return;
@@ -530,6 +639,7 @@
 			if (!files.length) {
 				return;
 			}
+			showSensitiveNoticeOnce();
 			var slots = MAX_PENDING_FILES - pendingFiles.length;
 			if (slots <= 0) {
 				appendBubble(i18n.tooManyFiles || 'Too many files.', 'status');
@@ -853,6 +963,9 @@
 			if (attachBtn) {
 				attachBtn.disabled = next;
 			}
+			if (uploadInfoBtn) {
+				uploadInfoBtn.disabled = next;
+			}
 		}
 
 		function setHistoryVisible(on) {
@@ -1032,15 +1145,30 @@
 				});
 		}
 
-		function shortenTitle(title) {
+		function shortenTitle(title, fallback) {
 			var t = String(title || '').trim();
-			if (!t) {
-				return i18n.untitledChat || 'Chat';
+			if (!t && fallback) {
+				t = String(fallback || '').trim();
 			}
-			if (t.length <= 48) {
+			if (!t) {
+				return '';
+			}
+			if (t.length <= 40) {
 				return t;
 			}
-			return t.slice(0, 45) + '…';
+			return t.slice(0, 37) + '…';
+		}
+
+		function historyItemTitle(row) {
+			var title = row && row.title ? String(row.title).trim() : '';
+			if (title) {
+				return shortenTitle(title);
+			}
+			var preview = row && row.last_message_preview
+				? String(row.last_message_preview).trim()
+				: '';
+			// Prefer generated title; else trim first-user / preview text to ~40 chars.
+			return shortenTitle(preview) || (i18n.untitledChat || 'Chat');
 		}
 
 		function loadHistoryList() {
@@ -1063,6 +1191,15 @@
 				.then(function (data) {
 					var rows =
 						data && Array.isArray(data.conversations) ? data.conversations : [];
+					// Service already omits empty shells; belt-and-suspenders client filter.
+					rows = rows.filter(function (row) {
+						var title = row && row.title ? String(row.title).trim() : '';
+						var preview =
+							row && row.last_message_preview
+								? String(row.last_message_preview).trim()
+								: '';
+						return !!(title || preview);
+					});
 					historyList.innerHTML = '';
 					if (!rows.length) {
 						var empty = document.createElement('p');
@@ -1078,16 +1215,17 @@
 						if (row.id === conversationId) {
 							btn.classList.add('is-active');
 						}
+						var itemTitle = historyItemTitle(row);
 						btn.setAttribute(
 							'aria-label',
-							shortenTitle(row.title) + ', ' + formatHistoryDate(row.updated_at)
+							itemTitle + ', ' + formatHistoryDate(row.updated_at)
 						);
 						var preview = row.last_message_preview
 							? String(row.last_message_preview).trim()
 							: '';
 						btn.innerHTML =
 							'<span class="amy-agent-history__item-title">' +
-							escapeHtml(shortenTitle(row.title)) +
+							escapeHtml(itemTitle) +
 							'</span>' +
 							'<span class="amy-agent-history__item-date">' +
 							escapeHtml(formatHistoryDate(row.updated_at)) +
@@ -1186,6 +1324,10 @@
 		});
 
 		document.addEventListener('keydown', function (event) {
+			if (event.key === 'Escape' && (attachMenuOpen || uploadInfoOpen)) {
+				// Popover Escape is handled by the upload listeners below.
+				return;
+			}
 			if (event.key === 'Escape' && expanded) {
 				event.preventDefault();
 				setExpanded(false);
@@ -1217,14 +1359,170 @@
 			}
 		});
 
-		if (uploadsEnabled && attachBtn && fileInput) {
+		if (uploadsEnabled && attachBtn && fileImageInput && filePdfInput) {
+			function attachMenuItems() {
+				return attachMenu
+					? Array.prototype.slice.call(
+							attachMenu.querySelectorAll('[role="menuitem"]')
+					  )
+					: [];
+			}
+
+			function closeAttachMenu(restoreFocus) {
+				if (!attachMenu || !attachMenuOpen) {
+					if (attachBtn) {
+						attachBtn.setAttribute('aria-expanded', 'false');
+					}
+					return;
+				}
+				attachMenuOpen = false;
+				attachMenu.hidden = true;
+				attachBtn.setAttribute('aria-expanded', 'false');
+				if (restoreFocus !== false) {
+					attachBtn.focus();
+				}
+			}
+
+			function openAttachMenu() {
+				closeUploadInfo(false);
+				attachMenuOpen = true;
+				attachMenu.hidden = false;
+				attachBtn.setAttribute('aria-expanded', 'true');
+				attachMenuFocusIndex = 0;
+				var items = attachMenuItems();
+				if (items[0]) {
+					items[0].focus();
+				}
+			}
+
+			function closeUploadInfo(restoreFocus) {
+				if (!uploadInfoPanel || !uploadInfoOpen) {
+					if (uploadInfoBtn) {
+						uploadInfoBtn.setAttribute('aria-expanded', 'false');
+					}
+					return;
+				}
+				uploadInfoOpen = false;
+				uploadInfoPanel.hidden = true;
+				uploadInfoBtn.setAttribute('aria-expanded', 'false');
+				if (restoreFocus !== false) {
+					uploadInfoBtn.focus();
+				}
+			}
+
+			function openUploadInfo() {
+				closeAttachMenu(false);
+				uploadInfoOpen = true;
+				uploadInfoPanel.hidden = false;
+				uploadInfoBtn.setAttribute('aria-expanded', 'true');
+			}
+
+			function closeAllUploadPopovers(restoreFocus) {
+				closeAttachMenu(restoreFocus);
+				closeUploadInfo(restoreFocus);
+			}
+
 			attachBtn.addEventListener('click', function () {
-				fileInput.click();
+				if (attachMenuOpen) {
+					closeAttachMenu();
+				} else {
+					openAttachMenu();
+				}
 			});
-			fileInput.addEventListener('change', function () {
-				queueFiles(fileInput.files);
-				fileInput.value = '';
+
+			if (uploadInfoBtn && uploadInfoPanel) {
+				uploadInfoBtn.addEventListener('click', function () {
+					if (uploadInfoOpen) {
+						closeUploadInfo();
+					} else {
+						openUploadInfo();
+					}
+				});
+			}
+
+			if (attachMenu) {
+				attachMenu.addEventListener('click', function (event) {
+					var choice = event.target.closest('[data-amy-attach-choice]');
+					if (!choice) {
+						return;
+					}
+					var kind = choice.getAttribute('data-amy-attach-choice');
+					closeAttachMenu();
+					if (kind === 'image') {
+						fileImageInput.click();
+					} else if (kind === 'document') {
+						filePdfInput.click();
+					}
+				});
+				attachMenu.addEventListener('keydown', function (event) {
+					var items = attachMenuItems();
+					if (!items.length) {
+						return;
+					}
+					if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+						event.preventDefault();
+						attachMenuFocusIndex = (attachMenuFocusIndex + 1) % items.length;
+						items[attachMenuFocusIndex].focus();
+					} else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+						event.preventDefault();
+						attachMenuFocusIndex =
+							(attachMenuFocusIndex - 1 + items.length) % items.length;
+						items[attachMenuFocusIndex].focus();
+					} else if (event.key === 'Home') {
+						event.preventDefault();
+						attachMenuFocusIndex = 0;
+						items[0].focus();
+					} else if (event.key === 'End') {
+						event.preventDefault();
+						attachMenuFocusIndex = items.length - 1;
+						items[attachMenuFocusIndex].focus();
+					} else if (event.key === 'Escape') {
+						event.preventDefault();
+						event.stopPropagation();
+						closeAttachMenu();
+					} else if (event.key === 'Enter' || event.key === ' ') {
+						event.preventDefault();
+						items[attachMenuFocusIndex].click();
+					}
+				});
+			}
+
+			fileImageInput.addEventListener('change', function () {
+				queueFiles(fileImageInput.files);
+				fileImageInput.value = '';
 			});
+			filePdfInput.addEventListener('change', function () {
+				queueFiles(filePdfInput.files);
+				filePdfInput.value = '';
+			});
+
+			document.addEventListener('mousedown', function (event) {
+				if (!attachMenuOpen && !uploadInfoOpen) {
+					return;
+				}
+				var t = event.target;
+				if (
+					attachBtn.contains(t) ||
+					(uploadInfoBtn && uploadInfoBtn.contains(t)) ||
+					(attachMenu && attachMenu.contains(t)) ||
+					(uploadInfoPanel && uploadInfoPanel.contains(t))
+				) {
+					return;
+				}
+				closeAllUploadPopovers(false);
+			});
+
+			document.addEventListener('keydown', function (event) {
+				if (event.key !== 'Escape') {
+					return;
+				}
+				if (attachMenuOpen || uploadInfoOpen) {
+					event.preventDefault();
+					event.stopPropagation();
+					closeAllUploadPopovers(true);
+				}
+			});
+
 			input.addEventListener('paste', function (event) {
 				var items = event.clipboardData && event.clipboardData.items;
 				if (!items) {
@@ -1292,6 +1590,7 @@
 			resetTextareaHeight();
 			appendBubble(text, 'user', Date.now() / 1000, attachments);
 			clearPendingFiles();
+			hideSensitiveNotice();
 			if (window.amyTrack) {
 				window.amyTrack('widget_message_sent');
 			}

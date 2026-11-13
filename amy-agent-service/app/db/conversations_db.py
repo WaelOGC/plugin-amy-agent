@@ -302,6 +302,30 @@ def list_visitor_public_conversations(
                 if len(preview) > 90:
                     preview = preview[:87] + "…"
             item["last_message_preview"] = preview or None
+            # Ensure history always has a usable title: prefer stored title,
+            # else first user message trimmed (widget also falls back client-side).
+            title = (item.get("title") or "").strip()
+            if not title:
+                first_user = conn.execute(
+                    """
+                    SELECT content FROM conversation_messages
+                    WHERE conversation_id = ? AND role = 'user'
+                    ORDER BY created_at ASC, id ASC
+                    LIMIT 1
+                    """,
+                    (item["id"],),
+                ).fetchone()
+                if first_user is not None and first_user["content"]:
+                    item["title"] = _derive_title(
+                        " ".join(str(first_user["content"]).split())
+                    )
+                    if item["title"]:
+                        # Persist so subsequent lists stay cheap.
+                        with conn:
+                            conn.execute(
+                                "UPDATE conversations SET title = ? WHERE id = ?",
+                                (item["title"], item["id"]),
+                            )
             out.append(item)
         return out
     finally:
@@ -351,13 +375,20 @@ def append_message(
                 and (conv["title"] is None or conv["title"] == "")
                 and prior_user_count == 0
             ):
+                title_src = (content or "").strip()
+                if not title_src and attachments:
+                    first = attachments[0] if isinstance(attachments, list) else None
+                    if isinstance(first, dict):
+                        title_src = str(first.get("filename") or "").strip()
+                    if not title_src:
+                        title_src = "Attachment"
                 conn.execute(
                     """
                     UPDATE conversations
                     SET title = ?, updated_at = ?
                     WHERE id = ?
                     """,
-                    (_derive_title(content), now, conversation_id),
+                    (_derive_title(title_src), now, conversation_id),
                 )
             else:
                 conn.execute(

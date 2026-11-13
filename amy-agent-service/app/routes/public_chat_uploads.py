@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import logging
+import re
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse, Response
 
 from app.auth import require_amy_secret
 from app.db import conversations_db, public_chat_uploads_db as uploads_db
 from app.schemas.messages import AttachmentRef, ErrorBody
 from app.services.public_chat_upload import (
+    MAX_FILE_BYTES,
     MAX_FILES_PER_MESSAGE,
     UploadRejected,
     attachment_ref_for_row,
@@ -25,6 +27,9 @@ router = APIRouter(tags=["public-chat-uploads"])
 # WP proxies file GETs under this path; stored attachment URLs use the same shape.
 PROXY_FILE_BASE = "/wp-json/amy-agent/v1/chat/files"
 
+_IP_RE = re.compile(r"^[0-9a-fA-F:.]+$")
+_READ_CHUNK = 64 * 1024
+
 
 def _error(code: str, message: str, http_status: int) -> JSONResponse:
     return JSONResponse(
@@ -33,18 +38,56 @@ def _error(code: str, message: str, http_status: int) -> JSONResponse:
     )
 
 
+def _sanitize_client_ip(raw: str | None) -> str | None:
+    value = (raw or "").strip()
+    if not value or len(value) > 64:
+        return None
+    # Only accept a single IP token (plugin sends REMOTE_ADDR).
+    if "," in value:
+        value = value.split(",", 1)[0].strip()
+    if not _IP_RE.match(value):
+        return None
+    return value
+
+
+async def _read_upload_bounded(file: UploadFile, content_length: int | None) -> bytes:
+    """Read upload body in chunks; abort as soon as MAX_FILE_BYTES+1 is exceeded."""
+    if content_length is not None and content_length > MAX_FILE_BYTES:
+        raise UploadRejected(
+            "file_too_large",
+            "Each file must be 5 MB or smaller.",
+        )
+
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        piece = await file.read(_READ_CHUNK)
+        if not piece:
+            break
+        total += len(piece)
+        if total > MAX_FILE_BYTES:
+            raise UploadRejected(
+                "file_too_large",
+                "Each file must be 5 MB or smaller.",
+            )
+        chunks.append(piece)
+    return b"".join(chunks)
+
+
 @router.post(
     "/v1/public-chat/upload",
     response_model=AttachmentRef,
     dependencies=[Depends(require_amy_secret)],
 )
 async def upload_public_chat_file(
+    request: Request,
     file: UploadFile = File(...),
     visitor_id: str = Form(...),
     conversation_id: str | None = Form(None),
     notify: bool = Form(True),
     message_excerpt: str | None = Form(None),
     allow_uploads: bool = Form(True),
+    x_amy_client_ip: str | None = Header(default=None, alias="X-Amy-Client-Ip"),
 ) -> AttachmentRef | JSONResponse:
     if not allow_uploads:
         return _error(
@@ -82,7 +125,31 @@ async def upload_public_chat_file(
                 status.HTTP_403_FORBIDDEN,
             )
 
-    data = await file.read()
+    # Trusted only because the caller already authenticated with X-Amy-Secret
+    # (WordPress plugin forwards the browser REMOTE_ADDR).
+    client_ip = _sanitize_client_ip(x_amy_client_ip)
+
+    raw_cl = request.headers.get("content-length")
+    if raw_cl and raw_cl.isdigit():
+        # Multipart overhead means Content-Length is larger than the file alone;
+        # still reject clearly impossible bodies early.
+        if int(raw_cl) > MAX_FILE_BYTES + (512 * 1024):
+            return _error(
+                "file_too_large",
+                "Each file must be 5 MB or smaller.",
+                status.HTTP_413_CONTENT_TOO_LARGE,
+            )
+
+    try:
+        data = await _read_upload_bounded(file, None)
+    except UploadRejected as exc:
+        http = (
+            status.HTTP_413_CONTENT_TOO_LARGE
+            if exc.code == "file_too_large"
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return _error(exc.code, exc.message, http)
+
     try:
         processed = process_public_chat_upload(
             data=data,
@@ -90,11 +157,14 @@ async def upload_public_chat_file(
             visitor_id=vid,
             conversation_id=conv_id,
             claimed_content_type=file.content_type,
+            client_ip=client_ip,
         )
     except UploadRejected as exc:
         http = status.HTTP_400_BAD_REQUEST
         if exc.code in ("rate_limited", "storage_full"):
             http = status.HTTP_429_TOO_MANY_REQUESTS
+        elif exc.code == "file_too_large":
+            http = status.HTTP_413_CONTENT_TOO_LARGE
         return _error(exc.code, exc.message, http)
 
     ref = attachment_ref_for_row(processed.row, proxy_base=PROXY_FILE_BASE)

@@ -27,7 +27,11 @@ MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 MAX_FILES_PER_MESSAGE = 3
 MAX_PDF_PAGES = 10
 MAX_LONGEST_SIDE = 2000
+MAX_RENDER_PIXELS = 4_000_000
+MAX_PAGE_POINTS = 20_000  # reject absurd declared PDF page sizes
 JPEG_QUALITY = 85
+DEFAULT_MAX_UPLOADS_PER_IP_HOUR = 10
+DEFAULT_MAX_UPLOADS_GLOBAL_HOUR = 200
 
 ALLOWED_IMAGE_KINDS = {
     "jpeg": "image/jpeg",
@@ -176,18 +180,38 @@ def _render_pdf_pages(data: bytes) -> list[tuple[bytes, int, int]]:
         pages: list[tuple[bytes, int, int]] = []
         for i in range(page_count):
             page = doc.load_page(i)
-            # ~144 dpi-ish via 2x matrix for readable thumbs without huge files.
-            pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
-            # Cap longest side after render.
-            w, h = int(pix.width), int(pix.height)
-            longest = max(w, h)
-            if longest > MAX_LONGEST_SIDE:
-                scale = MAX_LONGEST_SIDE / float(longest)
-                pix = page.get_pixmap(
-                    matrix=pymupdf.Matrix(2 * scale, 2 * scale),
-                    alpha=False,
+            rect = page.rect
+            width_pt = float(rect.width)
+            height_pt = float(rect.height)
+            if width_pt <= 0 or height_pt <= 0:
+                raise UploadRejected("invalid_pdf", "PDF page has invalid dimensions.")
+            longest_pt = max(width_pt, height_pt)
+            if longest_pt > MAX_PAGE_POINTS:
+                raise UploadRejected(
+                    "pdf_page_too_large",
+                    "PDF page dimensions are too large to process safely.",
                 )
-                w, h = int(pix.width), int(pix.height)
+            # Choose scale BEFORE rendering so a huge declared page never
+            # allocates a multi-hundred-MB pixmap.
+            scale_longest = MAX_LONGEST_SIDE / longest_pt
+            area_pt = width_pt * height_pt
+            scale_pixels = (MAX_RENDER_PIXELS / area_pt) ** 0.5
+            scale = min(scale_longest, scale_pixels)
+            if scale <= 0:
+                raise UploadRejected(
+                    "pdf_page_too_large",
+                    "PDF page dimensions are too large to process safely.",
+                )
+            pix = page.get_pixmap(
+                matrix=pymupdf.Matrix(scale, scale),
+                alpha=False,
+            )
+            w, h = int(pix.width), int(pix.height)
+            if w * h > MAX_RENDER_PIXELS or max(w, h) > MAX_LONGEST_SIDE:
+                raise UploadRejected(
+                    "pdf_page_too_large",
+                    "PDF page dimensions are too large to process safely.",
+                )
             img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=JPEG_QUALITY, optimize=True)
@@ -197,7 +221,12 @@ def _render_pdf_pages(data: bytes) -> list[tuple[bytes, int, int]]:
         doc.close()
 
 
-def _check_rate_and_quota(visitor_id: str, incoming_bytes: int) -> None:
+def _check_rate_and_quota(
+    visitor_id: str,
+    incoming_bytes: int,
+    *,
+    client_ip: str | None = None,
+) -> None:
     import time
 
     from app.config import get_settings
@@ -206,6 +235,14 @@ def _check_rate_and_quota(visitor_id: str, incoming_bytes: int) -> None:
     max_per_hour = int(
         getattr(settings, "public_chat_upload_max_per_hour", None)
         or uploads_db.DEFAULT_MAX_FILES_PER_HOUR
+    )
+    max_per_ip = int(
+        getattr(settings, "public_chat_upload_max_per_ip_hour", None)
+        or DEFAULT_MAX_UPLOADS_PER_IP_HOUR
+    )
+    max_global = int(
+        getattr(settings, "public_chat_upload_max_global_hour", None)
+        or DEFAULT_MAX_UPLOADS_GLOBAL_HOUR
     )
     storage_cap = int(
         getattr(settings, "public_chat_upload_storage_cap_bytes", None)
@@ -218,6 +255,22 @@ def _check_rate_and_quota(visitor_id: str, incoming_bytes: int) -> None:
         raise UploadRejected(
             "rate_limited",
             "You've uploaded quite a few files recently. Please try again later.",
+        )
+
+    ip = (client_ip or "").strip()
+    if ip:
+        ip_used = uploads_db.count_uploads_since_ip(ip, since)
+        if ip_used >= max_per_ip:
+            raise UploadRejected(
+                "rate_limited",
+                "You've uploaded quite a few files recently. Please try again later.",
+            )
+
+    global_used = uploads_db.count_uploads_since_global(since)
+    if global_used >= max_global:
+        raise UploadRejected(
+            "rate_limited",
+            "Upload traffic is high right now. Please try again later.",
         )
 
     total = uploads_db.total_active_storage_bytes()
@@ -235,6 +288,7 @@ def process_public_chat_upload(
     visitor_id: str,
     conversation_id: str | None = None,
     claimed_content_type: str | None = None,
+    client_ip: str | None = None,
 ) -> ProcessedUpload:
     """Validate, process, store, and return metadata for one public-chat file."""
     vid = (visitor_id or "").strip()
@@ -307,7 +361,9 @@ def process_public_chat_upload(
         # rows but return the primary PDF logical upload that references them
         # via page_count + description. Actual bytes are page JPEGs only —
         # original PDF is discarded.
-        _check_rate_and_quota(vid, sum(len(p[0]) for p in pages))
+        _check_rate_and_quota(
+            vid, sum(len(p[0]) for p in pages), client_ip=client_ip
+        )
 
         primary: ProcessedUpload | None = None
         page_ids: list[str] = []
@@ -333,6 +389,7 @@ def process_public_chat_upload(
                 height=h,
                 page_count=len(pages) if idx == 0 else None,
                 description=desc,
+                client_ip=client_ip if idx == 0 else None,
             )
             page_ids.append(row["id"])
             if primary is None:
@@ -355,7 +412,7 @@ def process_public_chat_upload(
 
     # Images
     processed, mime, width, height, ext = _reencode_image(data, kind)
-    _check_rate_and_quota(vid, len(processed))
+    _check_rate_and_quota(vid, len(processed), client_ip=client_ip)
     stored = f"{uuid.uuid4().hex}{ext}"
     path = uploads_db.absolute_path(stored)
     path.write_bytes(processed)
@@ -376,6 +433,7 @@ def process_public_chat_upload(
         height=height,
         page_count=None,
         description=desc,
+        client_ip=client_ip,
     )
     return ProcessedUpload(row=row, absolute_path=path)
 
