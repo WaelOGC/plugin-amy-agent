@@ -25,6 +25,11 @@ class Amy_Rest {
 	const RATE_LIMIT_WINDOW = 60;
 
 	/**
+	 * Max attachments per message (matches widget + service MAX_FILES_PER_MESSAGE).
+	 */
+	const MAX_ATTACHMENTS_PER_MESSAGE = 3;
+
+	/**
 	 * Allowed tracking event types (must match the Python service set).
 	 */
 	const TRACK_EVENT_TYPES = array(
@@ -1582,8 +1587,71 @@ class Amy_Rest {
 	}
 
 	/**
+	 * Sanitize public-chat attachment refs (AttachmentRef shape for /v1/chat).
+	 *
+	 * @param mixed $attachments Raw attachments array.
+	 * @return array<int, array{url: string, filename: string, content_type: string|null, id: string|null, kind: string|null, size: int|null}>
+	 */
+	private function sanitize_public_chat_attachments( $attachments ) {
+		if ( ! is_array( $attachments ) ) {
+			return array();
+		}
+
+		$clean         = array();
+		$allowed_kinds = array( 'image', 'pdf' );
+
+		foreach ( $attachments as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$url      = isset( $item['url'] ) ? esc_url_raw( (string) $item['url'] ) : '';
+			$filename = isset( $item['filename'] ) ? sanitize_text_field( (string) $item['filename'] ) : '';
+			if ( '' === $url || '' === $filename ) {
+				continue;
+			}
+
+			$content_type = null;
+			if ( isset( $item['content_type'] ) && null !== $item['content_type'] && '' !== (string) $item['content_type'] ) {
+				$content_type = sanitize_text_field( (string) $item['content_type'] );
+			}
+
+			$id = null;
+			if ( isset( $item['id'] ) && null !== $item['id'] && '' !== (string) $item['id'] ) {
+				$id = sanitize_text_field( (string) $item['id'] );
+			}
+
+			$kind = null;
+			if ( isset( $item['kind'] ) && null !== $item['kind'] && '' !== (string) $item['kind'] ) {
+				$candidate = sanitize_key( (string) $item['kind'] );
+				if ( in_array( $candidate, $allowed_kinds, true ) ) {
+					$kind = $candidate;
+				}
+			}
+
+			$size = null;
+			if ( isset( $item['size'] ) && null !== $item['size'] && '' !== $item['size'] && is_numeric( $item['size'] ) ) {
+				$size = max( 0, (int) $item['size'] );
+			}
+
+			$clean[] = array(
+				'url'          => $url,
+				'filename'     => $filename,
+				'content_type' => $content_type,
+				'id'           => $id,
+				'kind'         => $kind,
+				'size'         => $size,
+			);
+			if ( count( $clean ) >= self::MAX_ATTACHMENTS_PER_MESSAGE ) {
+				break;
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
 	 * @param mixed $messages Raw messages array.
-	 * @return array<int, array{role: string, content: string}>
+	 * @return array<int, array{role: string, content: string, attachments?: array<int, array{url: string, filename: string, content_type: string|null, id: string|null, kind: string|null, size: int|null}>}>
 	 */
 	private function sanitize_messages( $messages ) {
 		if ( ! is_array( $messages ) ) {
@@ -1597,15 +1665,26 @@ class Amy_Rest {
 			if ( ! is_array( $msg ) ) {
 				continue;
 			}
-			$role    = isset( $msg['role'] ) ? sanitize_key( (string) $msg['role'] ) : '';
-			$content = isset( $msg['content'] ) ? sanitize_textarea_field( (string) $msg['content'] ) : '';
-			if ( ! in_array( $role, $allowed_roles, true ) || '' === $content ) {
+			$role        = isset( $msg['role'] ) ? sanitize_key( (string) $msg['role'] ) : '';
+			$content     = isset( $msg['content'] ) ? sanitize_textarea_field( (string) $msg['content'] ) : '';
+			$attachments = $this->sanitize_public_chat_attachments(
+				isset( $msg['attachments'] ) ? $msg['attachments'] : array()
+			);
+			if ( ! in_array( $role, $allowed_roles, true ) ) {
 				continue;
 			}
-			$clean[] = array(
+			// Keep messages that have text and/or at least one valid attachment.
+			if ( '' === $content && empty( $attachments ) ) {
+				continue;
+			}
+			$entry = array(
 				'role'    => $role,
 				'content' => $content,
 			);
+			if ( ! empty( $attachments ) ) {
+				$entry['attachments'] = $attachments;
+			}
+			$clean[] = $entry;
 			if ( count( $clean ) >= 40 ) {
 				break;
 			}

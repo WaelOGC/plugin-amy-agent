@@ -137,7 +137,7 @@ Routes messages to the selected provider adapter and returns the assistant reply
 | --- | --- |
 | `mode` | `general` \| `submit_idea` \| `support` \| `admin` |
 | `page` | Current page context for routing (later phases) |
-| `messages` | Chronological chat turns |
+| `messages` | Chronological chat turns. Each may include `attachments[]` (`AttachmentRef`: required `url` + `filename`; optional `content_type`, `id`, `kind`, `size`, …). Public WordPress `/chat` sanitizer keeps messages that have non-empty `content` **or** at least one valid attachment (empty text + files is allowed); invalid attachment items (missing `url`/`filename`) are dropped; max 3 attachments per message. `Amy_Api_Client::chat()` JSON-encodes the payload as-is to this endpoint. |
 | `context` | Extensible bag for later features |
 | `pricing_catalogue` | Optional. Compact plain-text live price list from the active theme (`ogc_get_pricing_data()`), sent by WordPress on **public general** chat only (not admin, not Submit Idea). Service treats it as untrusted: strips control characters and hard-caps at ~6,000 characters. When non-empty, Python appends it to the public system prompt as a delimited “Current public price list” block. When absent/empty, Amy keeps the base public prompt (link to Pricing page, no quoted numbers). |
 | `visitor_timezone` | Optional. IANA timezone from the public widget (`Intl…timeZone`), max 64 chars. Sent only when **Friendly closing wishes in public chat** is ON in Amy → Settings. Validated server-side; invalid/missing → no closing-wish hint. Admin mode never uses it. |
