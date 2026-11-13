@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-13 (amy-agent v0.2.62 / amy-agent-service v0.2.22 — upload security + attach UI).
+> Last verified against code: 2026-11-13 (amy-agent v0.2.63 / amy-agent-service v0.2.22 — public chat attachments sanitize + forward).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -121,6 +121,10 @@
   bounded reads / early size checks; one-line textarea; attach + upload-info
   popovers; history titles from generated title / first user message. Deploy
   note: rebuild service for Pillow + PyMuPDF.
+- **Public chat attachment sanitize (plugin 0.2.63):** `sanitize_messages()` keeps
+  empty-content turns that include attachments and forwards AttachmentRef fields
+  (`url`, `filename`, `content_type`, `id`, `kind`, `size`, capped at 3) through
+  to `Amy_Api_Client::chat()` → `POST /v1/chat`. Service unchanged.
 
 ### 3. Infrastructure
 - Python service deployed on **Dokploy**, separate from the WP host, always-on
