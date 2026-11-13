@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-13 (amy-agent v0.2.59 / amy-agent-service v0.2.19 — friendlier public chat tone, widget Markdown headings, optional closing wishes + analytics split).
+> Last verified against code: 2026-11-13 (amy-agent v0.2.61 / amy-agent-service v0.2.21 — public chat uploads + widget polish).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -105,6 +105,17 @@
   Esc, localStorage). Tone: clearer emoji rule; closing wish only when hint
   block is present; `closing_wish_sent` adds an already-given system line.
   Admin chat and Submit Idea unchanged.
+- **Public chat uploads + polish (plugin 0.2.61 / service 0.2.21):** history
+  lists only chats with a visitor message; New chat clears the window (create
+  on first send); history rows show date+time (Today/Yesterday) and a muted
+  last-message preview; compact subtitle “AI assistant” vs expanded “OGC
+  NewFinity assistant”; thin dark/gold scrollbars; auto-growing textarea
+  (Enter send / Shift+Enter newline / IME-safe). Secure public uploads (JPEG/
+  PNG/WebP/PDF): magic-byte validation, image re-encode, PDF→page images
+  (Pillow + PyMuPDF), auth file serve (`nosniff`), rate/storage caps, 7-day
+  file retention, Gemini vision once then stored description, admin email +
+  Telegram notify. Settings: Allow file uploads / Notify me about uploads
+  (both default ON). Admin chat and Submit Idea upload limits unchanged.
 
 ### 3. Infrastructure
 - Python service deployed on **Dokploy**, separate from the WP host, always-on

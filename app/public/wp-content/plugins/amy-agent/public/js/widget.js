@@ -37,7 +37,7 @@
 
 		function iconSvg(name) {
 			var common =
-				'xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+				'xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
 			if (name === 'history') {
 				return (
 					'<svg ' +
@@ -66,6 +66,13 @@
 					'><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="14" y1="10" x2="21" y2="3"/></svg>'
 				);
 			}
+			if (name === 'attach') {
+				return (
+					'<svg ' +
+					common +
+					'><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>'
+				);
+			}
 			return '×';
 		}
 
@@ -73,6 +80,9 @@
 		var busy = false;
 		var showingHistory = false;
 		var expanded = false;
+		var uploadsEnabled = !!cfg.uploadsEnabled;
+		var MAX_PENDING_FILES = 3;
+		var pendingFiles = [];
 		var lastDateKey = null;
 		var focusBeforeExpand = null;
 		var reduceMotion = false;
@@ -172,12 +182,27 @@
 			'<div class="amy-agent-main">' +
 			'<div class="amy-agent-messages" data-amy-messages></div>' +
 			'<form class="amy-agent-form" data-amy-form>' +
-			'<input class="amy-agent-form__input" type="text" name="message" autocomplete="off" maxlength="2000" placeholder="' +
+			'<div class="amy-agent-form__chips" data-amy-chips hidden></div>' +
+			'<div class="amy-agent-form__row">' +
+			(uploadsEnabled
+				? '<button type="button" class="amy-agent-icon-btn amy-agent-form__attach" data-amy-attach aria-label="' +
+				  escapeHtml(i18n.attach || 'Attach a file') +
+				  '" title="' +
+				  escapeHtml(i18n.attach || 'Attach a file') +
+				  '">' +
+				  iconSvg('attach') +
+				  '</button><input type="file" class="amy-agent-form__file-input" data-amy-file-input hidden accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" multiple />'
+				: '') +
+			'<textarea class="amy-agent-form__input amy-agent-form__textarea" name="message" rows="1" autocomplete="off" maxlength="2000" placeholder="' +
 			escapeHtml(i18n.placeholder) +
-			'" data-amy-input />' +
+			'" data-amy-input></textarea>' +
 			'<button class="amy-agent-form__send" type="submit" data-amy-send>' +
 			escapeHtml(i18n.send) +
 			'</button>' +
+			'</div>' +
+			(uploadsEnabled
+				? '<p class="amy-agent-form__hint">' + escapeHtml(i18n.attachHint || '') + '</p>'
+				: '') +
 			'</form>' +
 			'</div>' +
 			'</div>' +
@@ -197,6 +222,10 @@
 		var form = root.querySelector('[data-amy-form]');
 		var input = root.querySelector('[data-amy-input]');
 		var sendBtn = root.querySelector('[data-amy-send]');
+		var chipsEl = root.querySelector('[data-amy-chips]');
+		var attachBtn = root.querySelector('[data-amy-attach]');
+		var fileInput = root.querySelector('[data-amy-file-input]');
+		var subtitleEl = root.querySelector('.amy-agent-header__subtitle');
 
 		function conversationUrl(suffix) {
 			return cfg.restUrl.replace(/\/chat$/, '/chat' + suffix);
@@ -299,16 +328,316 @@
 		}
 
 		function formatHistoryDate(tsSec) {
-			var ms = typeof tsSec === 'number' ? tsSec * 1000 : Date.now();
-			try {
-				return new Date(ms).toLocaleDateString(undefined, {
-					year: 'numeric',
-					month: 'short',
-					day: 'numeric',
-				});
-			} catch (e) {
-				return new Date(ms).toDateString();
+			return formatDateLabel(tsSec) + ', ' + formatTime(tsSec);
+		}
+
+		function updateSubtitle() {
+			if (!subtitleEl) {
+				return;
 			}
+			var text = expanded
+				? i18n.subtitleExpanded || i18n.subtitle || ''
+				: i18n.subtitleCompact || 'AI assistant';
+			subtitleEl.textContent = text;
+		}
+
+		function textareaMaxHeightPx() {
+			var linePx = 22;
+			try {
+				var cs = window.getComputedStyle(input);
+				var lh = parseFloat(cs.lineHeight);
+				if (lh && !isNaN(lh)) {
+					linePx = lh;
+				}
+			} catch (e) {}
+			var maxLines = expanded ? 10 : 6;
+			return Math.ceil(linePx * maxLines + 8);
+		}
+
+		function syncTextareaHeight() {
+			if (!input) {
+				return;
+			}
+			var maxPx = textareaMaxHeightPx();
+			input.style.height = 'auto';
+			var next = Math.min(input.scrollHeight, maxPx);
+			input.style.height = next + 'px';
+			input.style.overflowY = input.scrollHeight > maxPx ? 'auto' : 'hidden';
+		}
+
+		function resetTextareaHeight() {
+			if (!input) {
+				return;
+			}
+			input.style.height = '';
+			syncTextareaHeight();
+		}
+
+		function fileUrlWithVisitor(attachment) {
+			var url = attachment && attachment.url ? String(attachment.url) : '';
+			if (!url && attachment && attachment.id && cfg.filesUrl) {
+				url =
+					String(cfg.filesUrl).replace(/\/$/, '') +
+					'/' +
+					encodeURIComponent(attachment.id);
+			}
+			if (!url) {
+				return '#';
+			}
+			if (url.indexOf('visitor_id=') >= 0) {
+				return url;
+			}
+			var sep = url.indexOf('?') >= 0 ? '&' : '?';
+			return url + sep + 'visitor_id=' + encodeURIComponent(visitorId);
+		}
+
+		function attachmentKind(attachment) {
+			if (attachment.kind) {
+				return attachment.kind;
+			}
+			var ct = attachment.content_type || '';
+			if (ct.indexOf('image/') === 0) {
+				return 'image';
+			}
+			if (ct === 'application/pdf') {
+				return 'pdf';
+			}
+			return 'file';
+		}
+
+		function renderAttachmentsHtml(attachments) {
+			if (!attachments || !attachments.length) {
+				return '';
+			}
+			var parts = ['<div class="amy-agent-attachments">'];
+			attachments.forEach(function (a) {
+				if (!a) {
+					return;
+				}
+				if (a.expired) {
+					parts.push(
+						'<span class="amy-agent-attach-chip amy-agent-attach-chip--expired">' +
+							escapeHtml(i18n.fileExpired || 'File expired') +
+							'</span>'
+					);
+					return;
+				}
+				var url = fileUrlWithVisitor(a);
+				var kind = attachmentKind(a);
+				if (kind === 'image') {
+					parts.push(
+						'<a class="amy-agent-attach-thumb" href="' +
+							escapeHtml(url) +
+							'" target="_blank" rel="noopener noreferrer"><img src="' +
+							escapeHtml(url) +
+							'" alt="" loading="lazy" decoding="async" /></a>'
+					);
+				} else {
+					var name = a.filename || 'PDF';
+					parts.push(
+						'<a class="amy-agent-attach-chip" href="' +
+							escapeHtml(url) +
+							'" target="_blank" rel="noopener noreferrer">' +
+							escapeHtml(name) +
+							'</a>'
+					);
+				}
+			});
+			parts.push('</div>');
+			return parts.join('');
+		}
+
+		function formatFileSize(bytes) {
+			var n = typeof bytes === 'number' ? bytes : 0;
+			if (n < 1024) {
+				return n + ' B';
+			}
+			if (n < 1024 * 1024) {
+				return (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB';
+			}
+			return (n / (1024 * 1024)).toFixed(1) + ' MB';
+		}
+
+		function clearPendingFiles() {
+			pendingFiles = [];
+			renderPendingChips();
+		}
+
+		function renderPendingChips() {
+			if (!chipsEl) {
+				return;
+			}
+			chipsEl.innerHTML = '';
+			if (!pendingFiles.length) {
+				chipsEl.hidden = true;
+				return;
+			}
+			chipsEl.hidden = false;
+			pendingFiles.forEach(function (item) {
+				var chip = document.createElement('span');
+				chip.className = 'amy-agent-pending-chip';
+				if (item.status === 'uploading') {
+					chip.classList.add('is-uploading');
+				}
+				if (item.status === 'error') {
+					chip.classList.add('is-error');
+				}
+				var label =
+					'<span class="amy-agent-pending-chip__name" title="' +
+					escapeHtml(item.name) +
+					'">' +
+					escapeHtml(item.name) +
+					'</span><span class="amy-agent-pending-chip__size">' +
+					escapeHtml(formatFileSize(item.size)) +
+					'</span>';
+				if (item.status === 'uploading') {
+					label +=
+						'<span class="amy-agent-pending-chip__progress" aria-hidden="true"></span>';
+				}
+				chip.innerHTML =
+					label +
+					'<button type="button" class="amy-agent-pending-chip__remove" data-pending-id="' +
+					escapeHtml(item.id) +
+					'" aria-label="' +
+					escapeHtml(i18n.removeFile || 'Remove attachment') +
+					'">×</button>';
+				chipsEl.appendChild(chip);
+			});
+		}
+
+		function removePendingFile(id) {
+			pendingFiles = pendingFiles.filter(function (p) {
+				return p.id !== id;
+			});
+			renderPendingChips();
+		}
+
+		function successfulAttachments() {
+			return pendingFiles
+				.filter(function (p) {
+					return p.status === 'done' && p.attachment;
+				})
+				.map(function (p) {
+					return p.attachment;
+				});
+		}
+
+		function queueFiles(fileList) {
+			if (!uploadsEnabled || !fileList) {
+				return;
+			}
+			var files = Array.prototype.slice.call(fileList);
+			if (!files.length) {
+				return;
+			}
+			var slots = MAX_PENDING_FILES - pendingFiles.length;
+			if (slots <= 0) {
+				appendBubble(i18n.tooManyFiles || 'Too many files.', 'status');
+				return;
+			}
+			files.slice(0, slots).forEach(function (file) {
+				if (pendingFiles.length >= MAX_PENDING_FILES) {
+					return;
+				}
+				var item = {
+					id: uuid(),
+					file: file,
+					name: file.name || 'file',
+					size: file.size || 0,
+					status: 'uploading',
+					attachment: null,
+				};
+				pendingFiles.push(item);
+				renderPendingChips();
+				uploadPendingFile(item);
+			});
+			if (files.length > slots) {
+				appendBubble(i18n.tooManyFiles || 'Too many files.', 'status');
+			}
+		}
+
+		function uploadPendingFile(item) {
+			var fd = new FormData();
+			fd.append('visitor_id', visitorId);
+			fd.append('file', item.file, item.name);
+			fd.append('notify', cfg.uploadNotify ? 'true' : 'false');
+			fd.append('allow_uploads', 'true');
+			if (conversationId) {
+				fd.append('conversation_id', conversationId);
+			}
+			fetch(cfg.uploadUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					Accept: 'application/json',
+					'X-WP-Nonce': cfg.nonce,
+				},
+				body: fd,
+			})
+				.then(function (res) {
+					return res
+						.json()
+						.then(function (data) {
+							return { ok: res.ok, data: data };
+						})
+						.catch(function () {
+							return { ok: false, data: null };
+						});
+				})
+				.then(function (result) {
+					var idx = pendingFiles.findIndex(function (p) {
+						return p.id === item.id;
+					});
+					if (idx < 0) {
+						return;
+					}
+					if (result.ok && result.data) {
+						pendingFiles[idx].status = 'done';
+						pendingFiles[idx].attachment = result.data;
+					} else {
+						pendingFiles[idx].status = 'error';
+						appendBubble(i18n.uploadFailed || 'Upload failed.', 'status');
+					}
+					renderPendingChips();
+				})
+				.catch(function () {
+					var idx = pendingFiles.findIndex(function (p) {
+						return p.id === item.id;
+					});
+					if (idx >= 0) {
+						pendingFiles[idx].status = 'error';
+						renderPendingChips();
+						appendBubble(i18n.uploadFailed || 'Upload failed.', 'status');
+					}
+				});
+		}
+
+		function createConversationIfNeeded() {
+			if (conversationId) {
+				return Promise.resolve(conversationId);
+			}
+			return fetch(conversationUrl('/conversation'), {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: {
+					'Content-Type': 'application/json',
+					Accept: 'application/json',
+					'X-WP-Nonce': cfg.nonce,
+				},
+				body: JSON.stringify({ visitor_id: visitorId }),
+			})
+				.then(function (res) {
+					return res.ok
+						? res.json()
+						: Promise.reject(new Error('create_failed'));
+				})
+				.then(function (data) {
+					if (data && data.id) {
+						persistConversationId(data.id);
+						return data.id;
+					}
+					return Promise.reject(new Error('create_failed'));
+				});
 		}
 
 		function maybeAppendDateSep(tsSec) {
@@ -472,8 +801,9 @@
 			messagesEl.scrollTop = messagesEl.scrollHeight;
 		}
 
-		function appendBubble(text, kind, tsSec) {
+		function appendBubble(text, kind, tsSec, attachments) {
 			var stamp = typeof tsSec === 'number' ? tsSec : Date.now() / 1000;
+			var atts = attachments || [];
 			if (kind !== 'status') {
 				maybeAppendDateSep(stamp);
 			}
@@ -482,7 +812,18 @@
 			var el = document.createElement('div');
 			el.className = 'amy-agent-bubble amy-agent-bubble--' + kind;
 			if (kind === 'assistant') {
-				el.innerHTML = renderMarkdown(text);
+				el.innerHTML = renderMarkdown(text) + renderAttachmentsHtml(atts);
+			} else if (kind === 'user') {
+				if (atts.length) {
+					var body = text
+						? '<span class="amy-agent-bubble__text">' +
+						  escapeHtml(String(text)).replace(/\n/g, '<br>') +
+						  '</span>'
+						: '';
+					el.innerHTML = body + renderAttachmentsHtml(atts);
+				} else {
+					el.textContent = text;
+				}
 			} else {
 				el.textContent = text;
 			}
@@ -509,6 +850,9 @@
 			sendBtn.disabled = next;
 			input.disabled = next;
 			newChatBtn.disabled = next;
+			if (attachBtn) {
+				attachBtn.disabled = next;
+			}
 		}
 
 		function setHistoryVisible(on) {
@@ -592,6 +936,7 @@
 				focusBeforeExpand = null;
 			}
 			input.value = draft;
+			syncTextareaHeight();
 			scrollMessagesToEnd();
 		}
 
@@ -602,6 +947,8 @@
 			expandBtn.setAttribute('title', label);
 			expandBtn.innerHTML = iconSvg(expanded ? 'collapse' : 'expand');
 			expandBtn.hidden = !canExpand();
+			updateSubtitle();
+			syncTextareaHeight();
 		}
 
 		function setOpen(open) {
@@ -629,29 +976,12 @@
 		function startFreshConversation() {
 			clearMessages();
 			setHistoryVisible(false);
+			persistConversationId(null);
+			clearPendingFiles();
 			appendBubble(i18n.greeting, 'assistant', Date.now() / 1000);
-			fetch(conversationUrl('/conversation'), {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: {
-					'Content-Type': 'application/json',
-					Accept: 'application/json',
-					'X-WP-Nonce': cfg.nonce,
-				},
-				body: JSON.stringify({ visitor_id: visitorId }),
-			})
-				.then(function (res) {
-					return res.json();
-				})
-				.then(function (data) {
-					if (data && data.id) {
-						persistConversationId(data.id);
-						if (expanded) {
-							loadHistoryList();
-						}
-					}
-				})
-				.catch(function () {});
+			if (expanded) {
+				loadHistoryList();
+			}
 		}
 
 		function renderLoadedMessages(messages) {
@@ -664,7 +994,7 @@
 				var kind = m.role === 'user' ? 'user' : 'assistant';
 				var ts =
 					typeof m.created_at === 'number' ? m.created_at : Date.now() / 1000;
-				appendBubble(m.content, kind, ts);
+				appendBubble(m.content, kind, ts, m.attachments || []);
 			});
 		}
 
@@ -752,13 +1082,21 @@
 							'aria-label',
 							shortenTitle(row.title) + ', ' + formatHistoryDate(row.updated_at)
 						);
+						var preview = row.last_message_preview
+							? String(row.last_message_preview).trim()
+							: '';
 						btn.innerHTML =
 							'<span class="amy-agent-history__item-title">' +
 							escapeHtml(shortenTitle(row.title)) +
 							'</span>' +
 							'<span class="amy-agent-history__item-date">' +
 							escapeHtml(formatHistoryDate(row.updated_at)) +
-							'</span>';
+							'</span>' +
+							(preview
+								? '<span class="amy-agent-history__item-preview">' +
+								  escapeHtml(preview) +
+								  '</span>'
+								: '');
 						btn.addEventListener('click', function () {
 							if (busy) {
 								return;
@@ -786,6 +1124,8 @@
 
 		// Restore expand preference on desktop.
 		updateExpandUi();
+		updateSubtitle();
+		syncTextareaHeight();
 		if (readExpandedPref() && canExpand()) {
 			expanded = true;
 			root.classList.add('is-expanded');
@@ -861,6 +1201,74 @@
 			}
 		});
 
+		input.addEventListener('input', syncTextareaHeight);
+		input.addEventListener('keydown', function (event) {
+			if (event.key !== 'Enter' || event.shiftKey) {
+				return;
+			}
+			if (event.isComposing || event.keyCode === 229) {
+				return;
+			}
+			event.preventDefault();
+			if (typeof form.requestSubmit === 'function') {
+				form.requestSubmit();
+			} else {
+				form.dispatchEvent(new Event('submit', { cancelable: true }));
+			}
+		});
+
+		if (uploadsEnabled && attachBtn && fileInput) {
+			attachBtn.addEventListener('click', function () {
+				fileInput.click();
+			});
+			fileInput.addEventListener('change', function () {
+				queueFiles(fileInput.files);
+				fileInput.value = '';
+			});
+			input.addEventListener('paste', function (event) {
+				var items = event.clipboardData && event.clipboardData.items;
+				if (!items) {
+					return;
+				}
+				var images = [];
+				for (var i = 0; i < items.length; i++) {
+					if (items[i].kind === 'file') {
+						var f = items[i].getAsFile();
+						if (f && f.type && f.type.indexOf('image/') === 0) {
+							images.push(f);
+						}
+					}
+				}
+				if (images.length) {
+					event.preventDefault();
+					queueFiles(images);
+				}
+			});
+			if (chipsEl) {
+				chipsEl.addEventListener('click', function (event) {
+					var btn = event.target.closest('[data-pending-id]');
+					if (!btn) {
+						return;
+					}
+					removePendingFile(btn.getAttribute('data-pending-id'));
+				});
+			}
+			function onDragOver(event) {
+				event.preventDefault();
+				event.dataTransfer.dropEffect = 'copy';
+			}
+			function onDrop(event) {
+				event.preventDefault();
+				if (event.dataTransfer && event.dataTransfer.files) {
+					queueFiles(event.dataTransfer.files);
+				}
+			}
+			form.addEventListener('dragover', onDragOver);
+			form.addEventListener('drop', onDrop);
+			panel.addEventListener('dragover', onDragOver);
+			panel.addEventListener('drop', onDrop);
+		}
+
 		form.addEventListener('submit', function (event) {
 			event.preventDefault();
 			if (busy) {
@@ -868,12 +1276,22 @@
 			}
 
 			var text = (input.value || '').trim();
-			if (!text) {
+			var attachments = successfulAttachments();
+			if (!text && !attachments.length) {
+				return;
+			}
+			if (
+				pendingFiles.some(function (p) {
+					return p.status === 'uploading';
+				})
+			) {
 				return;
 			}
 
 			input.value = '';
-			appendBubble(text, 'user', Date.now() / 1000);
+			resetTextareaHeight();
+			appendBubble(text, 'user', Date.now() / 1000, attachments);
+			clearPendingFiles();
 			if (window.amyTrack) {
 				window.amyTrack('widget_message_sent');
 			}
@@ -881,90 +1299,103 @@
 			var thinking = appendBubble(i18n.thinking, 'status');
 			setBusy(true);
 
-			var body = {
-				session_id: sessionId,
-				visitor_id: visitorId,
-				mode: 'general',
-				messages: [{ role: 'user', content: text }],
-				page: {
-					url: cfg.pageUrl || window.location.href,
-					slug: cfg.pageSlug || '',
-				},
-				context: {},
-			};
-			if (conversationId) {
-				body.conversation_id = conversationId;
-			}
-			if (cfg.closingWishes !== false) {
-				try {
-					var tz =
-						typeof Intl !== 'undefined' &&
-						Intl.DateTimeFormat &&
-						Intl.DateTimeFormat().resolvedOptions
-							? Intl.DateTimeFormat().resolvedOptions().timeZone
-							: '';
-					if (tz) {
-						body.visitor_timezone = String(tz).slice(0, 64);
-					}
-				} catch (tzErr) {
-					/* ignore */
+			function postChat(convId) {
+				var userMsg = { role: 'user', content: text };
+				if (attachments.length) {
+					userMsg.attachments = attachments;
 				}
-				try {
-					var lang =
-						(navigator.languages && navigator.languages[0]) ||
-						navigator.language ||
-						'';
-					if (lang) {
-						body.visitor_language = String(lang).slice(0, 32);
+				var body = {
+					session_id: sessionId,
+					visitor_id: visitorId,
+					mode: 'general',
+					messages: [userMsg],
+					page: {
+						url: cfg.pageUrl || window.location.href,
+						slug: cfg.pageSlug || '',
+					},
+					context: {},
+					conversation_id: convId,
+				};
+				if (cfg.closingWishes !== false) {
+					try {
+						var tz =
+							typeof Intl !== 'undefined' &&
+							Intl.DateTimeFormat &&
+							Intl.DateTimeFormat().resolvedOptions
+								? Intl.DateTimeFormat().resolvedOptions().timeZone
+								: '';
+						if (tz) {
+							body.visitor_timezone = String(tz).slice(0, 64);
+						}
+					} catch (tzErr) {
+						/* ignore */
 					}
-				} catch (langErr) {
-					/* ignore */
+					try {
+						var lang =
+							(navigator.languages && navigator.languages[0]) ||
+							navigator.language ||
+							'';
+						if (lang) {
+							body.visitor_language = String(lang).slice(0, 32);
+						}
+					} catch (langErr) {
+						/* ignore */
+					}
 				}
+
+				return fetch(cfg.restUrl, {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: {
+						'Content-Type': 'application/json',
+						Accept: 'application/json',
+						'X-WP-Nonce': cfg.nonce,
+					},
+					body: JSON.stringify(body),
+				})
+					.then(function (res) {
+						return res
+							.json()
+							.then(function (data) {
+								return { ok: res.ok, status: res.status, data: data };
+							})
+							.catch(function () {
+								return { ok: false, status: res.status, data: null };
+							});
+					})
+					.then(function (result) {
+						thinking.remove();
+						if (
+							result.ok &&
+							result.data &&
+							result.data.reply &&
+							typeof result.data.reply.content === 'string'
+						) {
+							var reply = result.data.reply.content;
+							appendBubble(reply, 'assistant', Date.now() / 1000);
+							if (
+								result.data.meta &&
+								result.data.meta.closing_wish &&
+								window.amyTrack
+							) {
+								window.amyTrack('chat_closing_wish');
+							}
+							if (expanded) {
+								loadHistoryList();
+							}
+							return;
+						}
+						appendBubble(i18n.unavailable, 'status');
+					})
+					.catch(function () {
+						thinking.remove();
+						appendBubble(i18n.unavailable, 'status');
+					});
 			}
 
-			fetch(cfg.restUrl, {
-				method: 'POST',
-				credentials: 'same-origin',
-				headers: {
-					'Content-Type': 'application/json',
-					Accept: 'application/json',
-					'X-WP-Nonce': cfg.nonce,
-				},
-				body: JSON.stringify(body),
-			})
-				.then(function (res) {
-					return res
-						.json()
-						.then(function (data) {
-							return { ok: res.ok, status: res.status, data: data };
-						})
-						.catch(function () {
-							return { ok: false, status: res.status, data: null };
-						});
-				})
-				.then(function (result) {
-					thinking.remove();
-					if (
-						result.ok &&
-						result.data &&
-						result.data.reply &&
-						typeof result.data.reply.content === 'string'
-					) {
-						var reply = result.data.reply.content;
-						appendBubble(reply, 'assistant', Date.now() / 1000);
-						if (
-							result.data.meta &&
-							result.data.meta.closing_wish &&
-							window.amyTrack
-						) {
-							window.amyTrack('chat_closing_wish');
-						}
-						if (expanded) {
-							loadHistoryList();
-						}
-						return;
-					}
-					appendBubble(i18n.unavailable, 'status');
+			createConversationIfNeeded()
+				.then(function (convId) {
+					return postChat(convId);
 				})
 				.catch(function () {
 					thinking.remove();

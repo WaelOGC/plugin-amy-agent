@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     # Example: https://ogcnewfinity.com — no trailing slash.
     # When unset, assign/mid/expiry still create dashboard notifications; channels soft-skip.
     wordpress_base_url: str = ""
+    # Public-chat secure uploads: max files per visitor per rolling hour.
+    public_chat_upload_max_per_hour: int = 10
+    # Total active public-chat upload storage cap (bytes). Default 1 GB.
+    public_chat_upload_storage_cap_bytes: int = 1_073_741_824
 
 
 @lru_cache

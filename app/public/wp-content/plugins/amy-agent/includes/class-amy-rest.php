@@ -154,6 +154,26 @@ class Amy_Rest {
 			)
 		);
 
+		register_rest_route(
+			self::NAMESPACE,
+			'/chat/upload',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_public_chat_upload' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/chat/files/(?P<id>[a-f0-9]+)',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'handle_public_chat_file' ),
+				'permission_callback' => array( $this, 'can_chat' ),
+			)
+		);
+
 		$this->register_submit_idea_routes();
 		$this->register_admin_chat_routes();
 
@@ -713,6 +733,169 @@ class Amy_Rest {
 			$file
 		);
 		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * POST /chat/upload — public widget file proxy.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_public_chat_upload( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$allow = $this->settings->is_public_chat_uploads_enabled();
+		if ( ! $allow ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'uploads_disabled',
+					'message' => __( 'File uploads are turned off for public chat.', 'amy-agent' ),
+				),
+				403
+			);
+		}
+
+		$visitor_id = $this->sanitize_visitor_id( $request->get_param( 'visitor_id' ) );
+		if ( '' === $visitor_id ) {
+			$visitor_id = $this->sanitize_visitor_id( $request->get_header( 'X-Amy-Visitor-Id' ) );
+		}
+		if ( '' === $visitor_id ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A valid visitor id is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$files = $request->get_file_params();
+		$file  = isset( $files['file'] ) && is_array( $files['file'] ) ? $files['file'] : null;
+		if ( ! $file ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A file is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$conversation_id = sanitize_text_field( (string) $request->get_param( 'conversation_id' ) );
+		if ( '' === $conversation_id ) {
+			$conversation_id = null;
+		}
+		$message_excerpt = sanitize_textarea_field( (string) $request->get_param( 'message_excerpt' ) );
+
+		$result = $this->api_client->public_chat_upload(
+			$visitor_id,
+			$file,
+			$conversation_id,
+			$this->settings->is_public_chat_upload_notify_enabled(),
+			$message_excerpt,
+			$allow
+		);
+		return $this->upstream_response( $result );
+	}
+
+	/**
+	 * GET /chat/files/{id} — proxy processed upload bytes to the browser.
+	 *
+	 * @param WP_REST_Request $request Request.
+	 * @return WP_REST_Response
+	 */
+	public function handle_public_chat_file( $request ) {
+		if ( ! $this->settings->is_ready() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'not_available',
+					'message' => __( 'Amy is not available right now.', 'amy-agent' ),
+				),
+				503
+			);
+		}
+
+		$file_id = sanitize_text_field( (string) $request->get_param( 'id' ) );
+		if ( ! preg_match( '/^[a-f0-9]+$/i', $file_id ) ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'Invalid file id.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$visitor_id = $this->sanitize_visitor_id( $request->get_param( 'visitor_id' ) );
+		if ( '' === $visitor_id ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'A valid visitor id is required.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$result = $this->api_client->get_public_chat_file( $file_id, $visitor_id, false );
+		$status = (int) $result['status_code'];
+		if ( $status < 100 ) {
+			$status = 502;
+		}
+
+		if ( empty( $result['ok'] ) || ! is_string( $result['body'] ) ) {
+			$body = is_array( $result['json'] ) ? $result['json'] : array(
+				'error'   => 'upstream_error',
+				'message' => ! empty( $result['error'] ) ? (string) $result['error'] : __( 'Amy is unavailable right now.', 'amy-agent' ),
+			);
+			return new WP_REST_Response( $body, $status );
+		}
+
+		$binary = $result['body'];
+		$ctype  = ! empty( $result['content_type'] ) ? (string) $result['content_type'] : 'application/octet-stream';
+
+		$response = new WP_REST_Response( null, $status );
+		$response->header( 'Content-Type', $ctype );
+		$response->header( 'X-Content-Type-Options', 'nosniff' );
+		$response->header( 'Cache-Control', 'private, max-age=300' );
+
+		add_filter(
+			'rest_pre_serve_request',
+			static function ( $served, $rest_result, $req ) use ( $binary, $status, $ctype, $file_id ) {
+				if ( $served ) {
+					return $served;
+				}
+				if ( 'GET' !== $req->get_method() ) {
+					return $served;
+				}
+				$route = (string) $req->get_route();
+				if ( strpos( $route, '/chat/files/' ) === false ) {
+					return $served;
+				}
+				if ( sanitize_text_field( (string) $req->get_param( 'id' ) ) !== $file_id ) {
+					return $served;
+				}
+				status_header( $status );
+				header( 'Content-Type: ' . $ctype );
+				header( 'X-Content-Type-Options: nosniff' );
+				header( 'Cache-Control: private, max-age=300' );
+				// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- binary file body.
+				echo $binary;
+				return true;
+			},
+			10,
+			3
+		);
+
+		return $response;
 	}
 
 	/**

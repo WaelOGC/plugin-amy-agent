@@ -163,13 +163,17 @@
 	margin: 0.15rem 0 0;
 	font-size: 0.75rem;
 	color: var(--amy-muted);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .amy-agent-header__actions {
 	display: flex;
 	align-items: center;
-	gap: 0.2rem;
+	gap: 0.12rem;
 	flex-shrink: 0;
+	flex-wrap: nowrap;
 }
 
 .amy-agent-icon-btn {
@@ -177,8 +181,8 @@
 	border: 0;
 	background: transparent;
 	color: var(--amy-muted);
-	width: 2rem;
-	height: 2rem;
+	width: 1.7rem;
+	height: 1.7rem;
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -294,6 +298,8 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.35rem;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(var(--amy-brand-rgb), 0.45) transparent;
 }
 
 .amy-agent-history__empty,
@@ -345,6 +351,17 @@
 	color: var(--amy-muted);
 }
 
+.amy-agent-history__item-preview {
+	font-size: 0.72rem;
+	line-height: 1.35;
+	color: var(--amy-muted);
+	opacity: 0.85;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
 .amy-agent-messages {
 	flex: 1;
 	overflow-y: auto;
@@ -352,6 +369,28 @@
 	display: flex;
 	flex-direction: column;
 	gap: 0.65rem;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(var(--amy-brand-rgb), 0.45) transparent;
+}
+
+.amy-agent-messages::-webkit-scrollbar,
+.amy-agent-history__list::-webkit-scrollbar,
+.amy-agent-form__textarea::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+.amy-agent-messages::-webkit-scrollbar-track,
+.amy-agent-history__list::-webkit-scrollbar-track,
+.amy-agent-form__textarea::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.amy-agent-messages::-webkit-scrollbar-thumb,
+.amy-agent-history__list::-webkit-scrollbar-thumb,
+.amy-agent-form__textarea::-webkit-scrollbar-thumb {
+	background: rgba(var(--amy-brand-rgb), 0.45);
+	border-radius: 999px;
 }
 
 .amy-agent-date-sep {
@@ -482,10 +521,88 @@
 
 .amy-agent-form {
 	display: flex;
-	gap: 0.5rem;
+	flex-direction: column;
+	gap: 0.45rem;
 	padding: 0.75rem;
 	border-top: 1px solid rgba(var(--amy-brand-rgb), 0.18);
 	flex-shrink: 0;
+}
+
+.amy-agent-form__row {
+	display: flex;
+	align-items: flex-end;
+	gap: 0.4rem;
+}
+
+.amy-agent-form__chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+}
+
+.amy-agent-form__chips[hidden] {
+	display: none !important;
+}
+
+.amy-agent-form__hint {
+	margin: 0;
+	font-size: 0.68rem;
+	line-height: 1.35;
+	color: var(--amy-muted);
+	opacity: 0.85;
+}
+
+.amy-agent-form__attach {
+	flex-shrink: 0;
+	align-self: flex-end;
+	margin-bottom: 0.15rem;
+}
+
+.amy-agent-pending-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	max-width: 100%;
+	padding: 0.25rem 0.45rem;
+	border-radius: 0.5rem;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.25);
+	background: rgba(0, 0, 0, 0.35);
+	font-size: 0.75rem;
+}
+
+.amy-agent-pending-chip.is-uploading {
+	opacity: 0.85;
+}
+
+.amy-agent-pending-chip.is-error {
+	border-color: rgba(255, 120, 120, 0.45);
+}
+
+.amy-agent-pending-chip__name {
+	max-width: 9rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.amy-agent-pending-chip__size {
+	color: var(--amy-muted);
+	font-size: 0.68rem;
+}
+
+.amy-agent-pending-chip__remove {
+	appearance: none;
+	border: 0;
+	background: transparent;
+	color: var(--amy-muted);
+	cursor: pointer;
+	padding: 0 0.15rem;
+	font-size: 1rem;
+	line-height: 1;
+}
+
+.amy-agent-pending-chip__remove:hover {
+	color: var(--amy-accent);
 }
 
 .amy-agent-form__input {
@@ -500,6 +617,16 @@
 	font-size: 0.9rem;
 }
 
+.amy-agent-form__textarea {
+	resize: none;
+	line-height: 1.35;
+	min-height: 2.75rem;
+	max-height: none;
+	overflow-y: hidden;
+	scrollbar-width: thin;
+	scrollbar-color: rgba(var(--amy-brand-rgb), 0.45) transparent;
+}
+
 .amy-agent-form__input::placeholder {
 	color: rgba(201, 201, 201, 0.7);
 }
@@ -508,6 +635,61 @@
 	outline: none;
 	border-color: var(--amy-accent);
 	box-shadow: 0 0 0 2px rgba(var(--amy-brand-rgb), 0.15);
+}
+
+.amy-agent-attachments {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	margin-top: 0.45rem;
+}
+
+.amy-agent-bubble__text + .amy-agent-attachments {
+	margin-top: 0.35rem;
+}
+
+.amy-agent-attach-thumb {
+	display: block;
+	border-radius: 0.45rem;
+	overflow: hidden;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.25);
+	max-width: 8rem;
+}
+
+.amy-agent-attach-thumb img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	max-height: 6rem;
+	object-fit: cover;
+}
+
+.amy-agent-attach-chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.3rem 0.55rem;
+	border-radius: 0.45rem;
+	border: 1px solid rgba(var(--amy-brand-rgb), 0.3);
+	background: rgba(0, 0, 0, 0.25);
+	font-size: 0.78rem;
+	color: var(--amy-accent-soft);
+	text-decoration: none;
+	max-width: 12rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.amy-agent-attach-chip:hover,
+.amy-agent-attach-chip:focus-visible {
+	border-color: var(--amy-accent);
+	color: var(--amy-accent);
+}
+
+.amy-agent-attach-chip--expired {
+	border-style: dashed;
+	opacity: 0.75;
+	color: var(--amy-muted);
 }
 
 .amy-agent-form__send {

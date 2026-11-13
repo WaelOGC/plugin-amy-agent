@@ -67,10 +67,30 @@ class PageContext(BaseModel):
     slug: str | None = None
 
 
+class AttachmentPageRef(BaseModel):
+    id: str
+    url: str
+
+
 class AttachmentRef(BaseModel):
     url: str
     filename: str
     content_type: str | None = None
+    # Public-chat secure uploads (optional; admin/Submit Idea leave these unset).
+    id: str | None = None
+    kind: str | None = None  # image | pdf
+    size: int | None = None
+    expired: bool = False
+    description: str | None = None
+    page_count: int | None = None
+    pages: list[AttachmentPageRef] | None = None
+
+
+class InlineMediaPart(BaseModel):
+    """Provider-only binary part (not persisted on conversation messages)."""
+
+    mime_type: str
+    data: str  # base64
 
 
 class ToolCallPart(BaseModel):
@@ -92,6 +112,8 @@ class ChatMessage(BaseModel):
     # Tool-result turn (role=tool).
     tool_call_id: str | None = None
     name: str | None = None
+    # Ephemeral multimodal parts for the current provider call only.
+    inline_media: list[InlineMediaPart] = Field(default_factory=list)
 
 
 class ChatRequest(BaseModel):

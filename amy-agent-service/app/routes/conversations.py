@@ -58,6 +58,7 @@ def _to_summary(row: dict) -> ConversationSummary:
         created_at=row["created_at"],
         updated_at=row["updated_at"],
         visitor_id=row.get("visitor_id"),
+        last_message_preview=row.get("last_message_preview"),
     )
 
 

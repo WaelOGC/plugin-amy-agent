@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__, config_task_rules as rules
-from app.db import analytics_db, conversations_db
+from app.db import analytics_db, conversations_db, public_chat_uploads_db
 from app.routes import (
     analytics,
     chat,
@@ -19,6 +19,7 @@ from app.routes import (
     email_marketing,
     health,
     notifications,
+    public_chat_uploads,
     seo_batches,
     seo_tasks,
     submit_idea,
@@ -26,6 +27,7 @@ from app.routes import (
 )
 from app.routes.conversations import CONVERSATION_UPLOAD_ROOT
 from app.routes.submit_idea import UPLOAD_ROOT
+from app.services.public_chat_upload import delete_expired_uploads
 from app.services.task_escalation import run_escalation_pass
 
 logging.basicConfig(level=logging.INFO)
@@ -73,6 +75,21 @@ def run_conversation_purge() -> None:
         logger.exception("Conversation purge failed")
 
 
+def run_public_chat_upload_purge() -> None:
+    """Delete public-chat upload files older than 7 days; keep conversation text."""
+    try:
+        # Ensure DB schema exists even if no upload happened yet.
+        public_chat_uploads_db._connect().close()
+        result = delete_expired_uploads(days=public_chat_uploads_db.RETENTION_DAYS)
+        logger.info(
+            "Public chat upload purge complete (expired_rows=%s deleted_files=%s)",
+            result.get("expired_rows"),
+            result.get("deleted_files"),
+        )
+    except Exception:
+        logger.exception("Public chat upload purge failed")
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     scheduler.add_job(
@@ -107,6 +124,14 @@ async def lifespan(_app: FastAPI):
         replace_existing=True,
         max_instances=1,
     )
+    scheduler.add_job(
+        run_public_chat_upload_purge,
+        "interval",
+        seconds=rules.ESCALATION_JOB_INTERVAL_SECONDS,
+        id="public_chat_upload_purge",
+        replace_existing=True,
+        max_instances=1,
+    )
     scheduler.start()
     logger.info(
         "Task escalation scheduler started (every %ss)",
@@ -122,6 +147,10 @@ async def lifespan(_app: FastAPI):
     )
     logger.info(
         "Conversation purge scheduler started (every %ss, grace 30 days)",
+        rules.ESCALATION_JOB_INTERVAL_SECONDS,
+    )
+    logger.info(
+        "Public chat upload purge scheduler started (every %ss, retention 7 days)",
         rules.ESCALATION_JOB_INTERVAL_SECONDS,
     )
     try:
@@ -142,6 +171,7 @@ app.include_router(health.router)
 app.include_router(config_sync.router)
 app.include_router(chat.router)
 app.include_router(conversations.router)
+app.include_router(public_chat_uploads.router)
 app.include_router(email_marketing.router)
 app.include_router(submit_idea.router)
 app.include_router(tasks.router)

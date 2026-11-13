@@ -25,6 +25,10 @@ class Amy_Settings {
 	const OPTION_MARKETING_FROM_NAME  = 'amy_agent_marketing_from_name';
 	/** Friendly closing wishes in public chat (default ON). */
 	const OPTION_CLOSING_WISHES       = 'amy_agent_closing_wishes';
+	/** Allow file uploads in public chat (default ON). */
+	const OPTION_PUBLIC_CHAT_UPLOADS  = 'amy_agent_public_chat_uploads';
+	/** Notify site admin about public chat uploads (default ON). */
+	const OPTION_PUBLIC_CHAT_UPLOAD_NOTIFY = 'amy_agent_public_chat_upload_notify';
 
 	const OPTION_TELEGRAM_ENABLED = 'amy_agent_telegram_enabled';
 	const OPTION_TELEGRAM_TOKEN   = 'amy_agent_telegram_bot_token';
@@ -112,6 +116,7 @@ class Amy_Settings {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_init', array( $this, 'normalize_enabled_checkbox_post' ), 0 );
 		add_action( 'admin_init', array( $this, 'normalize_closing_wishes_checkbox_post' ), 0 );
+		add_action( 'admin_init', array( $this, 'normalize_public_chat_upload_checkbox_post' ), 0 );
 		add_action( 'admin_init', array( $this, 'normalize_telegram_enabled_checkbox_post' ), 0 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( AMY_AGENT_FILE ), array( $this, 'add_settings_link' ) );
@@ -167,6 +172,31 @@ class Amy_Settings {
 			return;
 		}
 		$_POST[ self::OPTION_CLOSING_WISHES ] = ( '1' === (string) $raw ) ? '1' : '0';
+	}
+
+	/**
+	 * Normalize public-chat upload + notify checkboxes to "0" or "1".
+	 */
+	public function normalize_public_chat_upload_checkbox_post() {
+		if ( ! isset( $_POST['option_page'] ) || 'amy_agent_settings' !== $_POST['option_page'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		foreach ( array( self::OPTION_PUBLIC_CHAT_UPLOADS, self::OPTION_PUBLIC_CHAT_UPLOAD_NOTIFY ) as $option ) {
+			$raw = isset( $_POST[ $option ] ) ? wp_unslash( $_POST[ $option ] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			if ( is_array( $raw ) ) {
+				$_POST[ $option ] = in_array( '1', array_map( 'strval', $raw ), true ) ? '1' : '0';
+				continue;
+			}
+			if ( null === $raw ) {
+				$_POST[ $option ] = '0';
+				continue;
+			}
+			$_POST[ $option ] = ( '1' === (string) $raw ) ? '1' : '0';
+		}
 	}
 
 	/**
@@ -231,6 +261,26 @@ class Amy_Settings {
 		register_setting(
 			'amy_agent_settings',
 			self::OPTION_CLOSING_WISHES,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+				'default'           => '1',
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_PUBLIC_CHAT_UPLOADS,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+				'default'           => '1',
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_PUBLIC_CHAT_UPLOAD_NOTIFY,
 			array(
 				'type'              => 'string',
 				'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
@@ -1103,6 +1153,24 @@ class Amy_Settings {
 	}
 
 	/**
+	 * Whether visitors may attach files in public chat (default ON).
+	 *
+	 * @return bool
+	 */
+	public function is_public_chat_uploads_enabled() {
+		return '1' === (string) get_option( self::OPTION_PUBLIC_CHAT_UPLOADS, '1' );
+	}
+
+	/**
+	 * Whether admins are notified about public chat uploads (default ON).
+	 *
+	 * @return bool
+	 */
+	public function is_public_chat_upload_notify_enabled() {
+		return '1' === (string) get_option( self::OPTION_PUBLIC_CHAT_UPLOAD_NOTIFY, '1' );
+	}
+
+	/**
 	 * Service URL + shared secret look configured enough for theme activation.
 	 *
 	 * @return bool
@@ -1493,6 +1561,36 @@ class Amy_Settings {
 								<span class="amy-agent-settings__toggle-copy">
 									<strong><?php echo esc_html__( 'Friendly closing wishes in public chat', 'amy-agent' ); ?></strong>
 									<span><?php echo esc_html__( 'When on, public Amy may add a short goodbye wish (weekend / holidays / day-evening) once per conversation. Tone changes stay on either way. Off: the widget does not send timezone and the service never adds the wish hint.', 'amy-agent' ); ?></span>
+								</span>
+							</label>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__toggle" for="amy_agent_public_chat_uploads">
+								<input
+									type="checkbox"
+									id="amy_agent_public_chat_uploads"
+									name="<?php echo esc_attr( self::OPTION_PUBLIC_CHAT_UPLOADS ); ?>"
+									value="1"
+									<?php checked( $this->is_public_chat_uploads_enabled(), true ); ?>
+								/>
+								<span class="amy-agent-settings__toggle-copy">
+									<strong><?php echo esc_html__( 'Allow file uploads in public chat', 'amy-agent' ); ?></strong>
+									<span><?php echo esc_html__( 'When on, visitors can attach images or PDFs (up to 5 MB) in the floating Amy widget. Off: the attach control is hidden and uploads are rejected.', 'amy-agent' ); ?></span>
+								</span>
+							</label>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__toggle" for="amy_agent_public_chat_upload_notify">
+								<input
+									type="checkbox"
+									id="amy_agent_public_chat_upload_notify"
+									name="<?php echo esc_attr( self::OPTION_PUBLIC_CHAT_UPLOAD_NOTIFY ); ?>"
+									value="1"
+									<?php checked( $this->is_public_chat_upload_notify_enabled(), true ); ?>
+								/>
+								<span class="amy-agent-settings__toggle-copy">
+									<strong><?php echo esc_html__( 'Notify me about uploads', 'amy-agent' ); ?></strong>
+									<span><?php echo esc_html__( 'When on, each public chat upload can email the site admin and ping linked Telegram admins (if Telegram is enabled).', 'amy-agent' ); ?></span>
 								</span>
 							</label>
 						</div>
