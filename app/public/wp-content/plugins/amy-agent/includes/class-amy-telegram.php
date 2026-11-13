@@ -1196,6 +1196,86 @@ class Amy_Telegram {
 	}
 
 	/**
+	 * Send a photo to a chat (multipart Bot API).
+	 *
+	 * @param int    $chat_id    Chat id.
+	 * @param string $file_path  Local readable image path.
+	 * @param string $caption    Optional caption.
+	 * @param bool   $allow_html Whether caption uses HTML parse mode.
+	 * @return array{ok:bool,error:string|null}
+	 */
+	public function send_photo_to_chat( $chat_id, $file_path, $caption = '', $allow_html = false ) {
+		$token = $this->get_bot_token();
+		if ( '' === $token ) {
+			return array(
+				'ok'    => false,
+				'error' => __( 'Bot token is not configured.', 'amy-agent' ),
+			);
+		}
+		$file_path = (string) $file_path;
+		if ( '' === $file_path || ! is_readable( $file_path ) ) {
+			return array(
+				'ok'    => false,
+				'error' => __( 'Photo file is not readable.', 'amy-agent' ),
+			);
+		}
+		if ( ! class_exists( 'CURLFile' ) ) {
+			return array(
+				'ok'    => false,
+				'error' => __( 'CURLFile is required for photo uploads.', 'amy-agent' ),
+			);
+		}
+
+		$url  = 'https://api.telegram.org/bot' . $token . '/sendPhoto';
+		$post = array(
+			'chat_id' => (int) $chat_id,
+			'photo'   => new \CURLFile( $file_path, 'image/jpeg', basename( $file_path ) ),
+		);
+		$caption = trim( (string) $caption );
+		if ( '' !== $caption ) {
+			$post['caption'] = $caption;
+			if ( $allow_html ) {
+				$post['parse_mode'] = 'HTML';
+			}
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init
+		$ch = curl_init( $url );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_POST           => true,
+				CURLOPT_POSTFIELDS     => $post,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_TIMEOUT        => 30,
+			)
+		);
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_exec
+		$raw = curl_exec( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_errno
+		$errno = curl_errno( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error
+		$errstr = curl_error( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_close
+		curl_close( $ch );
+
+		if ( $errno ) {
+			return array(
+				'ok'    => false,
+				'error' => $errstr ? $errstr : __( 'Telegram photo upload failed.', 'amy-agent' ),
+			);
+		}
+
+		$data = json_decode( (string) $raw, true );
+		$ok   = is_array( $data ) && ! empty( $data['ok'] );
+		return array(
+			'ok'    => $ok,
+			'error' => $ok ? null : ( is_array( $data ) && ! empty( $data['description'] ) ? (string) $data['description'] : __( 'Telegram API request failed.', 'amy-agent' ) ),
+		);
+	}
+
+	/**
 	 * Send a message to a chat (HTML with plain fallback).
 	 *
 	 * @param int    $chat_id    Chat id.

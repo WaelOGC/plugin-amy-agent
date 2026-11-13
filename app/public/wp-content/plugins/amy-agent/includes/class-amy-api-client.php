@@ -689,6 +689,214 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * POST /v1/public-chat/upload — multipart file proxy (public widget).
+	 *
+	 * @param string      $visitor_id       Visitor session id.
+	 * @param array       $file             WordPress-style file array.
+	 * @param string|null $conversation_id  Optional conversation id.
+	 * @param bool        $notify           Whether to trigger admin notify.
+	 * @param string      $message_excerpt  Optional visitor message excerpt.
+	 * @param bool        $allow_uploads    Site setting mirror for upstream gate.
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function public_chat_upload( $visitor_id, array $file, $conversation_id = null, $notify = true, $message_excerpt = '', $allow_uploads = true ) {
+		$base = $this->settings->get_service_url();
+		if ( '' === $base ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Service URL is not configured.',
+			);
+		}
+
+		$secret = $this->settings->get_shared_secret();
+		if ( '' === $secret ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Shared secret is not configured.',
+			);
+		}
+
+		$tmp  = isset( $file['tmp_name'] ) ? (string) $file['tmp_name'] : '';
+		$name = isset( $file['name'] ) ? (string) $file['name'] : 'upload';
+		$type = isset( $file['type'] ) ? (string) $file['type'] : 'application/octet-stream';
+
+		if ( '' === $tmp || ! is_readable( $tmp ) ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'Uploaded file is not readable.',
+			);
+		}
+
+		if ( ! class_exists( 'CURLFile' ) ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => 'CURLFile is required for uploads.',
+			);
+		}
+
+		$url  = $base . '/v1/public-chat/upload';
+		$body = array(
+			'visitor_id'    => (string) $visitor_id,
+			'notify'        => $notify ? 'true' : 'false',
+			'allow_uploads' => $allow_uploads ? 'true' : 'false',
+			'file'          => new \CURLFile( $tmp, $type, $name ),
+		);
+		if ( null !== $conversation_id && '' !== (string) $conversation_id ) {
+			$body['conversation_id'] = (string) $conversation_id;
+		}
+		if ( '' !== (string) $message_excerpt ) {
+			$body['message_excerpt'] = (string) $message_excerpt;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- multipart proxy to local Python service.
+		$ch = curl_init( $url );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt
+		curl_setopt_array(
+			$ch,
+			array(
+				CURLOPT_POST           => true,
+				CURLOPT_POSTFIELDS     => $body,
+				CURLOPT_RETURNTRANSFER => true,
+				CURLOPT_TIMEOUT        => 60,
+				CURLOPT_HTTPHEADER     => array(
+					'Accept: application/json',
+					'X-Amy-Secret: ' . $secret,
+				),
+			)
+		);
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_exec
+		$raw = curl_exec( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_errno
+		$errno = curl_errno( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_error
+		$errstr = curl_error( $ch );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_getinfo
+		$status = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_close
+		curl_close( $ch );
+
+		if ( $errno ) {
+			return array(
+				'ok'          => false,
+				'status_code' => 0,
+				'body'        => null,
+				'error'       => $errstr ? $errstr : 'Upload request failed.',
+			);
+		}
+
+		$decoded = json_decode( (string) $raw, true );
+
+		return array(
+			'ok'          => $status >= 200 && $status < 300,
+			'status_code' => $status,
+			'body'        => is_array( $decoded ) ? $decoded : null,
+			'error'       => ( $status >= 200 && $status < 300 ) ? null : ( is_array( $decoded ) && isset( $decoded['message'] ) ? (string) $decoded['message'] : 'Request failed.' ),
+		);
+	}
+
+	/**
+	 * GET /v1/public-chat/files/{id} — binary file bytes from Python service.
+	 *
+	 * @param string $file_id         Upload id.
+	 * @param string $visitor_id      Visitor id (required for public access).
+	 * @param bool   $is_full_admin   Whether to request full-admin bypass.
+	 * @return array{ok: bool, status_code: int, body: string|null, content_type: string|null, error: string|null, json: array|null}
+	 */
+	public function get_public_chat_file( $file_id, $visitor_id, $is_full_admin = false ) {
+		$base = $this->settings->get_service_url();
+		if ( '' === $base ) {
+			return array(
+				'ok'           => false,
+				'status_code'  => 0,
+				'body'         => null,
+				'content_type' => null,
+				'error'        => 'Service URL is not configured.',
+				'json'         => null,
+			);
+		}
+
+		$secret = $this->settings->get_shared_secret();
+		if ( '' === $secret ) {
+			return array(
+				'ok'           => false,
+				'status_code'  => 0,
+				'body'         => null,
+				'content_type' => null,
+				'error'        => 'Shared secret is not configured.',
+				'json'         => null,
+			);
+		}
+
+		$query = array(
+			'wp_user_id'    => 0,
+			'is_full_admin' => $is_full_admin ? 'true' : 'false',
+		);
+		if ( '' !== (string) $visitor_id ) {
+			$query['visitor_id'] = (string) $visitor_id;
+		}
+
+		$url = $base . '/v1/public-chat/files/' . rawurlencode( (string) $file_id ) . '?' . http_build_query( $query );
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'timeout' => 30,
+				'headers' => array(
+					'Accept'       => '*/*',
+					'X-Amy-Secret' => $secret,
+				),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return array(
+				'ok'           => false,
+				'status_code'  => 0,
+				'body'         => null,
+				'content_type' => null,
+				'error'        => $response->get_error_message(),
+				'json'         => null,
+			);
+		}
+
+		$status  = (int) wp_remote_retrieve_response_code( $response );
+		$raw     = wp_remote_retrieve_body( $response );
+		$decoded = json_decode( $raw, true );
+		$ctype   = wp_remote_retrieve_header( $response, 'content-type' );
+		$ctype   = is_string( $ctype ) ? $ctype : null;
+
+		if ( $status >= 200 && $status < 300 ) {
+			return array(
+				'ok'           => true,
+				'status_code'  => $status,
+				'body'         => (string) $raw,
+				'content_type' => $ctype,
+				'error'        => null,
+				'json'         => null,
+			);
+		}
+
+		return array(
+			'ok'           => false,
+			'status_code'  => $status,
+			'body'         => null,
+			'content_type' => null,
+			'error'        => is_array( $decoded ) && isset( $decoded['message'] )
+				? (string) $decoded['message']
+				: $this->extract_error_message( $status, is_array( $decoded ) ? $decoded : null ),
+			'json'         => is_array( $decoded ) ? $decoded : null,
+		);
+	}
+
+	/**
 	 * GET /v1/tasks/stats — aggregate counts for Task Service cards.
 	 *
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}

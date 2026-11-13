@@ -9,6 +9,7 @@ defined( 'ABSPATH' ) || exit;
 
 require_once AMY_AGENT_PATH . 'includes/class-amy-telegram.php';
 require_once AMY_AGENT_PATH . 'includes/class-amy-task-notify.php';
+require_once AMY_AGENT_PATH . 'includes/class-amy-chat-upload-notify.php';
 
 /**
  * Boots Amy Agent subsystems.
@@ -108,6 +109,11 @@ class Amy_Plugin {
 	public $task_notify;
 
 	/**
+	 * @var Amy_Chat_Upload_Notify
+	 */
+	public $chat_upload_notify;
+
+	/**
 	 * Returns the singleton instance.
 	 *
 	 * @return Amy_Plugin
@@ -135,6 +141,7 @@ class Amy_Plugin {
 		$this->seo_batches_ajax     = new Amy_Seo_Batches_Ajax( $this->api_client );
 		$this->telegram             = new Amy_Telegram( $this->settings, $this->api_client );
 		$this->task_notify          = new Amy_Task_Notify( $this->settings, $this->telegram );
+		$this->chat_upload_notify   = new Amy_Chat_Upload_Notify( $this->settings, $this->telegram );
 		$this->theme_bridge         = new Amy_Theme_Bridge( $this->settings );
 		$this->rest                 = new Amy_Rest( $this->api_client, $this->settings, $this->theme_bridge );
 		$this->assets               = new Amy_Assets( $this->settings );
@@ -152,6 +159,7 @@ class Amy_Plugin {
 		$this->seo_batches_ajax->register();
 		$this->telegram->register();
 		$this->task_notify->register();
+		$this->chat_upload_notify->register();
 		$this->rest->register();
 		$this->theme_bridge->register();
 		$this->assets->register();
@@ -173,7 +181,9 @@ class Amy_Plugin {
 			'amy_agent_avatar_url'            => '',
 			'amy_agent_marketing_from_email'  => Amy_Settings::DEFAULT_MARKETING_FROM_EMAIL,
 			'amy_agent_marketing_from_name'   => Amy_Settings::DEFAULT_MARKETING_FROM_NAME,
-			'amy_agent_closing_wishes'        => '1',
+			'amy_agent_closing_wishes'             => '1',
+			'amy_agent_public_chat_uploads'          => '1',
+			'amy_agent_public_chat_upload_notify'    => '1',
 		);
 
 		foreach ( $defaults as $key => $value ) {
