@@ -238,6 +238,18 @@
 					continue;
 				}
 
+				// Headings → bold line (same size as chat text; not a large <h*>).
+				var headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+				if (headingMatch) {
+					html.push(
+						'<p class="amy-agent-md-heading"><strong>' +
+							formatInline(headingMatch[2]) +
+							'</strong></p>'
+					);
+					i += 1;
+					continue;
+				}
+
 				var ulMatch = line.match(/^[\-\*]\s+(.+)$/);
 				var olMatch = line.match(/^\d+\.\s+(.+)$/);
 
@@ -276,7 +288,11 @@
 					if (/^\s*$/.test(next)) {
 						break;
 					}
-					if (/^[\-\*]\s+/.test(next) || /^\d+\.\s+/.test(next)) {
+					if (
+						/^#{1,3}\s+/.test(next) ||
+						/^[\-\*]\s+/.test(next) ||
+						/^\d+\.\s+/.test(next)
+					) {
 						break;
 					}
 					para.push(formatInline(next));
@@ -362,6 +378,33 @@
 			if (conversationId) {
 				body.conversation_id = conversationId;
 			}
+			// Friendly closing wishes: send IANA timezone + browser language when enabled.
+			if (cfg.closingWishes !== false) {
+				try {
+					var tz =
+						typeof Intl !== 'undefined' &&
+						Intl.DateTimeFormat &&
+						Intl.DateTimeFormat().resolvedOptions
+							? Intl.DateTimeFormat().resolvedOptions().timeZone
+							: '';
+					if (tz) {
+						body.visitor_timezone = String(tz).slice(0, 64);
+					}
+				} catch (tzErr) {
+					/* ignore */
+				}
+				try {
+					var lang =
+						(navigator.languages && navigator.languages[0]) ||
+						navigator.language ||
+						'';
+					if (lang) {
+						body.visitor_language = String(lang).slice(0, 32);
+					}
+				} catch (langErr) {
+					/* ignore */
+				}
+			}
 
 			fetch(cfg.restUrl, {
 				method: 'POST',
@@ -390,6 +433,13 @@
 					) {
 						var reply = result.data.reply.content;
 						appendBubble(reply, 'assistant');
+						if (
+							result.data.meta &&
+							result.data.meta.closing_wish &&
+							window.amyTrack
+						) {
+							window.amyTrack('chat_closing_wish');
+						}
 						return;
 					}
 					appendBubble(cfg.i18n.unavailable, 'status');

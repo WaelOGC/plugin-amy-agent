@@ -104,6 +104,8 @@ def signal_for_events(events: list[dict[str, Any]]) -> str:
         return "Sent a chat message"
     if event_type == "widget_opened":
         return "Opened chat"
+    if event_type == "chat_closing_wish":
+        return "Received a closing wish"
     if event_type == "submit_idea_started":
         return "Started Submit Idea"
     if event_type == "submit_idea_step_reached":

@@ -173,6 +173,7 @@ class Amy_Plugin {
 			'amy_agent_avatar_url'            => '',
 			'amy_agent_marketing_from_email'  => Amy_Settings::DEFAULT_MARKETING_FROM_EMAIL,
 			'amy_agent_marketing_from_name'   => Amy_Settings::DEFAULT_MARKETING_FROM_NAME,
+			'amy_agent_closing_wishes'        => '1',
 		);
 
 		foreach ( $defaults as $key => $value ) {

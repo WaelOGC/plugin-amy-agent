@@ -19,6 +19,7 @@ _DATA_DIR.mkdir(parents=True, exist_ok=True)
 # here when a future migration needs a new column on an existing conversations.db.
 _CONVERSATION_COLUMN_DEFAULTS: dict[str, str] = {
     "visitor_id": "TEXT",
+    "closing_wish_sent": "INTEGER NOT NULL DEFAULT 0",
 }
 _MESSAGE_COLUMN_DEFAULTS: dict[str, str] = {
     "attachments": "TEXT",
@@ -105,6 +106,8 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
 
 
 def _conversation_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    keys = set(row.keys())
+    closing_raw = row["closing_wish_sent"] if "closing_wish_sent" in keys else 0
     return {
         "id": row["id"],
         "wp_user_id": int(row["wp_user_id"]),
@@ -115,6 +118,7 @@ def _conversation_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "created_at": float(row["created_at"]),
         "updated_at": float(row["updated_at"]),
         "visitor_id": row["visitor_id"] if row["visitor_id"] is not None else None,
+        "closing_wish_sent": bool(int(closing_raw or 0)),
     }
 
 
@@ -317,6 +321,25 @@ def get_messages(conversation_id: str) -> list[dict[str, Any]]:
             (conversation_id,),
         ).fetchall()
         return [_message_row_to_dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def mark_closing_wish_sent(conversation_id: str) -> bool:
+    """Record that a closing-wish hint was used once for this conversation."""
+    now = time.time()
+    conn = _connect()
+    try:
+        with conn:
+            cur = conn.execute(
+                """
+                UPDATE conversations
+                SET closing_wish_sent = 1, updated_at = ?
+                WHERE id = ?
+                """,
+                (now, conversation_id),
+            )
+        return cur.rowcount > 0
     finally:
         conn.close()
 

@@ -155,3 +155,18 @@ class EmailAudienceResponse(BaseModel):
     send_policy: str = "approve_then_send"
     notes: str | None = None
     error: str | None = None
+
+
+class ClosingWishCohortCounts(BaseModel):
+    conversations: int = 0
+    submit_idea_started: int = 0
+
+
+class ClosingWishEffectResponse(BaseModel):
+    """Last-N-days public chat → Submit Idea, split by closing wish."""
+
+    ok: bool = True
+    days: int = 30
+    public_chat_conversations: int = 0
+    with_closing_wish: ClosingWishCohortCounts = ClosingWishCohortCounts()
+    without_closing_wish: ClosingWishCohortCounts = ClosingWishCohortCounts()

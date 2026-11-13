@@ -100,11 +100,12 @@ class Amy_Assets {
 			'amy-agent-widget',
 			'amyAgentWidget',
 			array(
-				'restUrl'   => esc_url_raw( rest_url( 'amy-agent/v1/chat' ) ),
-				'nonce'     => wp_create_nonce( 'wp_rest' ),
-				'pageUrl'   => esc_url_raw( home_url( add_query_arg( array() ) ) ),
-				'pageSlug'  => is_singular() ? (string) get_post_field( 'post_name', get_queried_object_id() ) : '',
-				'avatarUrl' => esc_url_raw( $this->settings->get_avatar_url() ),
+				'restUrl'        => esc_url_raw( rest_url( 'amy-agent/v1/chat' ) ),
+				'nonce'          => wp_create_nonce( 'wp_rest' ),
+				'pageUrl'        => esc_url_raw( home_url( add_query_arg( array() ) ) ),
+				'pageSlug'       => is_singular() ? (string) get_post_field( 'post_name', get_queried_object_id() ) : '',
+				'avatarUrl'      => esc_url_raw( $this->settings->get_avatar_url() ),
+				'closingWishes'  => $this->settings->is_closing_wishes_enabled(),
 				'i18n'      => array(
 					'title'         => __( 'Amy', 'amy-agent' ),
 					'subtitle'      => __( 'OGC NewFinity assistant', 'amy-agent' ),

@@ -71,8 +71,9 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | GET | `/v1/tasks/{id}/progress-notes` | List progress notes |
 | POST | `/v1/tasks/{id}/progress-notes` | Add a progress note |
 | POST | `/v1/tasks/progress-notes/from-telegram` | Consume mid free-text reply when pending |
-| POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set) |
+| POST | `/v1/analytics/event` | Ingest a visitor event (fixed event-type set, includes `chat_closing_wish`) |
 | GET | `/v1/analytics/summary` | Shared lead-session summary (counts, with_email, last-seen, optional sample; `include_emails=true` for admin) |
+| GET | `/v1/analytics/closing-wish-effect` | Last-N-days public chat → Submit Idea split by closing wish |
 | GET | `/v1/analytics/traffic` | Page-view traffic depth from `visitor_events` (windows + top paths; not GA) |
 | GET | `/v1/analytics/email-audience` | Read-only Email Marketing audience (leads with email); Approve → Send unchanged; no AgentMail |
 | POST | `/v1/chat` (`mode: admin`) | P3/P4 orchestrator: allowlisted tools (`analytics_summary`, `analytics_leads_query`, `analytics_traffic`, `email_audience_summary`, `seo_summary`, `task_stats`) with intent auto-invoke + provider tool loop (Gemini/OpenAI/Anthropic/DeepSeek). Slash `/analytics` remains a WP/Telegram shortcut. |

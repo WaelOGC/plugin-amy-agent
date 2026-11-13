@@ -9,7 +9,7 @@
 > `docs/00-extensibility-principles.md` — read it once, alongside whichever
 > individual tool plan you're working from.
 >
-> Last verified against code: 2026-11-12 (amy-agent v0.2.58 / amy-agent-service v0.2.18 — live theme pricing catalogue on public chat).
+> Last verified against code: 2026-11-13 (amy-agent v0.2.59 / amy-agent-service v0.2.19 — friendlier public chat tone, widget Markdown headings, optional closing wishes + analytics split).
 > SEO Tasks original Task 1 (engine wiring) plus redesign Task 1 (batch engine +
 > category/tag/media checks), redesign Task 2 (chat/card UI), and AI content +
 > image generation are implemented. Dokploy `data/` volume already covers
@@ -88,6 +88,16 @@
   visitors to Submit Your Idea. Admin chat and Submit Idea never receive the
   catalogue. If the theme helper is missing, behaviour matches the old
   “link only, no numbers” path.
+- **Friendlier public chat (plugin 0.2.59 / service 0.2.19):** warmer public
+  `AMY_SYSTEM_PROMPT` tone (answer-first, short replies, light emoji, no
+  discount pressure). Widget `renderMarkdown` supports `#`/`##`/`###` as a bold
+  line plus bullet/numbered lists. Optional **Friendly closing wishes** Settings
+  toggle (default ON): widget sends IANA timezone + browser language; service
+  picks one deterministic occasion (weekend / holidays / New Year / day-evening)
+  and attaches a once-per-conversation hint (flag on `conversations`). Analytics
+  event `chat_closing_wish` + Amy → Analytics last-30d with/without → Submit Idea
+  split via `GET /v1/analytics/closing-wish-effect`. Admin chat and Submit Idea
+  prompts unchanged.
 
 ### 3. Infrastructure
 - Python service deployed on **Dokploy**, separate from the WP host, always-on
@@ -145,9 +155,13 @@
   a second APScheduler job alongside task escalation). Lives in the existing
   Dokploy `data/` volume — no extra volume config needed.
 - Event ingestion: `POST /v1/analytics/event` with a fixed event-type allowlist
-  (`page_view`, widget, Submit Idea funnel, `contact_form_*`). Unknown types
-  rejected with 400. IP geolocation via ip-api.com on first event of a session
-  (country/city only; raw IP is not stored). Failures never drop the event.
+  (`page_view`, widget, `chat_closing_wish`, Submit Idea funnel, `contact_form_*`).
+  Unknown types rejected with 400. IP geolocation via ip-api.com on first event
+  of a session (country/city only; raw IP is not stored). Failures never drop
+  the event.
+- **Closing-wish effect (plugin 0.2.59 / service 0.2.19):**
+  `GET /v1/analytics/closing-wish-effect` + Amy → Analytics cards comparing
+  last-30d public chats with vs without a closing wish → `submit_idea_started`.
 - Lead scoring: `cold` / `warm` / `hot` computed on ingest and stored on the
   session row. Admin list is ranked hot → warm → cold, then last seen.
 - WP: public `POST /wp-json/amy-agent/v1/track` (rate-limited independently of
@@ -263,6 +277,9 @@ Given the agreed priority order and what's already live:
   Still open: Support Bot, News Channel, website→Telegram link-code expiry.
 - **Public Amy live pricing** (plugin **0.2.58** / service **0.2.18**): theme
   price list → public chat system prompt (see Frontend Amy Assistant above).
+- **Friendlier public chat** (plugin **0.2.59** / service **0.2.19**): tone +
+  widget Markdown + optional closing wishes + analytics split (see Frontend Amy
+  Assistant above).
 - **Theme-side Analytics Task 2** — **done in theme** (Clarity + Contact
   `amyTrack` hooks already ship on `ogc-newfinity`). Remaining from
   `07-analytics-plan.md` §5 if still needed: cookie-policy copy update

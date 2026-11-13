@@ -127,7 +127,9 @@ Routes messages to the selected provider adapter and returns the assistant reply
     "model": null
   },
   "context": {},
-  "pricing_catalogue": "Custom WordPress Development\nStarter Website — €549, one-off\n…"
+  "pricing_catalogue": "Custom WordPress Development\nStarter Website — €549, one-off\n…",
+  "visitor_timezone": "Europe/Amsterdam",
+  "visitor_language": "nl-NL"
 }
 ```
 
@@ -138,6 +140,8 @@ Routes messages to the selected provider adapter and returns the assistant reply
 | `messages` | Chronological chat turns |
 | `context` | Extensible bag for later features |
 | `pricing_catalogue` | Optional. Compact plain-text live price list from the active theme (`ogc_get_pricing_data()`), sent by WordPress on **public general** chat only (not admin, not Submit Idea). Service treats it as untrusted: strips control characters and hard-caps at ~6,000 characters. When non-empty, Python appends it to the public system prompt as a delimited “Current public price list” block. When absent/empty, Amy keeps the base public prompt (link to Pricing page, no quoted numbers). |
+| `visitor_timezone` | Optional. IANA timezone from the public widget (`Intl…timeZone`), max 64 chars. Sent only when **Friendly closing wishes in public chat** is ON in Amy → Settings. Validated server-side; invalid/missing → no closing-wish hint. Admin mode never uses it. |
+| `visitor_language` | Optional. Browser language tag (max 32 chars), same Settings gate as timezone. Validated/capped; not used for calendar occasions. |
 
 **Success `200`:**
 
@@ -151,10 +155,13 @@ Routes messages to the selected provider adapter and returns the assistant reply
   "actions": [],
   "meta": {
     "provider": "openai",
-    "model": "gpt-4o-mini"
+    "model": "gpt-4o-mini",
+    "closing_wish": false
   }
 }
 ```
+
+`meta.closing_wish` is `true` when the service attached a closing-wish hint on an ending turn and marked the conversation (once). The public widget then fires `amyTrack('chat_closing_wish')`.
 
 **Provider failure `502`:**
 
@@ -175,7 +182,7 @@ Routes messages to the selected provider adapter and returns the assistant reply
 
 All require `X-Amy-Secret`. Unknown `event_type` values are rejected (`400`); the allowlist is:
 
-`page_view`, `widget_opened`, `widget_message_sent`, `submit_idea_started`, `submit_idea_step_reached`, `submit_idea_abandoned`, `submit_idea_completed`, `submit_idea_contact_captured`, `contact_form_started`, `contact_form_abandoned`, `contact_form_submitted`.
+`page_view`, `widget_opened`, `widget_message_sent`, `chat_closing_wish`, `submit_idea_started`, `submit_idea_step_reached`, `submit_idea_abandoned`, `submit_idea_completed`, `submit_idea_contact_captured`, `contact_form_started`, `contact_form_abandoned`, `contact_form_submitted`.
 
 `submit_idea_contact_captured` fires as soon as the visitor shares email (email-first Submit Idea step) and is an email-capture event (`event_data.email` → `lead_email`). `submit_idea_completed` still fires when the brief is finalized.
 
@@ -194,6 +201,26 @@ There is no newsletter event type (the newsletter form has no working backend ye
 ```
 
 `event_data` and `page_path` are optional. `ip` is injected by WordPress (never stored long-term; used once per new session for country/city lookup).
+
+`chat_closing_wish` is recorded by the public widget (via `window.amyTrack`) when `meta.closing_wish` is true on a public chat reply.
+
+### `GET /v1/analytics/closing-wish-effect`
+
+Requires `X-Amy-Secret`. Optional query `days` (1–90, default 30).
+
+Returns public-chat conversation counts for the window, split by whether the session also has `chat_closing_wish`, plus how many in each split also have `submit_idea_started`:
+
+```json
+{
+  "ok": true,
+  "days": 30,
+  "public_chat_conversations": 40,
+  "with_closing_wish": { "conversations": 12, "submit_idea_started": 4 },
+  "without_closing_wish": { "conversations": 28, "submit_idea_started": 5 }
+}
+```
+
+Cohort = distinct sessions with `widget_message_sent` in the window.
 
 **Response `200`:** `{ "ok": true, "session_id": "…", "lead_status": "cold"|"warm"|"hot" }`
 
@@ -330,6 +357,8 @@ Namespace: `amy-agent/v1`
 
 - Returns `503` when Amy is not ready (`amy_agent_enabled` + service URL + secret).
 - Rate limit: **20 requests per IP per 60 seconds** (WordPress transient). Exceeded → `429`.
+- On each public `general` chat proxy, when **Friendly closing wishes in public chat** is ON (default), PHP may forward `visitor_timezone` / `visitor_language` from the widget. When OFF, those fields are omitted and the service never adds a closing-wish hint. Tone changes still apply.
+- Closing wishes use a deterministic calendar in the service (`closing_wishes.py`): weekend / Happy holidays (24–26 Dec) / Happy New Year (30 Dec–2 Jan) / day-evening. Hint is once per conversation (`conversations.closing_wish_sent`). Admin chat never receives it.
 - Browser never receives AI API keys; PHP injects `ai` when calling Python.
 - Widget only enqueues when `ogc_amy_agent_is_active` / Amy is ready.
 - On each public `general` chat proxy, PHP may attach `pricing_catalogue` from `Amy_Theme_Bridge::get_pricing_catalogue()` (theme helper `ogc_get_pricing_data()`, 1-hour transient cache, cleared on theme switch and theme/plugin update). Cap ~6,000 characters. Admin chat and Submit Idea never send this field.

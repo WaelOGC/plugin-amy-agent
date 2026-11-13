@@ -15,6 +15,7 @@ VALID_EVENT_TYPES = frozenset(
         "page_view",
         "widget_opened",
         "widget_message_sent",
+        "chat_closing_wish",
         "submit_idea_started",
         "submit_idea_step_reached",
         "submit_idea_abandoned",
@@ -272,6 +273,64 @@ def count_email_capture_sessions(*, since: float | None = None) -> int:
     try:
         row = conn.execute(sql, params).fetchone()
         return int(row["n"] if row is not None else 0)
+    finally:
+        conn.close()
+
+
+def closing_wish_effect(*, since: float) -> dict[str, Any]:
+    """Public-chat vs Submit Idea conversion, split by closing-wish presence.
+
+    Cohort = distinct sessions with ``widget_message_sent`` at/after ``since``.
+    Split by whether the session also has ``chat_closing_wish``.
+    For each split, count how many also have ``submit_idea_started``.
+    """
+    conn = _connect()
+    try:
+        chat_rows = conn.execute(
+            """
+            SELECT DISTINCT session_id
+            FROM visitor_events
+            WHERE event_type = 'widget_message_sent' AND created_at >= ?
+            """,
+            (since,),
+        ).fetchall()
+        chat_ids = {str(r["session_id"]) for r in chat_rows}
+
+        wish_rows = conn.execute(
+            """
+            SELECT DISTINCT session_id
+            FROM visitor_events
+            WHERE event_type = 'chat_closing_wish' AND created_at >= ?
+            """,
+            (since,),
+        ).fetchall()
+        wish_ids = {str(r["session_id"]) for r in wish_rows}
+
+        idea_rows = conn.execute(
+            """
+            SELECT DISTINCT session_id
+            FROM visitor_events
+            WHERE event_type = 'submit_idea_started' AND created_at >= ?
+            """,
+            (since,),
+        ).fetchall()
+        idea_ids = {str(r["session_id"]) for r in idea_rows}
+
+        with_wish = chat_ids & wish_ids
+        without_wish = chat_ids - wish_ids
+
+        return {
+            "days": None,  # filled by caller
+            "public_chat_conversations": len(chat_ids),
+            "with_closing_wish": {
+                "conversations": len(with_wish),
+                "submit_idea_started": len(with_wish & idea_ids),
+            },
+            "without_closing_wish": {
+                "conversations": len(without_wish),
+                "submit_idea_started": len(without_wish & idea_ids),
+            },
+        }
     finally:
         conn.close()
 

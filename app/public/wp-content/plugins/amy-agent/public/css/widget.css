@@ -189,6 +189,17 @@
 	color: var(--amy-accent);
 }
 
+/* Markdown headings render as a bold line (not oversized <h1>–<h3>). */
+.amy-agent-bubble--assistant .amy-agent-md-heading {
+	margin: 0 0 0.5rem;
+	font-size: inherit;
+	line-height: inherit;
+}
+
+.amy-agent-bubble--assistant .amy-agent-md-heading:last-child {
+	margin-bottom: 0;
+}
+
 .amy-agent-bubble--assistant ol,
 .amy-agent-bubble--assistant ul {
 	margin: 0.35rem 0 0.65rem;

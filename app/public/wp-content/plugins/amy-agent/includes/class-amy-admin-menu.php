@@ -571,15 +571,21 @@ class Amy_Admin_Menu {
 					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					'nonce'   => wp_create_nonce( Amy_Analytics_Ajax::NONCE_ACTION ),
 					'i18n'    => array(
-						'loadError'  => __( 'Could not load leads. Check the Amy Agent service connection.', 'amy-agent' ),
-						'empty'      => __( 'No visitors yet.', 'amy-agent' ),
-						'justNow'    => __( 'just now', 'amy-agent' ),
-						'minutesAgo' => __( 'm ago', 'amy-agent' ),
-						'hoursAgo'   => __( 'h ago', 'amy-agent' ),
-						'daysAgo'    => __( 'd ago', 'amy-agent' ),
-						'statusHot'  => __( 'Hot', 'amy-agent' ),
-						'statusWarm' => __( 'Warm', 'amy-agent' ),
-						'statusCold' => __( 'Cold', 'amy-agent' ),
+						'loadError'           => __( 'Could not load leads. Check the Amy Agent service connection.', 'amy-agent' ),
+						'empty'               => __( 'No visitors yet.', 'amy-agent' ),
+						'justNow'             => __( 'just now', 'amy-agent' ),
+						'minutesAgo'          => __( 'm ago', 'amy-agent' ),
+						'hoursAgo'            => __( 'h ago', 'amy-agent' ),
+						'daysAgo'             => __( 'd ago', 'amy-agent' ),
+						'statusHot'           => __( 'Hot', 'amy-agent' ),
+						'statusWarm'          => __( 'Warm', 'amy-agent' ),
+						'statusCold'          => __( 'Cold', 'amy-agent' ),
+						'closingWishTitle'    => __( 'Closing wishes (last 30 days)', 'amy-agent' ),
+						'closingWishWith'     => __( 'With closing wish', 'amy-agent' ),
+						'closingWishWithout'  => __( 'Without closing wish', 'amy-agent' ),
+						'closingWishChats'    => __( 'Public chat conversations', 'amy-agent' ),
+						'closingWishIdeas'    => __( 'Went on to Submit Idea', 'amy-agent' ),
+						'closingWishLoadFail' => __( 'Could not load closing-wish metrics.', 'amy-agent' ),
 					),
 				)
 			);
@@ -2733,6 +2739,37 @@ class Amy_Admin_Menu {
 			</header>
 
 			<p class="amy-agent-analytics__error" id="amy-agent-analytics-error" hidden role="alert"></p>
+
+			<section class="amy-agent-analytics__wish" id="amy-agent-analytics-closing-wish" aria-label="<?php echo esc_attr__( 'Closing wishes', 'amy-agent' ); ?>">
+				<h2 class="amy-agent-analytics__wish-title"><?php echo esc_html__( 'Closing wishes (last 30 days)', 'amy-agent' ); ?></h2>
+				<p class="amy-agent-analytics__wish-intro">
+					<?php echo esc_html__( 'Public chat conversations and how many of those visitors started Submit Idea — compared with vs without a closing wish.', 'amy-agent' ); ?>
+				</p>
+				<div class="amy-agent-analytics__wish-grid">
+					<div class="amy-agent-analytics__wish-card">
+						<p class="amy-agent-analytics__wish-label"><?php echo esc_html__( 'With closing wish', 'amy-agent' ); ?></p>
+						<p class="amy-agent-analytics__wish-stat">
+							<span class="amy-agent-analytics__wish-num" data-amy-wish-with-chats>—</span>
+							<span class="amy-agent-analytics__wish-unit"><?php echo esc_html__( 'chats', 'amy-agent' ); ?></span>
+						</p>
+						<p class="amy-agent-analytics__wish-stat amy-agent-analytics__wish-stat--secondary">
+							<span class="amy-agent-analytics__wish-num" data-amy-wish-with-ideas>—</span>
+							<span class="amy-agent-analytics__wish-unit"><?php echo esc_html__( 'started Submit Idea', 'amy-agent' ); ?></span>
+						</p>
+					</div>
+					<div class="amy-agent-analytics__wish-card">
+						<p class="amy-agent-analytics__wish-label"><?php echo esc_html__( 'Without closing wish', 'amy-agent' ); ?></p>
+						<p class="amy-agent-analytics__wish-stat">
+							<span class="amy-agent-analytics__wish-num" data-amy-wish-without-chats>—</span>
+							<span class="amy-agent-analytics__wish-unit"><?php echo esc_html__( 'chats', 'amy-agent' ); ?></span>
+						</p>
+						<p class="amy-agent-analytics__wish-stat amy-agent-analytics__wish-stat--secondary">
+							<span class="amy-agent-analytics__wish-num" data-amy-wish-without-ideas>—</span>
+							<span class="amy-agent-analytics__wish-unit"><?php echo esc_html__( 'started Submit Idea', 'amy-agent' ); ?></span>
+						</p>
+					</div>
+				</div>
+			</section>
 
 			<div class="amy-agent-analytics__toolbar">
 				<div class="amy-agent-analytics__filters" role="tablist" aria-label="<?php echo esc_attr__( 'Filter by lead status', 'amy-agent' ); ?>">

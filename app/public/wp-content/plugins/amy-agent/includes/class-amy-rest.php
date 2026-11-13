@@ -31,6 +31,7 @@ class Amy_Rest {
 		'page_view',
 		'widget_opened',
 		'widget_message_sent',
+		'chat_closing_wish',
 		'submit_idea_started',
 		'submit_idea_step_reached',
 		'submit_idea_abandoned',
@@ -838,6 +839,18 @@ class Amy_Rest {
 			}
 		}
 
+		// Closing wishes: pass timezone/language only when the Settings toggle is on.
+		if ( 'general' === $mode && $this->settings->is_closing_wishes_enabled() ) {
+			$tz = $this->sanitize_visitor_timezone( $request->get_param( 'visitor_timezone' ) );
+			if ( '' !== $tz ) {
+				$payload['visitor_timezone'] = $tz;
+			}
+			$lang = $this->sanitize_visitor_language( $request->get_param( 'visitor_language' ) );
+			if ( '' !== $lang ) {
+				$payload['visitor_language'] = $lang;
+			}
+		}
+
 		$result = $this->api_client->chat( $payload );
 		$status = (int) $result['status_code'];
 		if ( $status < 100 ) {
@@ -1237,6 +1250,45 @@ class Amy_Rest {
 	private function sanitize_visitor_id( $raw ) {
 		$value = sanitize_text_field( (string) $raw );
 		if ( ! preg_match( '/^[a-f0-9-]{16,64}$/i', $value ) ) {
+			return '';
+		}
+		return $value;
+	}
+
+	/**
+	 * Cap/validate IANA timezone from the public widget (max 64 chars).
+	 *
+	 * @param mixed $raw Raw timezone.
+	 * @return string Empty when invalid.
+	 */
+	private function sanitize_visitor_timezone( $raw ) {
+		$value = sanitize_text_field( (string) $raw );
+		$value = trim( $value );
+		if ( '' === $value || strlen( $value ) > 64 ) {
+			return '';
+		}
+		if ( ! preg_match( '/^[A-Za-z0-9_+\-\/]+$/', $value ) ) {
+			return '';
+		}
+		if ( str_starts_with( $value, '/' ) || str_ends_with( $value, '/' ) || str_contains( $value, '..' ) ) {
+			return '';
+		}
+		return $value;
+	}
+
+	/**
+	 * Cap/validate browser language tag (max 32 chars).
+	 *
+	 * @param mixed $raw Raw language.
+	 * @return string Empty when invalid.
+	 */
+	private function sanitize_visitor_language( $raw ) {
+		$value = sanitize_text_field( (string) $raw );
+		$value = str_replace( '_', '-', trim( $value ) );
+		if ( '' === $value || strlen( $value ) > 32 ) {
+			return '';
+		}
+		if ( ! preg_match( '/^[A-Za-z0-9\-]+$/', $value ) ) {
 			return '';
 		}
 		return $value;
