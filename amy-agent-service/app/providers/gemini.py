@@ -125,14 +125,17 @@ def _gemini_contents(
             if (msg.content or "").strip():
                 parts.append({"text": msg.content})
             for tc in msg.tool_calls:
-                parts.append(
-                    {
-                        "functionCall": {
-                            "name": tc.name,
-                            "args": tc.arguments or {},
-                        }
+                fc_part: dict[str, Any] = {
+                    "functionCall": {
+                        "name": tc.name,
+                        "args": tc.arguments or {},
                     }
-                )
+                }
+                # Sibling of functionCall on the Part (not inside functionCall).
+                sig = getattr(tc, "thought_signature", None)
+                if sig:
+                    fc_part["thoughtSignature"] = sig
+                parts.append(fc_part)
             contents.append({"role": "model", "parts": parts})
             continue
         role = "user" if msg.role == "user" else "model"
@@ -250,11 +253,21 @@ class GeminiProvider(BaseProvider):
                         continue
                     raw_args = fn.get("args") or fn.get("arguments") or {}
                     args = raw_args if isinstance(raw_args, dict) else {}
+                    # REST JSON uses camelCase; tolerate snake_case if present.
+                    raw_sig = part.get("thoughtSignature")
+                    if raw_sig is None:
+                        raw_sig = part.get("thought_signature")
+                    if raw_sig is None:
+                        raw_sig = fn.get("thoughtSignature") or fn.get("thought_signature")
+                    thought_signature = (
+                        str(raw_sig).strip() if raw_sig is not None and str(raw_sig).strip() else None
+                    )
                     tool_calls.append(
                         ToolCallRequest(
                             id=f"gemini_call_{idx}",
                             name=name,
                             arguments=args,
+                            thought_signature=thought_signature,
                         )
                     )
             text = "".join(texts).strip() or None

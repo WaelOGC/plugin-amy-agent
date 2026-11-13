@@ -99,6 +99,8 @@ class ToolCallPart(BaseModel):
     id: str
     name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
+    # Gemini 3+ thought signature; omitted for other providers / older history.
+    thought_signature: str | None = None
 
 
 class ChatMessage(BaseModel):

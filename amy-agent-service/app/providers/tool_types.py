@@ -22,6 +22,8 @@ class ToolCallRequest:
     id: str
     name: str
     arguments: dict[str, Any] = field(default_factory=dict)
+    # Gemini 3+ thought signature (opaque); required on replay for tool turns.
+    thought_signature: str | None = None
 
 
 @dataclass
