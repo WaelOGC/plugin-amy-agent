@@ -525,10 +525,9 @@ def _append_recommendations_to_reply(
 ) -> str:
     """Deterministically append the structured block when any recommendations exist.
 
-    Uses the same ``**Recommendations**`` header as
-    :func:`append_recommendations_block` so Telegram always receives Markdown
-    bold markers the plugin converter turns into ``<b>`` — never a model-paraphrased
-    plain Finding/Evidence trailer.
+    Delegates to :func:`append_recommendations_block`, which emits Telegram HTML
+    ``<b>`` labels inside ``@@AMY_TG_HTML@@`` sentinels (not Markdown ``**``) and
+    strips a trailing model-echoed plain Finding/Evidence trailer first.
     """
     if not recommendations:
         return text

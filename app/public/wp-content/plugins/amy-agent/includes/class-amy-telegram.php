@@ -1094,18 +1094,30 @@ class Amy_Telegram {
 	}
 
 	/**
+	 * Sentinel markers for service-emitted Telegram HTML recommendation blocks.
+	 * Must match amy-agent-service recommendation_format.AMY_TG_HTML_*.
+	 */
+	const AMY_TG_HTML_START = '@@AMY_TG_HTML@@';
+	const AMY_TG_HTML_END   = '@@/AMY_TG_HTML@@';
+
+	/**
 	 * Convert assistant Markdown to Telegram HTML (parse_mode HTML).
 	 *
 	 * Telegram supports only a small HTML subset — no headings or list tags —
 	 * so Markdown headings become bold lines and bullets become "• " prefixes.
 	 * Raw Markdown markers (#, leading * / -) must not reach the final text.
 	 *
+	 * Service recommendation blocks arrive as already-escaped HTML inside
+	 * @@AMY_TG_HTML@@ sentinels (not Markdown). Those segments are injected
+	 * without htmlspecialchars. Bare Finding/Evidence/… label lines (model
+	 * echo without **) are promoted to <b> so Telegram never shows a plain
+	 * trailer when Markdown markers are absent.
+	 *
 	 * @param string $text Markdown-ish text.
 	 * @return string
 	 */
 	public static function markdown_to_telegram_html( $text ) {
 		$text = (string) $text;
-		$text = htmlspecialchars( $text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 
 		$placeholders = array();
 		$store        = static function ( $html ) use ( &$placeholders ) {
@@ -1113,6 +1125,19 @@ class Amy_Telegram {
 			$placeholders[ $key ] = $html;
 			return $key;
 		};
+
+		// Extract service HTML blocks before escaping (already escaped server-side).
+		$start = preg_quote( self::AMY_TG_HTML_START, '/' );
+		$end   = preg_quote( self::AMY_TG_HTML_END, '/' );
+		$text  = preg_replace_callback(
+			'/' . $start . '\r?\n?([\s\S]*?)' . $end . '/',
+			static function ( $m ) use ( $store ) {
+				return $store( trim( $m[1], "\r\n" ) );
+			},
+			$text
+		);
+
+		$text = htmlspecialchars( $text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 
 		$text = preg_replace_callback(
 			'/```[\w-]*\r?\n([\s\S]*?)```/',
@@ -1183,11 +1208,56 @@ class Amy_Telegram {
 		$text = preg_replace( '/(?<!\*)\*([^*\n]+)\*(?!\*)/', '<i>$1</i>', $text );
 		$text = preg_replace( '/\b_([^_\n]+)_\b/', '<i>$1</i>', $text );
 
+		$text = self::bold_recommendation_labels( $text );
+
 		if ( ! empty( $placeholders ) ) {
 			$text = str_replace( array_keys( $placeholders ), array_values( $placeholders ), $text );
 		}
 
 		return self::balance_telegram_html_tags( $text );
+	}
+
+	/**
+	 * Promote bare evidence-recommendation label lines to <b>…</b>.
+	 *
+	 * Survives the post-0.2.67 failure mode: model echoes Finding / Evidence /
+	 * Confidence / Limitations / Next step as plain lines with no Markdown
+	 * asterisks, so the ** → <b> pass never fires.
+	 *
+	 * Idempotent for lines that are already a single <b>…</b> wrapper.
+	 *
+	 * @param string $text HTML-in-progress (after htmlspecialchars + ** conversion).
+	 * @return string
+	 */
+	public static function bold_recommendation_labels( $text ) {
+		$labels = array(
+			'Recommendations',
+			'Finding',
+			'Evidence',
+			'Limitations',
+			'Next step',
+			'Suggested action',
+		);
+		$lines  = explode( "\n", (string) $text );
+		foreach ( $lines as $i => $line ) {
+			$trimmed = trim( $line );
+			if ( '' === $trimmed ) {
+				continue;
+			}
+			if ( preg_match( '/^<b>.*<\/b>$/s', $trimmed ) ) {
+				continue;
+			}
+			foreach ( $labels as $label ) {
+				if ( $trimmed === $label ) {
+					$lines[ $i ] = '<b>' . $label . '</b>';
+					continue 2;
+				}
+			}
+			if ( preg_match( '/^Confidence:\s+\S.*$/u', $trimmed ) ) {
+				$lines[ $i ] = '<b>' . $trimmed . '</b>';
+			}
+		}
+		return implode( "\n", $lines );
 	}
 
 	/**

@@ -351,12 +351,14 @@ _SAMPLE_REC = {
 }
 
 _SAMPLE_REC_BLOCK = (
-    "**Recommendations**\n"
-    "**Finding**\n1 hot lead session is active.\n"
-    "**Evidence**\nBased on 3 lead sessions in Amy Analytics.\n"
-    "**Confidence: low**\n"
-    "**Limitations**\nLead status is a heuristic, not a purchase guarantee.\n"
-    "**Next step**\nReview the hot sample and follow up."
+    "@@AMY_TG_HTML@@\n"
+    "<b>Recommendations</b>\n"
+    "<b>Finding</b>\n1 hot lead session is active.\n"
+    "<b>Evidence</b>\nBased on 3 lead sessions in Amy Analytics.\n"
+    "<b>Confidence: low</b>\n"
+    "<b>Limitations</b>\nLead status is a heuristic, not a purchase guarantee.\n"
+    "<b>Next step</b>\nReview the hot sample and follow up.\n"
+    "@@/AMY_TG_HTML@@"
 )
 
 
@@ -417,7 +419,7 @@ def test_run_admin_tool_loop_appends_recommendations_block() -> None:
     assert used == ["analytics_summary"]
     assert text.startswith("There are 3 visitor sessions, including 1 hot.")
     assert text.endswith(_SAMPLE_REC_BLOCK)
-    assert text.count("**Finding**") == 1
+    assert text.count("<b>Finding</b>") == 1
 
 
 def test_run_admin_tool_loop_dedupes_identical_recommendations() -> None:
@@ -486,7 +488,7 @@ def test_run_admin_tool_loop_dedupes_identical_recommendations() -> None:
 
     text, used = asyncio.run(_run())
     assert used == ["analytics_summary", "analytics_traffic"]
-    assert text.count("**Finding**") == 1
+    assert text.count("<b>Finding</b>") == 1
     assert text.endswith(_SAMPLE_REC_BLOCK)
 
 
@@ -613,7 +615,7 @@ def test_run_admin_tool_loop_appends_on_exhausted_rounds() -> None:
     assert used == ["analytics_summary"]
     assert text.startswith("Still 3 sessions after several looks.")
     assert text.endswith(_SAMPLE_REC_BLOCK)
-    assert text.count("**Finding**") == 1
+    assert text.count("<b>Finding</b>") == 1
 
 
 def test_run_admin_tool_loop_seed_recommendations_without_tool_calls() -> None:
