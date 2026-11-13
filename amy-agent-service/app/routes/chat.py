@@ -1,5 +1,7 @@
 """Chat endpoint — routes to the selected provider adapter."""
 
+import re
+
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
 
@@ -17,26 +19,6 @@ from app.schemas.messages import (
     ErrorBody,
     sanitize_pricing_catalogue,
 )
-
-PRICING_CATALOGUE_PROMPT_HEADER = (
-    "----- Current public price list (source of truth; do not invent beyond this) -----"
-)
-PRICING_CATALOGUE_PROMPT_FOOTER = (
-    "----- End public price list -----"
-)
-
-
-def _public_system_content(pricing_catalogue: str | None = None) -> str:
-    """Public Amy system prompt, optionally with a delimited live price list."""
-    catalogue = sanitize_pricing_catalogue(pricing_catalogue)
-    if not catalogue:
-        return AMY_SYSTEM_PROMPT
-    return (
-        f"{AMY_SYSTEM_PROMPT}\n\n"
-        f"{PRICING_CATALOGUE_PROMPT_HEADER}\n"
-        f"{catalogue}\n"
-        f"{PRICING_CATALOGUE_PROMPT_FOOTER}"
-    )
 from app.services.admin_chat_tools import (
     detect_admin_tool_intent,
     intent_context_messages,
@@ -46,6 +28,11 @@ from app.services.analytics_summary import (
     analytics_summary_for_chat,
     format_analytics_chat_context,
 )
+from app.services.closing_wishes import (
+    format_closing_wish_hint,
+    pick_closing_wish,
+    sanitize_timezone,
+)
 from app.services.seo_task_summary import (
     format_seo_chat_context,
     format_task_service_chat_context,
@@ -54,6 +41,32 @@ from app.services.seo_task_summary import (
 )
 
 router = APIRouter(tags=["chat"])
+
+PRICING_CATALOGUE_PROMPT_HEADER = (
+    "----- Current public price list (source of truth; do not invent beyond this) -----"
+)
+PRICING_CATALOGUE_PROMPT_FOOTER = (
+    "----- End public price list -----"
+)
+
+
+def _public_system_content(
+    pricing_catalogue: str | None = None,
+    closing_wish_hint: str | None = None,
+) -> str:
+    """Public Amy system prompt, optionally with price list and/or closing wish."""
+    catalogue = sanitize_pricing_catalogue(pricing_catalogue)
+    parts = [AMY_SYSTEM_PROMPT]
+    if catalogue:
+        parts.append(
+            f"{PRICING_CATALOGUE_PROMPT_HEADER}\n"
+            f"{catalogue}\n"
+            f"{PRICING_CATALOGUE_PROMPT_FOOTER}"
+        )
+    hint = (closing_wish_hint or "").strip()
+    if hint:
+        parts.append(hint)
+    return "\n\n".join(parts)
 
 
 def _admin_identity_message(
@@ -112,6 +125,55 @@ def _latest_user_text(messages: list[ChatMessage]) -> str:
     return ""
 
 
+# Lightweight goodbye / thanks cues (public chat). Multilingual basics only.
+_CLOSING_CUE_RE = re.compile(
+    r"(?i)\b("
+    r"thanks|thank\s+you|thx|bye|goodbye|good\s+bye|see\s+you|see\s+ya|"
+    r"take\s+care|that'?s\s+all|thats\s+all|that\s+is\s+all|"
+    r"merci|bedankt|dank\s+je|dankjewel|gracias|danke|ciao|"
+    r"au\s+revoir|tot\s+ziens|doei"
+    r")\b"
+)
+
+
+def _looks_like_conversation_ending(user_text: str) -> bool:
+    """True when the visitor's latest message looks like thanks / goodbye."""
+    text = (user_text or "").strip()
+    if not text:
+        return False
+    sample = text if len(text) <= 240 else text[-240:]
+    return _CLOSING_CUE_RE.search(sample) is not None
+
+
+def _resolve_closing_wish_hint(
+    *,
+    mode: str,
+    visitor_timezone: str | None,
+    conversation: dict | None,
+    latest_user_text: str = "",
+) -> tuple[str | None, bool]:
+    """Return ``(hint_block_or_None, should_mark_and_track)`` for public modes only.
+
+    The hint stays available on public turns while unused so Amy can apply it
+    on goodbye (LLM rules). Code marks the conversation + analytics only when
+    the visitor's latest message looks like a clear ending — enforcing once.
+    """
+    if mode == "admin":
+        return None, False
+    tz = sanitize_timezone(visitor_timezone)
+    if not tz:
+        return None, False
+    if conversation is not None and conversation.get("closing_wish_sent"):
+        return None, False
+    wish = pick_closing_wish(tz)
+    if wish is None:
+        return None, False
+    hint = format_closing_wish_hint(wish)
+    # Track/mark only on an ending turn so mid-conversation does not consume the once budget.
+    should_mark = _looks_like_conversation_ending(latest_user_text)
+    return hint, should_mark
+
+
 def _messages_with_system(
     messages: list[ChatMessage],
     *,
@@ -122,6 +184,7 @@ def _messages_with_system(
     include_seo_task_snapshots: bool = False,
     auto_invoke_tools: bool = True,
     pricing_catalogue: str | None = None,
+    closing_wish_hint: str | None = None,
 ) -> tuple[list[ChatMessage], list[str]]:
     """Prepend Amy's persona prompt unless a system message is already first.
 
@@ -133,7 +196,8 @@ def _messages_with_system(
     Slash ``/analytics`` remains a WP/Telegram shortcut outside this path.
 
     Public modes may append a delimited live theme price list when
-    ``pricing_catalogue`` is non-empty. Admin mode never receives it.
+    ``pricing_catalogue`` is non-empty, and an optional closing-wish hint.
+    Admin mode never receives either.
 
     Returns ``(messages, tools_auto_invoked)``.
     """
@@ -176,7 +240,10 @@ def _messages_with_system(
     return [
         ChatMessage(
             role="system",
-            content=_public_system_content(pricing_catalogue),
+            content=_public_system_content(
+                pricing_catalogue,
+                closing_wish_hint=closing_wish_hint,
+            ),
         ),
         *messages,
     ], []
@@ -235,6 +302,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
     conversation_id = (body.conversation_id or "").strip() or None
     new_user_message: ChatMessage | None = None
     history_for_completion: list[ChatMessage]
+    conversation: dict | None = None
 
     if conversation_id is not None:
         conversation = conversations_db.get_conversation(conversation_id)
@@ -278,6 +346,16 @@ async def chat(body: ChatRequest) -> JSONResponse:
     else:
         history_for_completion = list(body.messages)
 
+    closing_hint: str | None = None
+    mark_closing_wish = False
+    if body.mode != "admin":
+        closing_hint, mark_closing_wish = _resolve_closing_wish_hint(
+            mode=body.mode,
+            visitor_timezone=body.visitor_timezone,
+            conversation=conversation,
+            latest_user_text=_latest_user_text(history_for_completion),
+        )
+
     provider = get_provider(provider_slug)
     resolved_model = provider.resolve_model(body.ai.model)
     prepared, auto_tools = _messages_with_system(
@@ -286,6 +364,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
         wp_user_name=body.wp_user_name,
         wp_user_email=body.wp_user_email,
         pricing_catalogue=body.pricing_catalogue if body.mode != "admin" else None,
+        closing_wish_hint=closing_hint if body.mode != "admin" else None,
     )
     messages = _messages_for_provider(prepared)
 
@@ -320,6 +399,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
             status.HTTP_502_BAD_GATEWAY,
         )
 
+    closing_wish_used = False
     if conversation_id is not None and new_user_message is not None:
         conversations_db.append_message(
             conversation_id,
@@ -328,6 +408,15 @@ async def chat(body: ChatRequest) -> JSONResponse:
             attachments=[a.model_dump() for a in new_user_message.attachments] or None,
         )
         conversations_db.append_message(conversation_id, "assistant", text)
+        if mark_closing_wish and closing_hint:
+            conversations_db.mark_closing_wish_sent(conversation_id)
+            closing_wish_used = True
+    elif mark_closing_wish and closing_hint:
+        # Stateless public turn (no conversation_id) — still signal the widget.
+        closing_wish_used = True
+
+    if body.mode == "admin":
+        closing_wish_used = False
 
     payload = ChatSuccessResponse(
         session_id=body.session_id,
@@ -337,6 +426,7 @@ async def chat(body: ChatRequest) -> JSONResponse:
             provider=provider_slug,
             model=resolved_model,
             tools_used=tools_used,
+            closing_wish=closing_wish_used,
         ),
     )
     return JSONResponse(status_code=status.HTTP_200_OK, content=payload.model_dump())

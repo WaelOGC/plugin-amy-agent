@@ -223,6 +223,17 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * GET /v1/analytics/closing-wish-effect — public chat vs Submit Idea by closing wish.
+	 *
+	 * @param int $days Window in days (1–90).
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function get_closing_wish_effect( $days = 30 ) {
+		$days = max( 1, min( 90, (int) $days ) );
+		return $this->request( 'GET', '/v1/analytics/closing-wish-effect?days=' . $days );
+	}
+
+	/**
 	 * POST /v1/seo-tasks/check — rule-based snapshot check.
 	 *
 	 * @param array<string, mixed> $payload SeoCheckRequest body.

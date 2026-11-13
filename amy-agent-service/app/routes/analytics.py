@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 
@@ -11,6 +13,8 @@ from app.schemas.analytics import (
     AnalyticsSummaryResponse,
     AnalyticsSummarySampleItem,
     AnalyticsTrafficResponse,
+    ClosingWishCohortCounts,
+    ClosingWishEffectResponse,
     EmailAudienceResponse,
     EmailAudienceSampleItem,
     EventIngestRequest,
@@ -252,6 +256,34 @@ async def analytics_email_audience() -> EmailAudienceResponse:
         send_policy=str(snap.get("send_policy") or "approve_then_send"),
         notes=snap.get("notes"),
         error=snap.get("error"),
+    )
+
+
+@router.get(
+    "/v1/analytics/closing-wish-effect",
+    response_model=ClosingWishEffectResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def closing_wish_effect(
+    days: int = Query(default=30, ge=1, le=90),
+) -> ClosingWishEffectResponse:
+    """Public chat → Submit Idea split by closing wish (last N days)."""
+    since = time.time() - (days * 86400)
+    raw = analytics_db.closing_wish_effect(since=since)
+    with_raw = raw.get("with_closing_wish") or {}
+    without_raw = raw.get("without_closing_wish") or {}
+    return ClosingWishEffectResponse(
+        ok=True,
+        days=days,
+        public_chat_conversations=int(raw.get("public_chat_conversations") or 0),
+        with_closing_wish=ClosingWishCohortCounts(
+            conversations=int(with_raw.get("conversations") or 0),
+            submit_idea_started=int(with_raw.get("submit_idea_started") or 0),
+        ),
+        without_closing_wish=ClosingWishCohortCounts(
+            conversations=int(without_raw.get("conversations") or 0),
+            submit_idea_started=int(without_raw.get("submit_idea_started") or 0),
+        ),
     )
 
 

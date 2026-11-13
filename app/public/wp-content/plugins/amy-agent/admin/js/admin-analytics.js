@@ -113,6 +113,42 @@
 			});
 		}
 
+		function setWishNum(selector, value) {
+			var n = parseInt(value, 10);
+			$(selector).text(isNaN(n) ? '—' : String(n));
+		}
+
+		function loadClosingWishEffect() {
+			$.ajax({
+				url: cfg.ajaxUrl,
+				method: 'POST',
+				dataType: 'json',
+				data: {
+					action: 'amy_analytics_closing_wish_effect',
+					nonce: cfg.nonce,
+					days: 30,
+				},
+			})
+				.done(function (res) {
+					if (!res || !res.success || !res.data) {
+						return;
+					}
+					var data = res.data;
+					var withWish = data.with_closing_wish || {};
+					var withoutWish = data.without_closing_wish || {};
+					setWishNum('[data-amy-wish-with-chats]', withWish.conversations);
+					setWishNum('[data-amy-wish-with-ideas]', withWish.submit_idea_started);
+					setWishNum('[data-amy-wish-without-chats]', withoutWish.conversations);
+					setWishNum(
+						'[data-amy-wish-without-ideas]',
+						withoutWish.submit_idea_started
+					);
+				})
+				.fail(function () {
+					/* leave em-dashes; leads list still useful */
+				});
+		}
+
 		function loadLeads() {
 			$error.attr('hidden', 'hidden').text('');
 			$.ajax({
@@ -171,6 +207,7 @@
 			loadLeads();
 		});
 
+		loadClosingWishEffect();
 		loadLeads();
 	});
 })(jQuery);

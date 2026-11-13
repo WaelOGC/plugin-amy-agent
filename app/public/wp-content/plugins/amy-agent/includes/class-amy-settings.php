@@ -23,6 +23,8 @@ class Amy_Settings {
 	const OPTION_AVATAR_URL           = 'amy_agent_avatar_url';
 	const OPTION_MARKETING_FROM_EMAIL = 'amy_agent_marketing_from_email';
 	const OPTION_MARKETING_FROM_NAME  = 'amy_agent_marketing_from_name';
+	/** Friendly closing wishes in public chat (default ON). */
+	const OPTION_CLOSING_WISHES       = 'amy_agent_closing_wishes';
 
 	const OPTION_TELEGRAM_ENABLED = 'amy_agent_telegram_enabled';
 	const OPTION_TELEGRAM_TOKEN   = 'amy_agent_telegram_bot_token';
@@ -109,6 +111,7 @@ class Amy_Settings {
 	public function register() {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_init', array( $this, 'normalize_enabled_checkbox_post' ), 0 );
+		add_action( 'admin_init', array( $this, 'normalize_closing_wishes_checkbox_post' ), 0 );
 		add_action( 'admin_init', array( $this, 'normalize_telegram_enabled_checkbox_post' ), 0 );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( AMY_AGENT_FILE ), array( $this, 'add_settings_link' ) );
@@ -141,6 +144,29 @@ class Amy_Settings {
 		}
 
 		$_POST[ self::OPTION_ENABLED ] = ( '1' === (string) $raw ) ? '1' : '0';
+	}
+
+	/**
+	 * Ensure closing-wishes checkbox posts as plain "0" or "1".
+	 */
+	public function normalize_closing_wishes_checkbox_post() {
+		if ( ! isset( $_POST['option_page'] ) || 'amy_agent_settings' !== $_POST['option_page'] ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$raw = isset( $_POST[ self::OPTION_CLOSING_WISHES ] ) ? wp_unslash( $_POST[ self::OPTION_CLOSING_WISHES ] ) : null; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		if ( is_array( $raw ) ) {
+			$_POST[ self::OPTION_CLOSING_WISHES ] = in_array( '1', array_map( 'strval', $raw ), true ) ? '1' : '0';
+			return;
+		}
+		if ( null === $raw ) {
+			$_POST[ self::OPTION_CLOSING_WISHES ] = '0';
+			return;
+		}
+		$_POST[ self::OPTION_CLOSING_WISHES ] = ( '1' === (string) $raw ) ? '1' : '0';
 	}
 
 	/**
@@ -199,6 +225,16 @@ class Amy_Settings {
 				'type'              => 'string',
 				'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
 				'default'           => '0',
+			)
+		);
+
+		register_setting(
+			'amy_agent_settings',
+			self::OPTION_CLOSING_WISHES,
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_checkbox' ),
+				'default'           => '1',
 			)
 		);
 
@@ -1058,6 +1094,15 @@ class Amy_Settings {
 	}
 
 	/**
+	 * Whether public chat may send timezone for friendly closing wishes (default ON).
+	 *
+	 * @return bool
+	 */
+	public function is_closing_wishes_enabled() {
+		return '1' === (string) get_option( self::OPTION_CLOSING_WISHES, '1' );
+	}
+
+	/**
 	 * Service URL + shared secret look configured enough for theme activation.
 	 *
 	 * @return bool
@@ -1435,6 +1480,21 @@ class Amy_Settings {
 							<p class="amy-agent-settings__hint">
 								<?php echo esc_html__( 'Uncheck and save to hide Amy on the site again. Connection settings stay saved.', 'amy-agent' ); ?>
 							</p>
+						</div>
+						<div class="amy-agent-settings__field">
+							<label class="amy-agent-settings__toggle" for="amy_agent_closing_wishes">
+								<input
+									type="checkbox"
+									id="amy_agent_closing_wishes"
+									name="<?php echo esc_attr( self::OPTION_CLOSING_WISHES ); ?>"
+									value="1"
+									<?php checked( $this->is_closing_wishes_enabled(), true ); ?>
+								/>
+								<span class="amy-agent-settings__toggle-copy">
+									<strong><?php echo esc_html__( 'Friendly closing wishes in public chat', 'amy-agent' ); ?></strong>
+									<span><?php echo esc_html__( 'When on, public Amy may add a short goodbye wish (weekend / holidays / day-evening) once per conversation. Tone changes stay on either way. Off: the widget does not send timezone and the service never adds the wish hint.', 'amy-agent' ); ?></span>
+								</span>
+							</label>
 						</div>
 					</div>
 

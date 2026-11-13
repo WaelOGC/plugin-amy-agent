@@ -31,6 +31,7 @@ class Amy_Analytics_Ajax {
 	 */
 	public function register() {
 		add_action( 'wp_ajax_amy_analytics_leads_list', array( $this, 'ajax_leads_list' ) );
+		add_action( 'wp_ajax_amy_analytics_closing_wish_effect', array( $this, 'ajax_closing_wish_effect' ) );
 	}
 
 	/**
@@ -103,5 +104,24 @@ class Amy_Analytics_Ajax {
 		}
 
 		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array( 'leads' => array() ) );
+	}
+
+	/**
+	 * Closing-wish effect metrics via amy_analytics_closing_wish_effect.
+	 */
+	public function ajax_closing_wish_effect() {
+		$this->guard();
+
+		$days = 30;
+		if ( isset( $_REQUEST['days'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- verified in guard().
+			$days = (int) wp_unslash( $_REQUEST['days'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		}
+
+		$result = $this->api_client->get_closing_wish_effect( $days );
+		if ( ! $result['ok'] ) {
+			$this->send_api_error( $result );
+		}
+
+		wp_send_json_success( is_array( $result['body'] ) ? $result['body'] : array() );
 	}
 }
