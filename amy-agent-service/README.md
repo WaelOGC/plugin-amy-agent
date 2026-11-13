@@ -111,6 +111,10 @@ A plain restart of an older install without a rebuild will miss PDF/image proces
 
 ## Changelog
 
+### 0.2.26
+
+Admin chat visual style: system prompt requires a consistent structured-data reply shape (short opener, bold `**Section**` titles, one-line emoji status pills, 📍 item rows, each number stated once). Deterministic recommendations block reformatted with bold Finding/Evidence/Confidence/Limitations and a `> **Next step**` blockquote — judgment only, not a second number dump. Pair with plugin **0.2.66** Telegram Markdown→HTML converter (headings/bullets/blockquotes).
+
 ### 0.2.25
 
 Admin chat: append evidence-based recommendation blocks (`📊`/`📈`/`🎯`/`⚠️`/`✅`) verbatim after the model reply. `run_admin_tool_loop` accumulates `recommendations` from tool results (and intent auto-invoke seeds), dedupes by finding+evidence, and formats them in code — providers no longer paraphrase the structure away. Admin system prompt asks the model not to restate conclusions/confidence/actions. Plugin/widget unchanged (service only).

@@ -346,11 +346,11 @@ _SAMPLE_REC = {
 }
 
 _SAMPLE_REC_BLOCK = (
-    "📊 Finding: 1 hot lead session is active.\n"
-    "📈 Evidence: Based on 3 lead sessions in Amy Analytics.\n"
-    "🎯 Confidence: low\n"
-    "⚠️ Limitations: Lead status is a heuristic, not a purchase guarantee.\n"
-    "✅ Suggested action: Review the hot sample and follow up."
+    "**Finding**\n1 hot lead session is active.\n"
+    "**Evidence**\nBased on 3 lead sessions in Amy Analytics.\n"
+    "**Confidence: low**\n"
+    "**Limitations**\nLead status is a heuristic, not a purchase guarantee.\n"
+    "> **Next step**\n> Review the hot sample and follow up."
 )
 
 
@@ -411,7 +411,7 @@ def test_run_admin_tool_loop_appends_recommendations_block() -> None:
     assert used == ["analytics_summary"]
     assert text.startswith("There are 3 visitor sessions, including 1 hot.")
     assert text.endswith(_SAMPLE_REC_BLOCK)
-    assert text.count("📊 Finding:") == 1
+    assert text.count("**Finding**") == 1
 
 
 def test_run_admin_tool_loop_dedupes_identical_recommendations() -> None:
@@ -480,7 +480,7 @@ def test_run_admin_tool_loop_dedupes_identical_recommendations() -> None:
 
     text, used = asyncio.run(_run())
     assert used == ["analytics_summary", "analytics_traffic"]
-    assert text.count("📊 Finding:") == 1
+    assert text.count("**Finding**") == 1
     assert text.endswith(_SAMPLE_REC_BLOCK)
 
 
@@ -607,7 +607,7 @@ def test_run_admin_tool_loop_appends_on_exhausted_rounds() -> None:
     assert used == ["analytics_summary"]
     assert text.startswith("Still 3 sessions after several looks.")
     assert text.endswith(_SAMPLE_REC_BLOCK)
-    assert text.count("📊 Finding:") == 1
+    assert text.count("**Finding**") == 1
 
 
 def test_run_admin_tool_loop_seed_recommendations_without_tool_calls() -> None:

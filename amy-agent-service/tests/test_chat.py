@@ -970,3 +970,9 @@ def test_admin_prompt_mentions_tools_and_richer_analytics_fields() -> None:
     assert "seo tasks, task service board stats, and live web search are not wired" not in lower
     assert "do not restate conclusions" in lower
     assert "structured recommendations summary" in lower
+    assert "one short opening line" in lower
+    assert "state each fact once" in lower or "stating each fact once" in lower
+    assert "never repeat a number" in lower
+    assert "📍" in AMY_ADMIN_SYSTEM_PROMPT
+    assert "do not use markdown headings" in lower
+    assert "inline emoji markers" in lower

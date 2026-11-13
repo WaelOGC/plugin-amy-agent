@@ -119,17 +119,18 @@ def recommendation_from_mapping(data: Mapping[str, Any]) -> Recommendation:
 def format_recommendation(rec: Recommendation) -> str:
     """Render one recommendation for Telegram / admin chat text.
 
-    Structured block with light emoji markers (same family as Telegram task
-    alerts). Factual count replies stay emoji-free elsewhere.
+    Uses Markdown the Telegram HTML converter turns into bold section titles
+    and a highlighted Next-step blockquote. Judgment-focused: confidence,
+    limitations, and action — not a second dump of the same counts.
     """
     lines = [
-        f"📊 Finding: {rec.finding}",
-        f"📈 Evidence: {rec.evidence}",
-        f"🎯 Confidence: {rec.confidence}",
-        f"⚠️ Limitations: {rec.limitations}",
+        f"**Finding**\n{rec.finding}",
+        f"**Evidence**\n{rec.evidence}",
+        f"**Confidence: {rec.confidence}**",
+        f"**Limitations**\n{rec.limitations}",
     ]
     if rec.recommended_action:
-        lines.append(f"✅ Suggested action: {rec.recommended_action}")
+        lines.append(f"> **Next step**\n> {rec.recommended_action}")
     return "\n".join(lines)
 
 
@@ -149,5 +150,5 @@ def append_recommendations_block(
     block = format_recommendations(list(recs))
     base = (body or "").rstrip()
     if not base:
-        return "Recommendations:\n" + block
-    return f"{base}\n\nRecommendations:\n{block}"
+        return "**Recommendations**\n" + block
+    return f"{base}\n\n**Recommendations**\n{block}"

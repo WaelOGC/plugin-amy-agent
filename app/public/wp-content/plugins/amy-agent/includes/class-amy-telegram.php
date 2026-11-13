@@ -1095,6 +1095,10 @@ class Amy_Telegram {
 	/**
 	 * Convert assistant Markdown to Telegram HTML (parse_mode HTML).
 	 *
+	 * Telegram supports only a small HTML subset — no headings or list tags —
+	 * so Markdown headings become bold lines and bullets become "• " prefixes.
+	 * Raw Markdown markers (#, leading * / -) must not reach the final text.
+	 *
 	 * @param string $text Markdown-ish text.
 	 * @return string
 	 */
@@ -1102,39 +1106,85 @@ class Amy_Telegram {
 		$text = (string) $text;
 		$text = htmlspecialchars( $text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 
+		$placeholders = array();
+		$store        = static function ( $html ) use ( &$placeholders ) {
+			$key                    = "\x00TG" . count( $placeholders ) . "\x00";
+			$placeholders[ $key ] = $html;
+			return $key;
+		};
+
 		$text = preg_replace_callback(
 			'/```[\w-]*\r?\n([\s\S]*?)```/',
-			static function ( $m ) {
-				return '<pre>' . $m[1] . '</pre>';
+			static function ( $m ) use ( $store ) {
+				return $store( '<pre>' . $m[1] . '</pre>' );
 			},
 			$text
 		);
 
-		$text = preg_replace( '/`([^`]+)`/', '<code>$1</code>', $text );
+		$text = preg_replace_callback(
+			'/`([^`]+)`/',
+			static function ( $m ) use ( $store ) {
+				return $store( '<code>' . $m[1] . '</code>' );
+			},
+			$text
+		);
 
 		$text = preg_replace_callback(
 			'/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/',
-			static function ( $m ) {
+			static function ( $m ) use ( $store ) {
 				$url = esc_url( $m[2], array( 'http', 'https' ) );
 				if ( '' === $url ) {
 					return $m[0];
 				}
-				return '<a href="' . $url . '">' . $m[1] . '</a>';
+				return $store( '<a href="' . $url . '">' . $m[1] . '</a>' );
 			},
 			$text
 		);
+
+		$lines   = explode( "\n", $text );
+		$out     = array();
+		$bq_buf  = array();
+		$flush_bq = static function () use ( &$bq_buf, &$out ) {
+			if ( empty( $bq_buf ) ) {
+				return;
+			}
+			$out[]  = '<blockquote>' . implode( "\n", $bq_buf ) . '</blockquote>';
+			$bq_buf = array();
+		};
+
+		foreach ( $lines as $line ) {
+			// htmlspecialchars turns ">" into "&gt;" before this pass.
+			if ( preg_match( '/^&gt;\s?(.*)$/', $line, $m ) ) {
+				$bq_buf[] = $m[1];
+				continue;
+			}
+			$flush_bq();
+
+			if ( preg_match( '/^#{1,6}\s*(.+)$/', $line, $m ) ) {
+				$title = trim( $m[1] );
+				$title = preg_replace( '/\*\*([^*]+)\*\*/', '$1', $title );
+				$out[] = '<b>' . $title . '</b>';
+				continue;
+			}
+			if ( preg_match( '/^#{1,6}\s*$/', $line ) ) {
+				continue;
+			}
+			if ( preg_match( '/^[\*\-]\s+(.+)$/', $line, $m ) ) {
+				$out[] = '• ' . $m[1];
+				continue;
+			}
+			$out[] = $line;
+		}
+		$flush_bq();
+		$text = implode( "\n", $out );
 
 		$text = preg_replace( '/\*\*([^*]+)\*\*/', '<b>$1</b>', $text );
 		$text = preg_replace( '/(?<!\*)\*([^*\n]+)\*(?!\*)/', '<i>$1</i>', $text );
 		$text = preg_replace( '/\b_([^_\n]+)_\b/', '<i>$1</i>', $text );
 
-		$lines = explode( "\n", $text );
-		foreach ( $lines as $i => $line ) {
-			if ( preg_match( '/^(\*|-)  /', $line ) ) {
-				$lines[ $i ] = '• ' . substr( $line, 2 );
-			}
+		if ( ! empty( $placeholders ) ) {
+			$text = str_replace( array_keys( $placeholders ), array_values( $placeholders ), $text );
 		}
-		$text = implode( "\n", $lines );
 
 		return self::balance_telegram_html_tags( $text );
 	}
@@ -1146,7 +1196,7 @@ class Amy_Telegram {
 	 * @return string
 	 */
 	private static function balance_telegram_html_tags( $html ) {
-		$tags  = array( 'b', 'i', 'code', 'pre', 'a' );
+		$tags  = array( 'b', 'i', 'code', 'pre', 'a', 'blockquote' );
 		$stack = array();
 		$parts = preg_split( '/(<\/?[^>]+>)/', $html, -1, PREG_SPLIT_DELIM_CAPTURE );
 		if ( ! is_array( $parts ) ) {
