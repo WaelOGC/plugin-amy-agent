@@ -58,10 +58,25 @@ def _connect() -> sqlite3.Connection:
         ON public_chat_uploads (created_at)
         """
     )
+    cols = {
+        str(r[1])
+        for r in conn.execute("PRAGMA table_info(public_chat_uploads)").fetchall()
+    }
+    if "client_ip" not in cols:
+        conn.execute(
+            "ALTER TABLE public_chat_uploads ADD COLUMN client_ip TEXT"
+        )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_pcu_ip_created
+        ON public_chat_uploads (client_ip, created_at)
+        """
+    )
     return conn
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    keys = set(row.keys())
     return {
         "id": row["id"],
         "visitor_id": row["visitor_id"],
@@ -78,6 +93,7 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
         "vision_sent": bool(int(row["vision_sent"] or 0)),
         "created_at": float(row["created_at"]),
         "deleted_at": float(row["deleted_at"]) if row["deleted_at"] is not None else None,
+        "client_ip": row["client_ip"] if "client_ip" in keys else None,
     }
 
 
@@ -94,6 +110,7 @@ def create_upload(
     height: int | None = None,
     page_count: int | None = None,
     description: str | None = None,
+    client_ip: str | None = None,
 ) -> dict[str, Any]:
     upload_id = uuid.uuid4().hex
     now = time.time()
@@ -105,8 +122,8 @@ def create_upload(
                 INSERT INTO public_chat_uploads (
                     id, visitor_id, conversation_id, original_filename, stored_name,
                     content_type, kind, size_bytes, width, height, page_count,
-                    description, vision_sent, created_at, deleted_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NULL)
+                    description, vision_sent, created_at, deleted_at, client_ip
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, NULL, ?)
                 """,
                 (
                     upload_id,
@@ -122,6 +139,7 @@ def create_upload(
                     page_count,
                     description,
                     now,
+                    (client_ip or "").strip() or None,
                 ),
             )
         row = conn.execute(
@@ -230,6 +248,46 @@ def count_uploads_since(visitor_id: str, since_ts: float) -> int:
               AND kind IN ('image', 'pdf')
             """,
             (visitor_id, since_ts),
+        ).fetchone()
+        return int(row["n"] if row else 0)
+    finally:
+        conn.close()
+
+
+def count_uploads_since_ip(client_ip: str, since_ts: float) -> int:
+    """Count logical uploads for one client IP in the rolling window."""
+    ip = (client_ip or "").strip()
+    if not ip:
+        return 0
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM public_chat_uploads
+            WHERE client_ip = ?
+              AND created_at >= ?
+              AND deleted_at IS NULL
+              AND kind IN ('image', 'pdf')
+            """,
+            (ip, since_ts),
+        ).fetchone()
+        return int(row["n"] if row else 0)
+    finally:
+        conn.close()
+
+
+def count_uploads_since_global(since_ts: float) -> int:
+    """Count all logical public-chat uploads in the rolling window."""
+    conn = _connect()
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM public_chat_uploads
+            WHERE created_at >= ?
+              AND deleted_at IS NULL
+              AND kind IN ('image', 'pdf')
+            """,
+            (since_ts,),
         ).fetchone()
         return int(row["n"] if row else 0)
     finally:

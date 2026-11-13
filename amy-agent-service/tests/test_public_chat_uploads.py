@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import io
 import os
+import resource
 import time
+import tracemalloc
 from unittest.mock import patch
 
 import pymupdf
@@ -21,9 +23,13 @@ from app.db import public_chat_uploads_db as uploads_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.services.public_chat_upload import (  # noqa: E402
     MAX_FILE_BYTES,
+    MAX_LONGEST_SIDE,
+    MAX_RENDER_PIXELS,
+    UploadRejected,
     delete_expired_uploads,
     load_inline_media_for_uploads,
     process_public_chat_upload,
+    _render_pdf_pages,
 )
 
 get_settings.cache_clear()
@@ -60,11 +66,18 @@ def _upload(
     filename: str = "shot.png",
     content_type: str = "image/png",
     notify: bool = False,
+    client_ip: str | None = None,
+    extra_headers: dict | None = None,
 ):
+    headers = dict(AUTH)
+    if client_ip:
+        headers["X-Amy-Client-Ip"] = client_ip
+    if extra_headers:
+        headers.update(extra_headers)
     with patch("app.routes.public_chat_uploads.maybe_notify_upload"):
         return client.post(
             "/v1/public-chat/upload",
-            headers=AUTH,
+            headers=headers,
             data={
                 "visitor_id": visitor_id,
                 "notify": "true" if notify else "false",
@@ -106,7 +119,52 @@ def test_rejects_oversized_file(client: TestClient) -> None:
         filename="big.bin",
         content_type="application/octet-stream",
     )
-    assert response.status_code == 400
+    assert response.status_code == 413
+    assert response.json()["error"] == "file_too_large"
+
+
+def test_six_mb_upload_rejected_without_full_buffer(client: TestClient) -> None:
+    """6 MB body must abort with 413; bounded reader stops before buffering all 6 MB."""
+    import asyncio
+
+    from app.routes import public_chat_uploads as upload_routes
+
+    six_mb = 6 * 1024 * 1024
+    chunks_seen: list[int] = []
+
+    class CountingUpload:
+        def __init__(self, payload: bytes) -> None:
+            self._buf = io.BytesIO(payload)
+            self.filename = "huge.bin"
+            self.content_type = "application/octet-stream"
+
+        async def read(self, n: int = -1) -> bytes:
+            piece = self._buf.read(n if n and n > 0 else None)
+            if piece:
+                chunks_seen.append(len(piece))
+            return piece
+
+    payload = b"A" * six_mb
+
+    async def run() -> None:
+        with pytest.raises(UploadRejected) as exc:
+            await upload_routes._read_upload_bounded(CountingUpload(payload), None)
+        assert exc.value.code == "file_too_large"
+
+    asyncio.run(run())
+
+    # Reader stops at the first chunk that would exceed MAX_FILE_BYTES.
+    assert sum(chunks_seen) <= MAX_FILE_BYTES + 64 * 1024
+    assert sum(chunks_seen) < six_mb
+
+    response = _upload(
+        client,
+        "visitor-6mb",
+        data=payload,
+        filename="huge.bin",
+        content_type="application/octet-stream",
+    )
+    assert response.status_code == 413
     assert response.json()["error"] == "file_too_large"
 
 
@@ -173,6 +231,102 @@ def test_rate_limit_eleventh_upload_in_hour_returns_429(client: TestClient) -> N
     blocked = _upload(client, visitor, data=_PNG, filename="shot-11.png")
     assert blocked.status_code == 429
     assert blocked.json()["error"] == "rate_limited"
+
+
+def test_rate_limit_per_client_ip_returns_429(client: TestClient) -> None:
+    shared_ip = "203.0.113.50"
+    for i in range(10):
+        resp = _upload(
+            client,
+            f"ip-visitor-{i}",
+            data=_PNG,
+            filename=f"ip-{i}.png",
+            client_ip=shared_ip,
+        )
+        assert resp.status_code == 200, resp.text
+
+    blocked = _upload(
+        client,
+        "ip-visitor-11",
+        data=_PNG,
+        filename="ip-11.png",
+        client_ip=shared_ip,
+    )
+    assert blocked.status_code == 429
+    assert blocked.json()["error"] == "rate_limited"
+
+    # A different IP still works under a fresh visitor id.
+    other = _upload(
+        client,
+        "ip-visitor-other",
+        data=_PNG,
+        filename="other.png",
+        client_ip="203.0.113.99",
+    )
+    assert other.status_code == 200, other.text
+
+
+def _pdf_with_page_size(width_pt: float, height_pt: float) -> bytes:
+    doc = pymupdf.open()
+    try:
+        doc.new_page(width=width_pt, height=height_pt)
+        return doc.tobytes()
+    finally:
+        doc.close()
+
+
+def test_huge_declared_pdf_page_stays_low_memory(client: TestClient, tmp_path, monkeypatch) -> None:
+    """8000×8000 pt page must not allocate ~800 MB; scale before pixmap."""
+    upload_root = tmp_path / "huge-pdf"
+    upload_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(uploads_db, "UPLOAD_ROOT", upload_root)
+    monkeypatch.setattr(uploads_db, "_DB_PATH", tmp_path / "huge-pdf.db")
+
+    pdf = _pdf_with_page_size(8000, 8000)
+
+    tracemalloc.start()
+    before = tracemalloc.get_traced_memory()[1]
+    rss_before = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
+    pages = _render_pdf_pages(pdf)
+    assert len(pages) == 1
+    _jpeg, w, h = pages[0]
+    assert max(w, h) <= MAX_LONGEST_SIDE
+    assert w * h <= MAX_RENDER_PIXELS
+
+    peak = tracemalloc.get_traced_memory()[1]
+    tracemalloc.stop()
+    rss_after = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
+    # Peak Python allocator delta well under a naive 8000*2 pixmap (~800 MB).
+    assert (peak - before) < 80 * 1024 * 1024
+    # ru_maxrss is KiB on Linux; allow generous headroom but fail on ~800 MB spikes.
+    assert (rss_after - rss_before) < 200 * 1024  # KiB
+
+    processed = process_public_chat_upload(
+        data=pdf,
+        original_filename="huge.pdf",
+        visitor_id="huge-pdf-visitor",
+        claimed_content_type="application/pdf",
+        client_ip="198.51.100.9",
+    )
+    assert processed.row["kind"] == "pdf"
+
+    # Absurd declared size is rejected cleanly (no render).
+    absurd = _pdf_with_page_size(25000, 25000)
+    with pytest.raises(UploadRejected) as exc:
+        _render_pdf_pages(absurd)
+    assert exc.value.code == "pdf_page_too_large"
+
+    response = _upload(
+        client,
+        "huge-pdf-api",
+        data=pdf,
+        filename="huge.pdf",
+        content_type="application/pdf",
+        client_ip="198.51.100.10",
+    )
+    assert response.status_code == 200, response.text
 
 
 def test_other_visitor_cannot_fetch_file(client: TestClient) -> None:

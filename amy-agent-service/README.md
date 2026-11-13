@@ -100,7 +100,24 @@ Task Service tasks are stored in a separate SQLite file at `data/tasks.db` (crea
 | GET | `/v1/seo-tasks/batches` | List recent runs (summary only; optional `content_type`, `status`) |
 | GET | `/uploads/submit-idea/{session_id}/{file}` | Public static files (no auth); scoped to upload dir |
 
+## Deploy note (0.2.22+)
+
+When deploying **amy-agent-service 0.2.22**, rebuild the service image / reinstall dependencies so new pip packages are present:
+
+- `Pillow>=10.0.0`
+- `pymupdf>=1.24.0`
+
+A plain restart of an older install without a rebuild will miss PDF/image processing deps.
+
 ## Changelog
+
+### 0.2.22
+
+Public-chat upload hardening: PDF pages are scaled **before** `get_pixmap` (cap longest side 2000 px / 4M pixels; reject absurd declared sizes); per-IP + global hourly rate limits alongside visitor limits (`X-Amy-Client-Ip` from the authenticated WP plugin); bounded chunked file reads with early `Content-Length` / 413; history title backfill from the first user message.
+
+### 0.2.21
+
+Secure public-chat uploads (magic bytes, Pillow re-encode, PyMuPDF PDF→JPEG pages), retention purge, vision-once media, visitor history previews.
 
 ### 0.1.7
 

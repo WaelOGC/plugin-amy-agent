@@ -699,7 +699,7 @@ class Amy_Api_Client {
 	 * @param bool        $allow_uploads    Site setting mirror for upstream gate.
 	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
 	 */
-	public function public_chat_upload( $visitor_id, array $file, $conversation_id = null, $notify = true, $message_excerpt = '', $allow_uploads = true ) {
+	public function public_chat_upload( $visitor_id, array $file, $conversation_id = null, $notify = true, $message_excerpt = '', $allow_uploads = true, $client_ip = '' ) {
 		$base = $this->settings->get_service_url();
 		if ( '' === $base ) {
 			return array(
@@ -756,6 +756,15 @@ class Amy_Api_Client {
 			$body['message_excerpt'] = (string) $message_excerpt;
 		}
 
+		$headers = array(
+			'Accept: application/json',
+			'X-Amy-Secret: ' . $secret,
+		);
+		$ip = is_string( $client_ip ) ? trim( $client_ip ) : '';
+		if ( '' !== $ip && 'unknown' !== $ip ) {
+			$headers[] = 'X-Amy-Client-Ip: ' . $ip;
+		}
+
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_init -- multipart proxy to local Python service.
 		$ch = curl_init( $url );
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_setopt
@@ -766,10 +775,7 @@ class Amy_Api_Client {
 				CURLOPT_POSTFIELDS     => $body,
 				CURLOPT_RETURNTRANSFER => true,
 				CURLOPT_TIMEOUT        => 60,
-				CURLOPT_HTTPHEADER     => array(
-					'Accept: application/json',
-					'X-Amy-Secret: ' . $secret,
-				),
+				CURLOPT_HTTPHEADER     => $headers,
 			)
 		);
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.curl_curl_exec

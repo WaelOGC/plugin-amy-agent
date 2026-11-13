@@ -777,6 +777,16 @@ class Amy_Rest {
 			);
 		}
 
+		if ( $this->is_upload_rate_limited() ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'rate_limited',
+					'message' => __( "You've uploaded quite a few files recently. Please try again later.", 'amy-agent' ),
+				),
+				429
+			);
+		}
+
 		$files = $request->get_file_params();
 		$file  = isset( $files['file'] ) && is_array( $files['file'] ) ? $files['file'] : null;
 		if ( ! $file ) {
@@ -786,6 +796,46 @@ class Amy_Rest {
 					'message' => __( 'A file is required.', 'amy-agent' ),
 				),
 				400
+			);
+		}
+
+		$upload_error = isset( $file['error'] ) ? (int) $file['error'] : UPLOAD_ERR_NO_FILE;
+		if ( UPLOAD_ERR_INI_SIZE === $upload_error || UPLOAD_ERR_FORM_SIZE === $upload_error ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'file_too_large',
+					'message' => __( 'Each file must be 5 MB or smaller.', 'amy-agent' ),
+				),
+				413
+			);
+		}
+		if ( UPLOAD_ERR_OK !== $upload_error ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'invalid_request',
+					'message' => __( 'Could not read the uploaded file. Please try again.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+
+		$size = isset( $file['size'] ) ? (int) $file['size'] : 0;
+		if ( $size <= 0 ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'empty_file',
+					'message' => __( 'Uploaded file is empty.', 'amy-agent' ),
+				),
+				400
+			);
+		}
+		if ( $size > 5 * 1024 * 1024 ) {
+			return new WP_REST_Response(
+				array(
+					'error'   => 'file_too_large',
+					'message' => __( 'Each file must be 5 MB or smaller.', 'amy-agent' ),
+				),
+				413
 			);
 		}
 
@@ -801,7 +851,8 @@ class Amy_Rest {
 			$conversation_id,
 			$this->settings->is_public_chat_upload_notify_enabled(),
 			$message_excerpt,
-			$allow
+			$allow,
+			$this->get_client_ip()
 		);
 		return $this->upstream_response( $result );
 	}
@@ -1615,6 +1666,31 @@ class Amy_Rest {
 	 */
 	private function is_track_rate_limited() {
 		return $this->is_ip_rate_limited( 'amy_track_rl_' );
+	}
+
+	/**
+	 * Public-chat upload limits: 10/hour per IP and 200/hour global.
+	 *
+	 * @return bool True when the caller should be blocked.
+	 */
+	private function is_upload_rate_limited() {
+		$window = HOUR_IN_SECONDS;
+		$ip     = $this->get_client_ip();
+		$ip_key = 'amy_upload_ip_' . md5( $ip );
+		$ip_n   = (int) get_transient( $ip_key );
+		if ( $ip_n >= 10 ) {
+			return true;
+		}
+
+		$global_key = 'amy_upload_global';
+		$global_n   = (int) get_transient( $global_key );
+		if ( $global_n >= 200 ) {
+			return true;
+		}
+
+		set_transient( $ip_key, $ip_n + 1, $window );
+		set_transient( $global_key, $global_n + 1, $window );
+		return false;
 	}
 
 	/**
