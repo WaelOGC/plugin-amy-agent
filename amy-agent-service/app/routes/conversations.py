@@ -69,6 +69,7 @@ def _to_detail(row: dict, messages: list[dict]) -> ConversationDetail:
                 role=m["role"],
                 content=m["content"],
                 attachments=m.get("attachments") or [],
+                created_at=m.get("created_at"),
             )
             for m in messages
         ],
@@ -130,6 +131,27 @@ async def list_conversations(
         is_full_admin=is_full_admin,
         mode=mode,
         include_archived=include_archived,
+    )
+    return ConversationListResponse(conversations=[_to_summary(r) for r in rows])
+
+
+@router.get(
+    "/v1/conversations/by-visitor",
+    response_model=ConversationListResponse,
+    dependencies=[Depends(require_amy_secret)],
+)
+async def list_conversations_by_visitor(
+    visitor_id: str = Query(..., min_length=1, max_length=128),
+    limit: int = Query(20, ge=1, le=20),
+) -> ConversationListResponse:
+    """List public-widget conversations for one visitor_id (newest first, max 20).
+
+    Never returns admin conversations. Ownership is exact ``visitor_id`` match
+    with ``wp_user_id = 0`` and ``mode != 'admin'``.
+    """
+    rows = conversations_db.list_visitor_public_conversations(
+        visitor_id,
+        limit=limit,
     )
     return ConversationListResponse(conversations=[_to_summary(r) for r in rows])
 

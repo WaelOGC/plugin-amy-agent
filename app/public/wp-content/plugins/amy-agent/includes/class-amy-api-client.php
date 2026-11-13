@@ -464,6 +464,21 @@ class Amy_Api_Client {
 	}
 
 	/**
+	 * GET /v1/conversations/by-visitor — public-widget history for one visitor.
+	 *
+	 * @param string $visitor_id Anonymous visitor token.
+	 * @param int    $limit      Max rows (1–20).
+	 * @return array{ok: bool, status_code: int, body: array|null, error: string|null}
+	 */
+	public function list_visitor_conversations( $visitor_id, $limit = 20 ) {
+		$query = array(
+			'visitor_id' => (string) $visitor_id,
+			'limit'      => max( 1, min( 20, (int) $limit ) ),
+		);
+		return $this->request( 'GET', '/v1/conversations/by-visitor?' . http_build_query( $query ) );
+	}
+
+	/**
 	 * POST /v1/conversations — create a conversation.
 	 *
 	 * @param int         $wp_user_id Owning WP user ID.

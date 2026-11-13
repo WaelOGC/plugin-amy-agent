@@ -98,6 +98,13 @@
   event `chat_closing_wish` + Amy → Analytics last-30d with/without → Submit Idea
   split via `GET /v1/analytics/closing-wish-effect`. Admin chat and Submit Idea
   prompts unchanged.
+- **Public chat UX (plugin 0.2.60 / service 0.2.20):** message timestamps +
+  date separators (`created_at`); New chat + History (visitor-scoped list via
+  `GET /v1/conversations/by-visitor` + WP `GET /chat/conversations`, max 20,
+  public mode only); desktop expand mode (~70%/80% panel, backdrop, focus trap,
+  Esc, localStorage). Tone: clearer emoji rule; closing wish only when hint
+  block is present; `closing_wish_sent` adds an already-given system line.
+  Admin chat and Submit Idea unchanged.
 
 ### 3. Infrastructure
 - Python service deployed on **Dokploy**, separate from the WP host, always-on

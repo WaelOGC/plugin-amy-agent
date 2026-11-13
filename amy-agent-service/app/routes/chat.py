@@ -29,6 +29,7 @@ from app.services.analytics_summary import (
     format_analytics_chat_context,
 )
 from app.services.closing_wishes import (
+    format_closing_wish_already_sent,
     format_closing_wish_hint,
     pick_closing_wish,
     sanitize_timezone,
@@ -160,10 +161,11 @@ def _resolve_closing_wish_hint(
     """
     if mode == "admin":
         return None, False
+    if conversation is not None and conversation.get("closing_wish_sent"):
+        # Wish already used — remind the model not to invent another.
+        return format_closing_wish_already_sent(), False
     tz = sanitize_timezone(visitor_timezone)
     if not tz:
-        return None, False
-    if conversation is not None and conversation.get("closing_wish_sent"):
         return None, False
     wish = pick_closing_wish(tz)
     if wish is None:

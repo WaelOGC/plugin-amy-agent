@@ -14,6 +14,8 @@
 	position: fixed;
 	right: 1.25rem;
 	bottom: 1.25rem;
+	/* Above typical theme back-to-top controls; launcher stays bottom-right
+	   without covering them when the panel is collapsed. */
 	z-index: 99999;
 	font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
 	color: var(--amy-text);
@@ -70,6 +72,21 @@
 	height: 40px;
 }
 
+.amy-agent-backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+	z-index: 0;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.2s ease;
+}
+
+.amy-agent-root.is-expanded.is-open .amy-agent-backdrop {
+	opacity: 1;
+	pointer-events: auto;
+}
+
 .amy-agent-panel {
 	position: absolute;
 	right: 0;
@@ -88,7 +105,8 @@
 	opacity: 0;
 	transform: translateY(12px) scale(0.98);
 	pointer-events: none;
-	transition: opacity 0.2s ease, transform 0.2s ease;
+	transition: opacity 0.2s ease, transform 0.2s ease, width 0.2s ease, height 0.2s ease;
+	z-index: 1;
 }
 
 .amy-agent-root.is-open .amy-agent-panel {
@@ -97,14 +115,28 @@
 	pointer-events: auto;
 }
 
+/* Desktop expand: large centered panel (~70% width / ~80% height, max ~1000px). */
+.amy-agent-root.is-expanded.is-open .amy-agent-panel {
+	position: fixed;
+	left: 50%;
+	right: auto;
+	top: 50%;
+	bottom: auto;
+	width: min(70vw, 1000px);
+	height: min(80vh, calc(100vh - 3rem));
+	transform: translate(-50%, -50%);
+	border-radius: 1.1rem;
+}
+
 .amy-agent-header {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	gap: 0.75rem;
-	padding: 0.9rem 1rem;
+	padding: 0.75rem 0.85rem;
 	border-bottom: 1px solid rgba(var(--amy-brand-rgb), 0.18);
 	background: linear-gradient(180deg, rgba(var(--amy-brand-rgb), 0.08), transparent);
+	flex-shrink: 0;
 }
 
 .amy-agent-header__brand {
@@ -133,22 +165,184 @@
 	color: var(--amy-muted);
 }
 
-.amy-agent-header__close {
+.amy-agent-header__actions {
+	display: flex;
+	align-items: center;
+	gap: 0.2rem;
+	flex-shrink: 0;
+}
+
+.amy-agent-icon-btn {
 	appearance: none;
 	border: 0;
 	background: transparent;
 	color: var(--amy-muted);
-	font-size: 1.4rem;
-	line-height: 1;
+	width: 2rem;
+	height: 2rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
 	cursor: pointer;
-	padding: 0.2rem 0.4rem;
-	border-radius: 0.4rem;
+	padding: 0;
+	border-radius: 0.45rem;
+	line-height: 1;
+	font-size: 1.25rem;
 }
 
-.amy-agent-header__close:hover,
-.amy-agent-header__close:focus-visible {
+.amy-agent-icon-btn:hover,
+.amy-agent-icon-btn:focus-visible {
 	color: var(--amy-accent);
+	background: rgba(var(--amy-brand-rgb), 0.1);
 	outline: none;
+}
+
+.amy-agent-icon-btn:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.amy-agent-icon-btn--expand {
+	display: none;
+}
+
+@media (min-width: 1024px) {
+	.amy-agent-icon-btn--expand {
+		display: inline-flex;
+	}
+}
+
+.amy-agent-header__close {
+	font-size: 1.35rem;
+}
+
+.amy-agent-body {
+	display: flex;
+	flex: 1;
+	min-height: 0;
+	position: relative;
+}
+
+.amy-agent-main {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	min-width: 0;
+	min-height: 0;
+}
+
+.amy-agent-history {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	background: rgba(0, 0, 0, 0.28);
+	border-right: 1px solid rgba(var(--amy-brand-rgb), 0.14);
+}
+
+/* Small widget: history is a full-panel view. */
+.amy-agent-root:not(.is-expanded) .amy-agent-history {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	width: 100%;
+	border-right: 0;
+}
+
+.amy-agent-root:not(.is-expanded) .amy-agent-history[hidden] {
+	display: none !important;
+}
+
+.amy-agent-root:not(.is-expanded).is-history .amy-agent-main {
+	visibility: hidden;
+}
+
+/* Expanded: history as left column. */
+.amy-agent-root.is-expanded .amy-agent-history {
+	position: relative;
+	width: 15.5rem;
+	flex-shrink: 0;
+}
+
+.amy-agent-root.is-expanded .amy-agent-history[hidden] {
+	display: flex !important;
+}
+
+.amy-agent-root.is-expanded .amy-agent-history__back {
+	display: none;
+}
+
+.amy-agent-history__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.65rem 0.75rem;
+	border-bottom: 1px solid rgba(var(--amy-brand-rgb), 0.12);
+}
+
+.amy-agent-history__title {
+	margin: 0;
+	font-size: 0.8rem;
+	font-weight: 600;
+	color: var(--amy-accent-soft);
+	letter-spacing: 0.02em;
+}
+
+.amy-agent-history__list {
+	flex: 1;
+	overflow-y: auto;
+	padding: 0.5rem;
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.amy-agent-history__empty,
+.amy-agent-history__loading {
+	margin: 0.75rem 0.5rem;
+	font-size: 0.82rem;
+	color: var(--amy-muted);
+	text-align: center;
+}
+
+.amy-agent-history__item {
+	appearance: none;
+	width: 100%;
+	text-align: left;
+	border: 1px solid transparent;
+	background: rgba(255, 255, 255, 0.03);
+	color: var(--amy-text);
+	border-radius: 0.55rem;
+	padding: 0.55rem 0.65rem;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+}
+
+.amy-agent-history__item:hover,
+.amy-agent-history__item:focus-visible {
+	border-color: rgba(var(--amy-brand-rgb), 0.35);
+	background: rgba(var(--amy-brand-rgb), 0.08);
+	outline: none;
+}
+
+.amy-agent-history__item.is-active {
+	border-color: rgba(var(--amy-brand-rgb), 0.45);
+	background: rgba(var(--amy-brand-rgb), 0.12);
+}
+
+.amy-agent-history__item-title {
+	font-size: 0.82rem;
+	line-height: 1.35;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.amy-agent-history__item-date {
+	font-size: 0.7rem;
+	color: var(--amy-muted);
 }
 
 .amy-agent-messages {
@@ -157,11 +351,51 @@
 	padding: 1rem;
 	display: flex;
 	flex-direction: column;
-	gap: 0.75rem;
+	gap: 0.65rem;
+}
+
+.amy-agent-date-sep {
+	align-self: center;
+	font-size: 0.7rem;
+	color: var(--amy-muted);
+	letter-spacing: 0.03em;
+	padding: 0.15rem 0.55rem;
+	margin: 0.15rem 0;
+	opacity: 0.9;
+}
+
+.amy-agent-msg {
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
+	max-width: 88%;
+}
+
+.amy-agent-msg--assistant {
+	align-self: flex-start;
+}
+
+.amy-agent-msg--user {
+	align-self: flex-end;
+	align-items: flex-end;
+}
+
+.amy-agent-msg--status {
+	align-self: center;
+	max-width: 100%;
+	align-items: center;
+}
+
+.amy-agent-msg__time {
+	font-size: 0.68rem;
+	line-height: 1;
+	color: var(--amy-muted);
+	opacity: 0.75;
+	padding: 0 0.2rem;
 }
 
 .amy-agent-bubble {
-	max-width: 88%;
+	max-width: 100%;
 	padding: 0.7rem 0.85rem;
 	border-radius: 0.85rem;
 	font-size: 0.9rem;
@@ -170,7 +404,6 @@
 }
 
 .amy-agent-bubble--assistant {
-	align-self: flex-start;
 	background: rgba(255, 255, 255, 0.04);
 	border: 1px solid rgba(var(--amy-brand-rgb), 0.18);
 	color: var(--amy-text);
@@ -232,7 +465,6 @@
 }
 
 .amy-agent-bubble--user {
-	align-self: flex-end;
 	background: rgba(var(--amy-brand-rgb), 0.14);
 	border: 1px solid rgba(var(--amy-brand-rgb), 0.35);
 	color: var(--amy-text);
@@ -240,7 +472,6 @@
 }
 
 .amy-agent-bubble--status {
-	align-self: center;
 	max-width: 100%;
 	background: transparent;
 	border: 0;
@@ -254,6 +485,7 @@
 	gap: 0.5rem;
 	padding: 0.75rem;
 	border-top: 1px solid rgba(var(--amy-brand-rgb), 0.18);
+	flex-shrink: 0;
 }
 
 .amy-agent-form__input {
@@ -318,7 +550,8 @@
 
 @media (prefers-reduced-motion: reduce) {
 	.amy-agent-launcher,
-	.amy-agent-panel {
+	.amy-agent-panel,
+	.amy-agent-backdrop {
 		transition: none;
 	}
 }

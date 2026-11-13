@@ -327,6 +327,9 @@ def test_api_create_visitor_conversation_persists_visitor_id(client: TestClient)
         params={"wp_user_id": 0, "is_full_admin": False, "visitor_id": "abc123"},
     )
     assert ok.status_code == 200
+    detail = ok.json()
+    # Messages include created_at for widget timestamps (empty list still ok).
+    assert "messages" in detail
 
     denied = client.get(
         f"/v1/conversations/{body['id']}",
@@ -335,6 +338,78 @@ def test_api_create_visitor_conversation_persists_visitor_id(client: TestClient)
     )
     assert denied.status_code == 403
     assert denied.json()["error"] == "forbidden"
+
+
+def test_list_visitor_public_conversations_scoped_and_capped(client: TestClient) -> None:
+    """Visitor list returns only that visitor's public chats; wrong id → empty."""
+    mine_a = conversations_db.create_conversation(
+        wp_user_id=0, mode="general", visitor_id="visitor-a"
+    )
+    conversations_db.append_message(mine_a["id"], "user", "First question about pricing")
+    mine_b = conversations_db.create_conversation(
+        wp_user_id=0, mode="general", visitor_id="visitor-a"
+    )
+    conversations_db.append_message(mine_b["id"], "user", "Second chat hello")
+
+    other = conversations_db.create_conversation(
+        wp_user_id=0, mode="general", visitor_id="visitor-b"
+    )
+    conversations_db.append_message(other["id"], "user", "Other visitor chat")
+
+    admin = conversations_db.create_conversation(
+        wp_user_id=7, mode="admin", title="Staff thread"
+    )
+    # Spoof visitor_id on an admin row must still never appear in the public list.
+    conn = conversations_db._connect()
+    try:
+        with conn:
+            conn.execute(
+                "UPDATE conversations SET visitor_id = ? WHERE id = ?",
+                ("visitor-a", admin["id"]),
+            )
+    finally:
+        conn.close()
+
+    listed = client.get(
+        "/v1/conversations/by-visitor",
+        headers=AUTH,
+        params={"visitor_id": "visitor-a", "limit": 20},
+    )
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()["conversations"]
+    ids = [r["id"] for r in rows]
+    assert mine_a["id"] in ids
+    assert mine_b["id"] in ids
+    assert other["id"] not in ids
+    assert admin["id"] not in ids
+    assert all(r["mode"] != "admin" for r in rows)
+    assert all(r["visitor_id"] == "visitor-a" for r in rows)
+    assert all(r["wp_user_id"] == 0 for r in rows)
+    # Newest first (mine_b updated after mine_a).
+    assert ids[0] == mine_b["id"]
+    # Titles from first visitor message.
+    by_id = {r["id"]: r for r in rows}
+    assert "First question" in (by_id[mine_a["id"]]["title"] or "")
+
+    wrong = client.get(
+        "/v1/conversations/by-visitor",
+        headers=AUTH,
+        params={"visitor_id": "nobody-here"},
+    )
+    assert wrong.status_code == 200
+    assert wrong.json()["conversations"] == []
+
+    # Detail includes message created_at for history timestamps.
+    detail = client.get(
+        f"/v1/conversations/{mine_a['id']}",
+        headers=AUTH,
+        params={"wp_user_id": 0, "is_full_admin": False, "visitor_id": "visitor-a"},
+    )
+    assert detail.status_code == 200
+    msgs = detail.json()["messages"]
+    assert len(msgs) >= 1
+    assert msgs[0].get("created_at") is not None
+    assert isinstance(msgs[0]["created_at"], (int, float))
 
 
 def test_append_message_attachments_round_trip(client: TestClient) -> None:
