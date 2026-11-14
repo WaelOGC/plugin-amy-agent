@@ -21,9 +21,9 @@ from typing import Any, Literal, Mapping
 Confidence = Literal["high", "medium", "low"]
 
 _CONFIDENCE_LABEL = {
-    "high": "high",
-    "medium": "medium",
-    "low": "low",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
 }
 
 # Plugin extracts these markers before htmlspecialchars and restores the
@@ -31,16 +31,22 @@ _CONFIDENCE_LABEL = {
 AMY_TG_HTML_START = "@@AMY_TG_HTML@@"
 AMY_TG_HTML_END = "@@/AMY_TG_HTML@@"
 
-# Model often restates Finding/Evidence/… as plain labels (no **). Strip that
-# trailer before we append the canonical HTML block so Telegram does not show
-# a plain duplicate above the bold system block.
+# Model often restates the recommendation trailer (legacy Finding/Evidence/…
+# or the compact 💡 Recommendation / Why / Confidence / Next step shape).
+# Strip that trailer before we append the canonical HTML block.
 _ECHOED_REC_TRAILER = re.compile(
     r"\n+"
     r"(?:"
     r"(?:\*\*)?Recommendations(?:\*\*)?"
     r"|"
     r"<b>Recommendations</b>"
+    r"|"
+    r"(?:\*\*)?(?:💡\s*)?Recommendation(?:\*\*)?"
+    r"|"
+    r"<b>(?:💡\s*)?Recommendation</b>"
     r")?\s*\n+"
+    r"(?:"
+    # Legacy dense labels
     r"(?:"
     r"(?:\*\*)?Finding(?:\*\*)?"
     r"|"
@@ -48,7 +54,23 @@ _ECHOED_REC_TRAILER = re.compile(
     r")\s*\n"
     r"(?=[\s\S]*?(?:(?:\*\*)?Evidence(?:\*\*)?|<b>Evidence</b>))"
     r"(?=[\s\S]*?(?:Confidence|<b>Confidence))"
+    r"|"
+    # Compact layout (finding prose, then Why / Confidence / Next step)
+    r"(?=[\s\S]*?(?:(?:\*\*)?Why:?(?:\*\*)?|<b>Why:</b>))"
+    r"(?=[\s\S]*?(?:Confidence|<b>Confidence))"
+    r")"
     r"[\s\S]*\Z",
+    re.IGNORECASE,
+)
+
+# Lone trailing "Recommendations" heading with no body (model leftover).
+_ECHOED_RECS_HEADING_ONLY = re.compile(
+    r"\n+"
+    r"(?:"
+    r"(?:\*\*)?Recommendations(?:\*\*)?"
+    r"|"
+    r"<b>Recommendations</b>"
+    r")\s*\Z",
     re.IGNORECASE,
 )
 
@@ -162,21 +184,34 @@ def wrap_amy_tg_html(inner_html: str) -> str:
 def format_recommendation(rec: Recommendation) -> str:
     """Render one recommendation as Telegram HTML (bold labels, escaped body).
 
+    Compact layout (blank lines between parts)::
+
+        <b>💡 Recommendation</b>
+        {finding}
+
+        <b>Why:</b> {evidence}
+        <b>Confidence:</b> {High|Medium|Low} · {limitations}
+
+        <b>➡️ Next step:</b> {recommended_action}
+
     Does **not** use Markdown ``**``. Labels are literal ``<b>…</b>``; finding /
     evidence / limitations / action text is HTML-escaped so characters like
     ``<``, ``&``, and ``Approve → Send`` cannot break ``parse_mode``.
     """
-    lines = [
-        f"<b>Finding</b>\n{_escape_telegram_html(rec.finding)}",
-        f"<b>Evidence</b>\n{_escape_telegram_html(rec.evidence)}",
-        f"<b>Confidence: {_escape_telegram_html(rec.confidence)}</b>",
-        f"<b>Limitations</b>\n{_escape_telegram_html(rec.limitations)}",
+    conf_label = _CONFIDENCE_LABEL[rec.confidence]
+    parts = [
+        f"<b>💡 Recommendation</b>\n{_escape_telegram_html(rec.finding)}",
+        (
+            f"<b>Why:</b> {_escape_telegram_html(rec.evidence)}\n"
+            f"<b>Confidence:</b> {_escape_telegram_html(conf_label)} · "
+            f"{_escape_telegram_html(rec.limitations)}"
+        ),
     ]
     if rec.recommended_action:
-        lines.append(
-            f"<b>Next step</b>\n{_escape_telegram_html(rec.recommended_action)}"
+        parts.append(
+            f"<b>➡️ Next step:</b> {_escape_telegram_html(rec.recommended_action)}"
         )
-    return "\n".join(lines)
+    return "\n\n".join(parts)
 
 
 def format_recommendations(recs: list[Recommendation] | tuple[Recommendation, ...]) -> str:
@@ -186,12 +221,15 @@ def format_recommendations(recs: list[Recommendation] | tuple[Recommendation, ..
 
 
 def strip_echoed_recommendations_trailer(body: str) -> str:
-    """Drop a trailing model-paraphrased Finding/Evidence/… block if present."""
+    """Drop a trailing model-paraphrased recommendation block if present."""
     text = body or ""
     match = _ECHOED_REC_TRAILER.search(text)
-    if not match:
-        return text
-    return text[: match.start()].rstrip()
+    if match:
+        text = text[: match.start()].rstrip()
+    heading = _ECHOED_RECS_HEADING_ONLY.search(text)
+    if heading:
+        text = text[: heading.start()].rstrip()
+    return text
 
 
 def append_recommendations_block(
@@ -203,12 +241,14 @@ def append_recommendations_block(
     The block is wrapped in :data:`AMY_TG_HTML_START` / :data:`AMY_TG_HTML_END`
     so the WordPress Telegram path can inject ``<b>`` without relying on
     Markdown ``**`` conversion (which fails when the model echoes plain labels).
+
+    No separate ``Recommendations`` heading — each rec already starts with
+    ``💡 Recommendation``.
     """
     if not recs:
         return body
     block = format_recommendations(list(recs))
-    inner = f"<b>Recommendations</b>\n{block}"
-    wrapped = wrap_amy_tg_html(inner)
+    wrapped = wrap_amy_tg_html(block)
     base = strip_echoed_recommendations_trailer(body or "").rstrip()
     if not base:
         return wrapped

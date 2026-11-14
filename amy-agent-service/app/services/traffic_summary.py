@@ -137,14 +137,15 @@ def build_traffic_recommendations(
                         "recent daily average."
                     ),
                     evidence=(
-                        f"last_24h pageviews={pv_24h}; last_7d pageviews={pv_7d} "
-                        f"(daily avg ≈ {daily_avg_7d:.1f}); ratio≈{ratio:.2f}×; "
-                        f"unique_sessions_7d={sess_7d}."
+                        f"{pv_24h} pageviews in the last 24h vs about "
+                        f"{daily_avg_7d:.0f}/day over the last 7 days "
+                        f"({pv_7d} pageviews, {sess_7d} sessions) — roughly "
+                        f"{ratio:.1f}× the recent average."
                     ),
                     confidence=confidence,
                     limitations=(
-                        "Amy Analytics page_view beacons only — not GA; short "
-                        "spikes can be bots, campaigns, or a single busy day."
+                        "Amy beacon pageviews only — not GA. Spikes can be bots "
+                        "or one busy day."
                     ),
                     recommended_action=(
                         "Check top paths for the last 7d in Amy → Analytics and "
@@ -160,14 +161,15 @@ def build_traffic_recommendations(
                         "recent daily average."
                     ),
                     evidence=(
-                        f"last_24h pageviews={pv_24h}; last_7d pageviews={pv_7d} "
-                        f"(daily avg ≈ {daily_avg_7d:.1f}); ratio≈{ratio:.2f}×; "
-                        f"unique_sessions_7d={sess_7d}."
+                        f"{pv_24h} pageviews in the last 24h vs about "
+                        f"{daily_avg_7d:.0f}/day over the last 7 days "
+                        f"({pv_7d} pageviews, {sess_7d} sessions) — roughly "
+                        f"{ratio:.1f}× the recent average."
                     ),
                     confidence=confidence,
                     limitations=(
-                        "Amy Analytics page_view beacons only — not GA; a quiet "
-                        "day is not proof of a lasting drop or tracking failure."
+                        "Amy beacon pageviews only — not GA. A quiet day is not "
+                        "proof of a lasting drop."
                     ),
                     recommended_action=(
                         "Compare with the 7d/30d windows in Amy → Analytics; "
@@ -189,14 +191,14 @@ def build_traffic_recommendations(
                         f"One path dominates recent page views: {path}."
                     ),
                     evidence=(
-                        f"last_7d pageviews={pv_7d}; top path {path} has "
-                        f"pageviews={top_pv} ({share:.0%} of 7d); "
-                        f"sessions={int(top.get('unique_sessions') or 0)}."
+                        f"{path} drew {top_pv} of {pv_7d} pageviews in the last "
+                        f"7 days ({share:.0%}), across "
+                        f"{int(top.get('unique_sessions') or 0)} sessions."
                     ),
                     confidence=confidence,
                     limitations=(
-                        "Path share is correlational — does not prove content "
-                        "quality, conversion value, or that other pages underperform."
+                        "Path share is correlational — not proof of content "
+                        "quality or that quieter pages underperform."
                     ),
                     recommended_action=(
                         "Review that path's content and lead capture points; "
