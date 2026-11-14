@@ -243,6 +243,27 @@ def build_analytics_summary(
     return result
 
 
+def _visitor_noun(n: int) -> str:
+    return "visitor" if n == 1 else "visitors"
+
+
+def _hot_email_evidence(*, hot: int, hot_with_email: int) -> str:
+    """Plain-English email-split evidence (never key=value)."""
+    hot_noun = _visitor_noun(hot)
+    if hot_with_email <= 0:
+        if hot == 0:
+            return "No hot visitors left an email."
+        return f"None of the {hot} hot {hot_noun} left an email."
+    if hot_with_email >= hot:
+        if hot == 1:
+            return "The 1 hot visitor left an email."
+        return f"All {hot} hot visitors left an email."
+    return (
+        f"{hot_with_email} of the {hot} hot {_visitor_noun(hot)} "
+        f"left an email."
+    )
+
+
 def build_analytics_recommendations(
     *,
     total: int,
@@ -256,6 +277,9 @@ def build_analytics_recommendations(
     Emits a hot-lead attention recommendation when any sessions are scored hot
     (the same judgment ``lead_scoring`` already applies per session). Plain
     totals with no hot emphasis return an empty list.
+
+    Finding states the conclusion (not a repeated hot count). Evidence is the
+    with/without-email split in plain English — never ``key=value`` dumps.
     """
     hot = int(counts.get("hot") or 0)
     if hot <= 0:
@@ -268,51 +292,46 @@ def build_analytics_recommendations(
         if lead.get("lead_email"):
             hot_with_email += 1
     hot_without_email = hot - hot_with_email
+    _ = with_email  # overall with_email is already in the body counts
 
     seen_7d = int(last_seen.get("last_7d") or 0)
     span_days = 7.0 if seen_7d > 0 else 0.0
     confidence = assess_confidence(data_points=total, span_days=span_days)
+    limitations = "Hot = rule-based intent. An email ≠ marketing consent."
+    evidence = _hot_email_evidence(hot=hot, hot_with_email=hot_with_email)
 
-    if hot_without_email > 0 and hot_with_email == 0:
-        action = (
-            "Open Amy → Analytics, review the hot sample, and watch for contact "
-            "capture on those sessions."
+    if hot_with_email == 0:
+        finding = (
+            "None of the hot visitors have left an email yet, so you can't "
+            "reach them directly."
         )
-        limitations = (
-            "Hot is rule-based intent only — no email on file means outreach "
-            "may not be possible; correlation with conversion is unproven."
+        action = (
+            "Review the hot sessions in Amy → Analytics and watch for contact "
+            "capture before outreach."
         )
     elif hot_without_email > 0:
-        action = (
-            "Prioritize the hot leads that already left an email, then review "
-            "the remaining hot sessions in Analytics."
+        finding = (
+            "Most hot visitors haven't left an email yet, so you can't reach "
+            "them directly."
         )
-        limitations = (
-            "Hot scoring is rule-based; having an email does not prove consent "
-            "for marketing — use Approve → Send in Email Marketing."
+        action = (
+            f"Contact the {hot_with_email} hot "
+            f"{'lead' if hot_with_email == 1 else 'leads'} with an email first, "
+            f"then review the other {hot_without_email} in Analytics."
         )
     else:
-        action = (
-            "Review hot leads with email in Amy → Analytics (or Email Marketing "
-            "audience) and follow up via Approve → Send if appropriate."
+        finding = (
+            "Every hot visitor left an email, so you can follow up directly."
         )
-        limitations = (
-            "Hot scoring is rule-based intent, not attributed revenue or "
-            "guaranteed conversion."
+        action = (
+            "Review hot leads with email in Amy → Analytics (or Email Marketing) "
+            "and follow up via Approve → Send if appropriate."
         )
 
     return [
         Recommendation(
-            finding=(
-                f"{hot} visitor session{'s are' if hot != 1 else ' is'} scored "
-                f"hot (high-intent)."
-            ),
-            evidence=(
-                f"{total} lead sessions total; hot={hot}, warm={int(counts.get('warm') or 0)}, "
-                f"cold={int(counts.get('cold') or 0)}; with_email={with_email}; "
-                f"hot_with_email={hot_with_email}; hot_without_email={hot_without_email}; "
-                f"seen_7d={seen_7d}."
-            ),
+            finding=finding,
+            evidence=evidence,
             confidence=confidence,
             limitations=limitations,
             recommended_action=action,
@@ -388,10 +407,31 @@ def format_analytics_chat_context(snapshot: dict[str, Any]) -> str:
             if str(item.get("lead_status") or "") == "hot"
         ]
     if hot_sample:
+        geo_keys: list[str] = []
+        for item in hot_sample:
+            geo_parts = [
+                p for p in (item.get("ip_city"), item.get("ip_country")) if p
+            ]
+            geo_keys.append(
+                ", ".join(str(p) for p in geo_parts) if geo_parts else ""
+            )
+        shared_geo = bool(geo_keys) and all(geo_keys) and len(set(geo_keys)) == 1
         lines.append(
             f"- hot lead sample (admin-safe, up to {len(hot_sample)}; "
             "emails OK to share with this teammate):"
         )
+        if shared_geo:
+            lines.append(
+                f"- sample display hint: all listed hot visitors share location "
+                f"📍 {geo_keys[0]} — put it once in the section title "
+                f"(e.g. **Hot Leads — 📍 City, Country**) and omit location "
+                "from each row; short rows: id — active … · email or no email."
+            )
+        else:
+            lines.append(
+                "- sample display hint: locations differ — keep 📍 on each row "
+                "when known; keep rows short (id · active … · email/no email)."
+            )
         for item in hot_sample:
             email = item.get("lead_email")
             if email:
@@ -425,6 +465,8 @@ def format_analytics_chat_context(snapshot: dict[str, Any]) -> str:
             "seen, cite these figures. Prefer 'visitor sessions' / lead-status / "
             "last-seen language; do not claim Google Analytics-style unique pageviews.",
             "Do NOT invent other numbers beyond this snapshot.",
+            "Do NOT write a Recommendations / Finding / Evidence / Confidence heading "
+            "yourself — the system appends the recommendation block.",
         ]
     )
     body = "\n".join(lines)

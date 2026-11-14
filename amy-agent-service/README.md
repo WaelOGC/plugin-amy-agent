@@ -111,6 +111,10 @@ A plain restart of an older install without a rebuild will miss PDF/image proces
 
 ## Changelog
 
+### 0.2.29
+
+Admin Telegram reply **content** cleanup (formatting already bold since 0.2.28/0.2.68): plain-English recommendation evidence (no `key=value` dumps); Finding states the conclusion by email-branch (none/some/all) instead of repeating the hot count; compact `💡 Recommendation` / Why / Confidence · limitations / Next step layout with capitalized confidence; strip echoed Recommendations trailer; admin system prompt for short natural openers and shared-location Hot Leads titles. HTML delivery path (`AMY_TG_HTML_*`, markdown converter, send_message) unchanged. Plugin unchanged.
+
 ### 0.2.28
 
 Telegram recommendations (AA-20): stop depending on Markdown `**` for the Recommendations trailer. `format_recommendation` / `append_recommendations_block` emit Telegram HTML `<b>` labels (body text HTML-escaped) inside `@@AMY_TG_HTML@@` sentinels; strip a trailing model-echoed plain Finding/Evidence block before append. Pair with plugin **0.2.68** (injects sentinel HTML without double-escaping; also boldifies bare label lines when the model echoes without markers). E2E asserts the final outbound HTML contains `<b>Finding</b>` etc. for the literal live paste.

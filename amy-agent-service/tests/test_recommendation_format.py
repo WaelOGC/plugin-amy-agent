@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import time
 
 import pytest
@@ -82,30 +83,34 @@ def test_assess_confidence_low() -> None:
 def test_format_recommendation_structure() -> None:
     rec = Recommendation(
         finding="Hot leads need follow-up.",
-        evidence="3 hot sessions in last 7d (n=40).",
+        evidence="3 of the 7 hot visitors left an email.",
         confidence="medium",
-        limitations="Rule-based intent only.",
+        limitations="Hot = rule-based intent. An email ≠ marketing consent.",
         recommended_action="Review Amy → Analytics hot sample.",
     )
     text = format_recommendation(rec)
-    assert "<b>Finding</b>\nHot leads need follow-up." in text
-    assert "<b>Evidence</b>\n3 hot sessions in last 7d (n=40)." in text
-    assert "<b>Confidence: medium</b>" in text
-    assert "<b>Limitations</b>\nRule-based intent only." in text
-    assert "<b>Next step</b>\nReview Amy → Analytics hot sample." in text
+    assert text.startswith("<b>💡 Recommendation</b>\nHot leads need follow-up.")
+    assert "\n\n<b>Why:</b> 3 of the 7 hot visitors left an email.\n" in text
+    assert "<b>Confidence:</b> Medium · Hot = rule-based intent. An email ≠ marketing consent." in text
+    assert "\n\n<b>➡️ Next step:</b> Review Amy → Analytics hot sample." in text
+    assert "<b>Finding</b>" not in text
+    assert "<b>Evidence</b>" not in text
+    assert "<b>Recommendations</b>" not in text
     assert "**" not in text
 
 
 def test_format_recommendation_omits_action_when_none() -> None:
     rec = Recommendation(
         finding="Session is cold.",
-        evidence="1 page_view only.",
+        evidence="1 page view only.",
         confidence="low",
         limitations="Sparse tracking.",
         recommended_action=None,
     )
     text = format_recommendation(rec)
     assert "Next step" not in text
+    assert "<b>💡 Recommendation</b>" in text
+    assert "<b>Confidence:</b> Low · Sparse tracking." in text
     assert format_recommendations([rec]) == text
 
 
@@ -188,15 +193,88 @@ def test_analytics_recommendation_when_hot(analytics_tmp) -> None:
     assert rec["limitations"]
 
     ctx = format_analytics_chat_context(snap)
-    assert "<b>Finding</b>" in ctx
-    assert "<b>Recommendations</b>" in ctx
+    assert "<b>💡 Recommendation</b>" in ctx
+    assert "<b>Why:</b>" in ctx
+    assert "<b>Recommendations</b>" not in ctx
     assert "@@AMY_TG_HTML@@" in ctx
+    # User-facing recommendation fields must not use key=value dumps.
+    rec_obj = build_analytics_recommendations(
+        total=snap["total"],
+        counts=snap["counts"],
+        with_email=snap["with_email"],
+        last_seen=snap["last_seen"],
+        leads=[
+            {"lead_status": "hot", "lead_email": "hot@example.com"},
+            {"lead_status": "cold"},
+        ],
+    )[0]
+    assert re.search(r"\w+=\d+", rec_obj.evidence) is None
+    assert re.search(r"\w+=\d+", rec_obj.finding) is None
 
     # Factual slash reply stays count-based (no recommendation block).
     slash = format_analytics_slash_reply(snap)
     assert "Sessions:" in slash
-    assert "<b>Finding</b>" not in slash
+    assert "<b>💡 Recommendation</b>" not in slash
     assert "**Finding**" not in slash
+
+
+def test_analytics_recommendation_branches_plain_english() -> None:
+    """Finding/evidence for no-email / some / all — singular, plural, zero."""
+
+    def _rec(*, hot: int, with_email: int, total: int = 10):
+        leads = []
+        for i in range(hot):
+            leads.append(
+                {
+                    "lead_status": "hot",
+                    "lead_email": f"h{i}@ex.com" if i < with_email else None,
+                }
+            )
+        leads.append({"lead_status": "cold"})
+        return build_analytics_recommendations(
+            total=total,
+            counts={"hot": hot, "warm": 0, "cold": 1, "other": 0},
+            with_email=with_email,
+            last_seen={"last_7d": 5},
+            leads=leads,
+        )[0]
+
+    # No email (plural)
+    none = _rec(hot=7, with_email=0)
+    assert "haven't left an email" in none.finding.lower() or "can't reach" in none.finding.lower()
+    assert "None of the 7 hot visitors left an email." == none.evidence
+    assert "7 visitor sessions are scored" not in none.finding
+    assert re.search(r"\w+=\d+", none.evidence) is None
+
+    # No email (singular)
+    none1 = _rec(hot=1, with_email=0)
+    assert "None of the 1 hot visitor left an email." == none1.evidence
+
+    # Some email
+    some = _rec(hot=7, with_email=2)
+    assert "haven't left an email" in some.finding.lower()
+    assert some.evidence == "2 of the 7 hot visitors left an email."
+    assert "Contact the 2 hot leads with an email first" in (some.recommended_action or "")
+    assert "other 5" in (some.recommended_action or "")
+
+    # Some email singular hot-with-email
+    some1 = _rec(hot=3, with_email=1)
+    assert some1.evidence == "1 of the 3 hot visitors left an email."
+    assert "Contact the 1 hot lead with an email first" in (some1.recommended_action or "")
+
+    # All have email (plural)
+    all_email = _rec(hot=5, with_email=5)
+    assert "every hot visitor left an email" in all_email.finding.lower()
+    assert all_email.evidence == "All 5 hot visitors left an email."
+
+    # All have email (singular)
+    all1 = _rec(hot=1, with_email=1)
+    assert all1.evidence == "The 1 hot visitor left an email."
+    assert "every hot visitor left an email" in all1.finding.lower()
+
+    for r in (none, none1, some, some1, all_email, all1):
+        for field in (r.finding, r.evidence, r.limitations, r.recommended_action or ""):
+            assert re.search(r"\w+=\d+", field) is None
 
 
 def test_analytics_no_recommendation_without_hot(analytics_tmp) -> None:
@@ -205,7 +283,7 @@ def test_analytics_no_recommendation_without_hot(analytics_tmp) -> None:
     analytics_db.set_lead_status("only-cold", "cold")
     snap = build_analytics_summary()
     assert snap["recommendations"] == []
-    assert "<b>Finding</b>" not in format_analytics_chat_context(snap)
+    assert "<b>💡 Recommendation</b>" not in format_analytics_chat_context(snap)
     # Direct builder stays empty.
     assert (
         build_analytics_recommendations(
@@ -226,7 +304,7 @@ def test_analytics_factual_empty_unchanged(analytics_tmp) -> None:
     assert snap["recommendations"] == []
     ctx = format_analytics_chat_context(snap)
     assert "EMPTY" in ctx
-    assert "<b>Finding</b>" not in ctx
+    assert "<b>💡 Recommendation</b>" not in ctx
     assert "**Finding**" not in ctx
     slash = format_analytics_slash_reply(snap)
     assert "no visitor sessions recorded yet" in slash.lower()
@@ -247,12 +325,13 @@ def test_seo_recommendation_when_open(seo_tmp) -> None:
     assert snap["open_count"] == 1
     assert len(snap["recommendations"]) == 1
     rec = snap["recommendations"][0]
-    assert "pending_approval" in rec["finding"] or "open" in rec["finding"].lower()
-    assert rec["evidence"]
+    assert "approval" in rec["finding"].lower()
+    assert "open" in rec["evidence"].lower()
+    assert re.search(r"\w+=\d+", rec["evidence"]) is None
     assert rec["limitations"]
     assert rec["recommended_action"]
     ctx = format_seo_chat_context(snap)
-    assert "<b>Finding</b>" in ctx
+    assert "<b>💡 Recommendation</b>" in ctx
 
 
 def test_seo_no_recommendation_when_no_open(seo_tmp) -> None:
@@ -267,7 +346,7 @@ def test_seo_no_recommendation_when_no_open(seo_tmp) -> None:
     snap = build_seo_review_summary()
     assert snap["open_count"] == 0
     assert snap["recommendations"] == []
-    assert "<b>Finding</b>" not in format_seo_chat_context(snap)
+    assert "<b>💡 Recommendation</b>" not in format_seo_chat_context(snap)
     assert (
         build_seo_recommendations(
             total=1,
@@ -307,6 +386,8 @@ def test_traffic_dominance_recommendation(analytics_tmp) -> None:
     )
     assert any("dominates" in r.finding.lower() for r in recs)
     assert any("/pricing" in r.evidence for r in recs)
+    for r in recs:
+        assert re.search(r"\w+=\d+", r.evidence) is None
 
 
 def test_traffic_no_recommendation_on_quiet_balanced(analytics_tmp) -> None:
@@ -352,7 +433,9 @@ def test_admin_tool_surfaces_formatted_recommendations(analytics_tmp, seo_tmp) -
     result = execute_admin_tool("analytics_summary", {})
     assert result["ok"] is True
     assert result["recommendations"]
-    assert "<b>Finding</b>" in result["chat_context"]
+    assert "<b>💡 Recommendation</b>" in result["chat_context"]
+    for rec in result["recommendations"]:
+        assert re.search(r"\w+=\d+", rec.get("evidence") or "") is None
 
     seo_tasks_db.create_check(
         wp_post_id=9,
@@ -363,4 +446,4 @@ def test_admin_tool_surfaces_formatted_recommendations(analytics_tmp, seo_tmp) -
     )
     seo = execute_admin_tool("seo_summary", {})
     assert seo["recommendations"]
-    assert "<b>Finding</b>" in seo["chat_context"]
+    assert "<b>💡 Recommendation</b>" in seo["chat_context"]

@@ -113,17 +113,23 @@ def build_seo_recommendations(
     # (span_days=0 prevents an automatic high confidence).
     confidence = assess_confidence(data_points=total, span_days=0.0)
     finding = (
-        f"{open_count} SEO check{'s are' if open_count != 1 else ' is'} "
-        f"open (pending_approval)."
+        "There are SEO checks waiting for your approval before any WordPress write."
+        if open_count != 1
+        else "There is an SEO check waiting for your approval before any WordPress write."
+    )
+    red_bit = (
+        f", including {red} red verdict{'s' if red != 1 else ''}"
+        if red > 0
+        else ""
     )
     evidence = (
-        f"{total} stored checks; open/pending_approval={open_count}, "
-        f"fixed/approved={fixed_count}, rejected={rejected_count}; "
-        f"verdicts={verdicts or {'none': 0}}."
+        f"{open_count} of {total} stored "
+        f"{'check' if total == 1 else 'checks'} "
+        f"{'is' if open_count == 1 else 'are'} still open"
+        f"{red_bit}; {fixed_count} already approved, {rejected_count} rejected."
     )
     limitations = (
-        "Stored check counts only — does not prove ranking impact, search "
-        "traffic change, or that approving will improve SEO."
+        "Stored check counts only — not proof of ranking or traffic impact."
     )
     if red > 0:
         action = (

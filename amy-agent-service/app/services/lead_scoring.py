@@ -126,17 +126,18 @@ def build_lead_status_recommendation(
         et = str(event.get("event_type") or "unknown")
         type_counts[et] = type_counts.get(et, 0) + 1
     type_bits = ", ".join(f"{k}×{v}" for k, v in sorted(type_counts.items())) or "none"
-    span_bit = f"{span_days:.1f}d" if span_days >= 0.1 else "<0.1d"
+    span_bit = (
+        f"{span_days:.1f} days" if span_days >= 0.1 else "under a day"
+    )
     evidence = (
-        f"session_id={session_id}; {n} stored events over {span_bit}; "
-        f"rule={rule_reason}; event_types=[{type_bits}]"
+        f"{n} stored {'event' if n == 1 else 'events'} over {span_bit} "
+        f"({type_bits}); matched rule: {rule_reason}."
     )
 
     finding = f"This visitor session is scored {status}."
     if status == "hot":
         limitations = (
-            "Rule-based intent only — does not prove purchase intent, "
-            "attribution, or that the visitor wants contact."
+            "Rule-based intent only — not proof of purchase intent or consent."
         )
         action = (
             "Review this session in Amy → Analytics and follow up if contact "
@@ -144,8 +145,7 @@ def build_lead_status_recommendation(
         )
     elif status == "warm":
         limitations = (
-            "Engagement signal only — chat or content interest does not "
-            "guarantee a lead conversion."
+            "Engagement signal only — not a guaranteed lead conversion."
         )
         action = (
             "Watch for further engagement (contact form / Submit Idea) before "
@@ -153,8 +153,7 @@ def build_lead_status_recommendation(
         )
     else:
         limitations = (
-            "Absence of warm/hot rules is not proof of low value — sparse "
-            "tracking or a short visit can look cold."
+            "Missing warm/hot signals can also mean sparse tracking or a short visit."
         )
         action = None
 
